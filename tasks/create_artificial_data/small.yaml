@@ -1,0 +1,11 @@
+task:
+  type: create_artificial_data
+  train_size: 1000
+  val_size: 200
+  test_size: 200
+  max_depth: 3
+  max_determiners: 3
+  max_nouns: 10
+  max_particles: 3
+  max_verbs: 10
+  save_dir: data/artificial/small/
