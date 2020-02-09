@@ -7,5 +7,8 @@ def get_task(task_data):
     if type == 'create_artificial_data':
         from app.tasks.create_artificial_data.task import CreateArtificialDataTask
         return CreateArtificialDataTask(**task_data)
+    elif type == 'train':
+        from app.tasks.train.task import TrainTask
+        return TrainTask(**task_data)
     else:
         raise Execption(f'Unknown task: {type}')
