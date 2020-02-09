@@ -1,5 +1,5 @@
-task:
-  type: create_artificial_data
+class: app.tasks.create_artificial_data.CreateArtificialDataTask
+params:
   train_size: 10000
   val_size: 2000
   test_size: 2000
@@ -9,3 +9,6 @@ task:
   max_particles: 20
   max_verbs: 200
   save_dir: data/artificial/medium/
+hydra:
+  run:
+    dir: ./outputs/create_artificial_data/${now:%Y-%m-%d}/${now:%H-%M-%S}

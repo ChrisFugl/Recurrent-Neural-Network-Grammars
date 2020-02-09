@@ -1,7 +1,0 @@
-task: any(
-  include('task_create_artificial_data'),
-  include('task_train'),
-  )
----
-task_create_artificial_data: !include app/tasks/create_artificial_data/validate.yaml
-task_train: !include app/tasks/train/validate.yaml

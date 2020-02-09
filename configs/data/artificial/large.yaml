@@ -1,0 +1,6 @@
+data:
+  class: app.data.loaders.artificial.ArtificialLoader
+  params:
+    train_path: data/artificial/large/train.txt
+    val_path: data/artificial/large/val.txt
+    test_path: data/artificial/large/test.txt

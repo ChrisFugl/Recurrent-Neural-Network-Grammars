@@ -1,0 +1,7 @@
+defaults:
+  - data: artificial/medium
+  - model: rnng
+  - optimizer: adam
+hydra:
+  run:
+    dir: ./outputs/train/${now:%Y-%m-%d}/${now:%H-%M-%S}
