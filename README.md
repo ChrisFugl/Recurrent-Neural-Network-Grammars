@@ -63,3 +63,22 @@ jupyter notebook
 ```
 
 Select "MscThesis" when creating a new notebook.
+
+## Oracle Files
+Oracle files are generated from annotated parse files. The format of an Oracle file is as follows:
+
+```
+brackets_1
+actions_1
+tokens_1
+unknownified_tokens_1
+...
+brackets_N
+actions_N
+tokens_N
+unknownified_tokens_N
+```
+
+The N annotated parses are transformed into (1) the original annotated parses (brackets_i), (2) the sequence of actions necessary to generate the parse tree (actions_i), (3) tokens in the annotated parse (tokens_i), and (4) tokens in the annotated tree where the tokens that only occurs one have been replaced with an unknown form (unknownified_tokens_i).
+
+Use `create_oracle.py` to generate an oracle from an annotated parse file.

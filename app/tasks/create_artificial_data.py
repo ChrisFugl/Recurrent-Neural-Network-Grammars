@@ -1,4 +1,5 @@
 from app.tasks.task import Task
+import hydra
 import random
 import os
 
@@ -25,11 +26,12 @@ class CreateArtificialDataTask(Task):
         :type max_verbs: int
         :type save_dir: str
         """
+        super().__init__()
         self._train_size = train_size
         self._val_size = val_size
         self._test_size = test_size
         self._max_depth = max_depth
-        self._save_dir = save_dir
+        self._save_dir = hydra.utils.to_absolute_path(save_dir)
         self._determiners = [f'd{i}' for i in range(max_determiners)]
         self._nouns = [f'n{i}' for i in range(max_nouns)]
         self._particles = [f'p{i}' for i in range(max_particles)]
@@ -75,7 +77,7 @@ class CreateArtificialDataTask(Task):
             if verb_phrase_type == 1:
                 # vp --> v
                 verb = self._create_verb()
-                return verb
+                return f'(VP {verb})'
             elif verb_phrase_type == 2:
                 # vp --> v, np
                 verb = self._create_verb()

@@ -1,0 +1,13 @@
+class: app.tasks.create_oracle.CreateOracleTask
+params:
+  train_path: data/artificial/medium/train.txt
+  train_save_path: data/artificial/medium/train.oracle
+  val_path: data/artificial/medium/val.txt
+  val_save_path: data/artificial/medium/val.oracle
+  test_path: data/artificial/medium/test.txt
+  test_save_path: data/artificial/medium/test.oracle
+  generative: true
+  fine_grained_unknowns: true
+hydra:
+  run:
+    dir: ./outputs/create_oracle/${now:%Y-%m-%d}/${now:%H-%M-%S}

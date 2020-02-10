@@ -9,6 +9,7 @@ class TrainTask(Task):
         :type model: app.models.model.Model
         :type optimizer: torch.optim.Optimizer
         """
+        super().__init__()
         self.data_loader = data_loader
         self.model = model
         self.optimizer = optimizer
