@@ -1,0 +1,5 @@
+defaults:
+  - clustering: brown
+hydra:
+  run:
+    dir: ./outputs/clustering/${now:%Y-%m-%d}/${now:%H-%M-%S}

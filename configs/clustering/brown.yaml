@@ -1,0 +1,6 @@
+clustering:
+  class: app.clustering.brown.BrownClustering
+  params:
+    input_path: data/artificial/medium/train.oracle
+    output_path: data/artificial/medium/train.cluster
+    clusters: 140

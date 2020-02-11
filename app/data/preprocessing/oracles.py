@@ -39,3 +39,13 @@ def _get_unknownifier(known_terminals, fine_grained_unknowns):
     else:
         unknownifier = constant_unknownifier
     return partial(unknownifier, known_terminals)
+
+def get_unknownified_terms_from_oracle(oracle):
+    """
+    :type oracle: list of str
+    :rtype: list of str
+    """
+    lines_count = len(oracle)
+    assert lines_count % 4 == 0, 'Oracle files must have a multiple of four lines.'
+    terms = oracle[3:lines_count:4]
+    return terms
