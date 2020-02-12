@@ -1,0 +1,4 @@
+iterator:
+  type: 'unordered'
+  batch_size: 16
+  shuffle: false

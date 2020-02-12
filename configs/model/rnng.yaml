@@ -1,2 +1,2 @@
 model:
-  class: app.models.rnng.RNNG
+  type: rnng

@@ -16,8 +16,9 @@ class ActionSet:
         """
         raise NotImplementedError('must be implemented by subclass')
 
-    def line2actions(self, line):
+    def line2actions(self, unknownified_tokens, line):
         """
+        :type unknownified_tokens: list of str
         :type line: str
         :rtype: list of app.data.actions.action.Action
         """

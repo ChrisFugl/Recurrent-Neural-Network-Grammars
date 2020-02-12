@@ -6,9 +6,9 @@ import re
 
 class Generative(ActionSet):
 
-    NT = 0
-    REDUCE = 1
-    GEN = 2
+    REDUCE = 0
+    GEN = 1
+    NT = 2
 
     _nt_pattern = re.compile(r'^NT\((\S+)\)$')
     _reduce_pattern = re.compile(r'^REDUCE$')
@@ -43,8 +43,9 @@ class Generative(ActionSet):
             return Action(Generative.GEN, gen_match.group(1))
         raise Exception(f'Unknown action: {value}')
 
-    def line2actions(self, line):
+    def line2actions(self, unknownified_tokens, line):
         """
+        :type unknownified_tokens: list of str
         :type line: str
         :rtype: list of app.data.actions.action.Action
         """
@@ -52,13 +53,16 @@ class Generative(ActionSet):
         assert line[len(line) - 1] == ')', 'Tree must end with ")".'
         actions = []
         line_index = 0
+        gen_index = 0
         while line_index != -1:
             if line[line_index] == ')':
                 action = Action(Generative.REDUCE, None)
                 search_index = line_index + 1
             elif is_start_of_terminal_node(line, line_index):
-                _, word, terminal_end_index = get_terminal_node(line, line_index)
+                _, _, terminal_end_index = get_terminal_node(line, line_index)
+                word = unknownified_tokens[gen_index]
                 action = Action(Generative.GEN, word)
+                gen_index += 1
                 search_index = terminal_end_index + 1
             else:
                 non_terminal = get_non_terminal_identifier(line, line_index)

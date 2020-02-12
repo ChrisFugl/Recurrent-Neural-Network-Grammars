@@ -1,14 +1,12 @@
-class: app.tasks.create_artificial_data.CreateArtificialDataTask
-params:
-  train_size: 10000
-  val_size: 2000
-  test_size: 2000
-  max_depth: 6
-  max_determiners: 20
-  max_nouns: 200
-  max_particles: 20
-  max_verbs: 200
-  save_dir: data/artificial/medium/
+train_size: 1000
+val_size: 200
+test_size: 200
+max_depth: 3
+max_determiners: 5
+max_nouns: 20
+max_particles: 5
+max_verbs: 20
+save_dir: data/artificial/small/
 hydra:
   run:
     dir: ./outputs/create_artificial_data/${now:%Y-%m-%d}/${now:%H-%M-%S}

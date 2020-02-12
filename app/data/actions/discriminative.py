@@ -6,9 +6,9 @@ import re
 
 class Discriminative(ActionSet):
 
-    NT = 0
-    REDUCE = 1
-    SHIFT = 2
+    REDUCE = 0
+    SHIFT = 1
+    NT = 2
 
     _nt_pattern = re.compile(r'^NT\((\S+)\)$')
     _reduce_pattern = re.compile(r'^REDUCE$')
@@ -43,8 +43,9 @@ class Discriminative(ActionSet):
             return Action(Discriminative.SHIFT, None)
         raise Exception(f'Unknown action: {value}')
 
-    def line2actions(self, line):
+    def line2actions(self, unknownified_tokens, line):
         """
+        :type unknownified_tokens: list of str
         :type line: str
         :rtype: list of app.data.actions.action.Action
         """

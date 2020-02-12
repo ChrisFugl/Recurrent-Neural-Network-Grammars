@@ -1,5 +1,6 @@
 defaults:
-  - data: artificial/medium
+  - iterator: unordered
+  - loader: artificial.small.generative.oracle
   - model: rnng
   - optimizer: adam
 hydra:

@@ -1,35 +1,34 @@
-from app.data.preprocessing import brackets2oracle, get_terminals
+from app.data.preprocessing.oracles import brackets2oracle
+from app.data.preprocessing.terminals import get_terminals
 from app.tasks.task import Task
 import hydra
 import os
 
 class CreateOracleTask(Task):
 
-    def __init__(self, train_path, train_save_path, val_path, val_save_path, test_path, test_save_path, generative, fine_grained_unknowns):
+    def __init__(self, loader, data_dir, generative, fine_grained_unknowns):
         """
-        :type train_path: str
-        :type train_save_path: str
-        :type val_path: str
-        :type val_save_path: str
-        :type test_path: str
-        :type test_save_path: str
+        :type loader: app.data.loaders.loader.Loader
+        :type data_dir: str
         :type generative: bool
         :type fine_grained_unknowns: bool
         """
         super().__init__()
-        self._train_path = hydra.utils.to_absolute_path(train_path)
-        self._train_save_path = hydra.utils.to_absolute_path(train_save_path)
-        self._val_path = hydra.utils.to_absolute_path(val_path)
-        self._val_save_path = hydra.utils.to_absolute_path(val_save_path)
-        self._test_path = hydra.utils.to_absolute_path(test_path)
-        self._test_save_path = hydra.utils.to_absolute_path(test_save_path)
+        absolute_data_dir = hydra.utils.to_absolute_path(data_dir)
+        save_dir_name = 'generative' if generative else 'discriminative'
+        self._save_dir_path = os.path.join(absolute_data_dir, save_dir_name)
+        self._train_save_path = os.path.join(self._save_dir_path, 'train.oracle')
+        self._val_save_path = os.path.join(self._save_dir_path, 'val.oracle')
+        self._test_save_path = os.path.join(self._save_dir_path, 'test.oracle')
+        self._loader = loader
         self._generative = generative
         self._fine_grained_unknowns = fine_grained_unknowns
 
     def run(self):
-        train_bracket_lines = self._load(self._train_path)
-        val_bracket_lines = self._load(self._val_path)
-        test_bracket_lines = self._load(self._test_path)
+        os.makedirs(self._save_dir_path, exist_ok=True)
+        train_bracket_lines = self._loader.load_train()
+        val_bracket_lines = self._loader.load_val()
+        test_bracket_lines = self._loader.load_test()
         terminals, terminals_counter = get_terminals(train_bracket_lines)
         train_oracle = brackets2oracle(train_bracket_lines, terminals, self._generative, self._fine_grained_unknowns)
         val_oracle = brackets2oracle(val_bracket_lines, terminals, self._generative, self._fine_grained_unknowns)
@@ -37,10 +36,6 @@ class CreateOracleTask(Task):
         self._save(train_oracle, self._train_save_path)
         self._save(val_oracle, self._val_save_path)
         self._save(test_oracle, self._test_save_path)
-
-    def _load(self, path):
-        with open(path, 'r') as file:
-            return file.readlines()
 
     def _save(self, oracle, path):
         self._create_parent_directories(path)

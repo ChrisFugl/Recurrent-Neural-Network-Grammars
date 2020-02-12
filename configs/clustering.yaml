@@ -1,5 +1,6 @@
 defaults:
   - clustering: brown
+  - loader: artificial.small.generative.oracle
 hydra:
   run:
     dir: ./outputs/clustering/${now:%Y-%m-%d}/${now:%H-%M-%S}
