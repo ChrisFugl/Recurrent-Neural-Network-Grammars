@@ -66,7 +66,10 @@ class UnorderedIterable:
         self._counter = 0
         self._total = len(tokens)
 
-    def next(self):
+    def __iter__(self):
+        return self
+
+    def __next__(self):
         if self._counter < self._total:
             start = self._counter
             end = min(self._counter + self._batch_size, self._total)
@@ -75,7 +78,7 @@ class UnorderedIterable:
             self._counter += self._batch_size
             return sentences, trees
         else:
-            raise StopIteration
+            raise StopIteration()
 
     def _to_tensor(self, values):
-        return torch.tensor(values, device=torch.device, dtype=torch.int)
+        return torch.tensor(values, device=self._device, dtype=torch.int)
