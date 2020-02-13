@@ -42,9 +42,11 @@ class ActionConverter:
         if index < self._singleton_count:
             return self._index2singleton[index]
         elif index < self._singleton_count + self._terminal_count:
-            return self._index2terminal[index - self._singleton_count]
+            terminal = self._index2terminal[index - self._singleton_count]
+            return f'GEN({terminal})'
         else:
-            return self._index2non_terminal[index - self._singleton_count - self._terminal_count]
+            non_terminal = self._index2non_terminal[index - self._singleton_count - self._terminal_count]
+            return f'NT({non_terminal})'
 
     def action2integer(self, action_string):
         """
