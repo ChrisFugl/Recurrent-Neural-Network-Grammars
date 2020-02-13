@@ -1,0 +1,5 @@
+defaults:
+  - loader: artificial.small.generative.oracle
+hydra:
+  run:
+    dir: ./outputs/create_oracle/${now:%Y-%m-%d}/${now:%H-%M-%S}
