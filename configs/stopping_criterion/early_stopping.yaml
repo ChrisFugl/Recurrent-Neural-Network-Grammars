@@ -1,0 +1,3 @@
+stopping_criterion:
+  type: early_stopping
+  epsilon: 1e-10

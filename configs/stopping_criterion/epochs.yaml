@@ -1,0 +1,3 @@
+stopping_criterion:
+  type: epochs
+  epochs: 16
