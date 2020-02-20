@@ -1,3 +1,5 @@
 BROWN_CLUSTERING_TOOL_PATH = 'tools/percyliang_browncluster/wcluster'
 SENTENCE_NON_TERMINAL = 'S'
 UNKNOWN_IDENTIFIER = '<UNK>'
+PAD_INDEX = 0
+PAD_SYMBOL = '<PAD>'

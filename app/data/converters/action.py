@@ -1,3 +1,4 @@
+from app.constants import PAD_INDEX, PAD_SYMBOL
 from app.data.actions.discriminative import Discriminative
 from app.data.actions.generative import Generative
 
@@ -24,7 +25,7 @@ class ActionConverter:
         self._terminal_count = len(self._index2terminal)
         self._non_terminal2index, self._index2non_terminal = self._get_non_terminal_actions(self._generative, self._action_set, trees)
         self._non_terminal_count = len(self._index2non_terminal)
-        self._actions_count = self._singleton_count + self._terminal_count + self._non_terminal_count
+        self._actions_count = 1 + self._singleton_count + self._terminal_count + self._non_terminal_count
 
     def count(self):
         """
@@ -39,9 +40,11 @@ class ActionConverter:
         :type integer: int
         :rtype: str
         """
-        if index < self._singleton_count:
+        if index == PAD_INDEX:
+            return PAD_SYMBOL
+        elif index < 1 + self._singleton_count:
             return self._index2singleton[index]
-        elif index < self._singleton_count + self._terminal_count:
+        elif index < 1 + self._singleton_count + self._terminal_count:
             terminal = self._index2terminal[index - self._singleton_count]
             return f'GEN({terminal})'
         else:
@@ -53,6 +56,8 @@ class ActionConverter:
         :type action: str
         :rtype: int
         """
+        if action_string == PAD_SYMBOL:
+            return PAD_INDEX
         action = self._action_set.string2action(action_string)
         if self._generative:
             if action.type == Generative.REDUCE:

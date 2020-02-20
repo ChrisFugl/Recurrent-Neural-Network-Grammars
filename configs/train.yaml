@@ -1,8 +1,20 @@
 defaults:
-  - iterator: unordered
-  - loader: artificial.small.generative.oracle
+  - model_type: generative
   - model: rnng
+  - memory: ${defaults.1.model}.rnn
+    optional: true
+  - embedding: ${defaults.0.model_type}.${defaults.1.model}
+    optional: true
+  - representation: ${defaults.1.model}.vanilla
+    optional: true
+  - stack: ${defaults.1.model}.rnn
+    optional: true
+  - rnn: ${defaults.0.model_type}.${defaults.1.model}.lstm
+  - iterator: unordered
+  - loader: artificial.small.${defaults.0.model_type}.oracle
+  - loss: negative_likelihood
   - optimizer: adam
+  - stopping_criterion: epochs
 hydra:
   run:
     dir: ./outputs/train/${now:%Y-%m-%d}/${now:%H-%M-%S}

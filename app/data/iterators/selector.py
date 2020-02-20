@@ -6,6 +6,7 @@ def get_iterator(config, tokens, actions, token_converter, action_converter, dev
     :type token_converter: app.data.converters.TokenConverter
     :type action_converter: app.data.converters.action.ActionConverter
     :type device: torch.device
+    :rtype: app.iterators.iterator.Iterator
     """
     if config.type == 'unordered':
         from app.data.iterators.unordered import UnorderedIterator

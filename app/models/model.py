@@ -5,16 +5,24 @@ class Model(nn.Module):
     Base model that all models should inherit from.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self):
+        super().__init__()
 
-    def likelihood(self, data):
+    def forward(self, tokens, actions):
+        """
+        :type tokens: torch.Tensor
+        :type actions: torch.Tensor
+        :rtype: torch.Tensor
+        """
+        return self.likelihood(tokens, actions)
+
+    def likelihood(self, tokens, actions):
         """
         Compute likelihood of each sentence/tree in a batch.
 
-        :param data: batch of words
-        :type data: list of sentence/tree
-        :rtype: list of float
+        :type tokens: torch.Tensor
+        :type actions: torch.Tensor
+        :rtype: torch.Tensor
         """
         raise NotImplementedError('method must be implemented by a subclass')
 
@@ -26,8 +34,10 @@ class Model(nn.Module):
         """
         raise NotImplementedError('method must be implemented by a subclass')
 
-    def parse(self, sentence):
+    def parse(self, tokens):
         """
         Generate a parse of a sentence.
+
+        :type tokens: torch.Tensor
         """
         raise NotImplementedError('method must be implemented by a subclass')

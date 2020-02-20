@@ -1,3 +1,5 @@
+from app.constants import PAD_INDEX, PAD_SYMBOL
+
 class TokenConverter:
     """
     Responsible for:
@@ -9,9 +11,9 @@ class TokenConverter:
         """
         :type sentences: list of list of str
         """
-        self._token2integer = {}
-        self._integer2token = []
-        counter = 0
+        self._token2integer = {PAD_SYMBOL: PAD_INDEX}
+        self._integer2token = [PAD_SYMBOL]
+        counter = PAD_INDEX + 1
         for sentence in sentences:
             for token in sentence:
                 if not token in self._token2integer:
