@@ -1,2 +1,2 @@
-generative: true
+type: generative
 fine_grained_unknowns: true

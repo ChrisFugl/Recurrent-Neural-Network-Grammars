@@ -6,10 +6,10 @@ class Loss(nn.Module):
     """
     pass
 
-    def forward(self, actions_probabilities, actions_lengths):
+    def forward(self, log_probs, actions_lengths):
         """
-        :param actions_probabilities: batch of probabilities of each action (size S x B)
-        :type actions_probabilities: torch.Tensor
+        :param log_probs: batch of log probabilities of each action (size S x B)
+        :type log_probs: torch.Tensor
         :type actions_lengths: list of int
         :rtype: torch.Tensor
         """

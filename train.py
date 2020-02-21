@@ -1,3 +1,4 @@
+from app.data.action_set import get_action_set
 from app.data.iterators import get_iterator
 from app.data.loaders import get_loader
 from app.data.converters.action import ActionConverter
@@ -15,26 +16,21 @@ def _main(config):
     loader = get_loader(config.loader)
     _, actions_train, _, unknownified_tokens_train = loader.load_train()
     _, actions_val, _, unknownified_tokens_val = loader.load_val()
-    token_converter = TokenConverter(unknownified_tokens_train)
-    action_converter = ActionConverter(token_converter, actions_train)
+    is_generative = config.model_type == 'generative'
     device = _get_device()
-    iterator_train = get_iterator(config.iterator, unknownified_tokens_train, actions_train, token_converter, action_converter, device)
-    iterator_val = get_iterator(config.iterator, unknownified_tokens_val, actions_val, token_converter, action_converter, device)
-    model = get_model(device, token_converter.count(), action_converter.count(), config)
+    token_converter = TokenConverter(unknownified_tokens_train)
+    action_converter = ActionConverter(token_converter, is_generative, actions_train)
+    action_set = get_action_set(config.model_type)
+    iterator_train = get_iterator(device, action_converter, token_converter, unknownified_tokens_train, actions_train, config.iterator)
+    iterator_val = get_iterator(device, action_converter, token_converter, unknownified_tokens_val, actions_val, config.iterator)
+    token_count = token_converter.count()
+    action_count = action_converter.count()
+    non_terminal_count = action_converter.count_non_terminals()
+    model = get_model(device, token_count, action_count, non_terminal_count, action_set, config)
     loss = get_loss(device, config.loss)
     optimizer = get_optimizer(config.optimizer, model.parameters())
     stopping_criterion = get_stopping_criterion(config.stopping_criterion)
-    task = TrainTask(
-        device,
-        iterator_train,
-        iterator_val,
-        model,
-        loss,
-        optimizer,
-        token_converter,
-        action_converter,
-        stopping_criterion,
-    )
+    task = TrainTask(device, iterator_train, iterator_val, model, loss, optimizer, stopping_criterion)
     task.run()
 
 def _get_device():

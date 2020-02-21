@@ -20,7 +20,7 @@ class EarlyStoppingStoppingCriterion(StoppingCriterion):
             self._prev_val_loss = val_loss
             return False
 
-        if val_loss < self._prev_val_loss or self._equal(val_loss, self._prev_val_loss):
+        if self._prev_val_loss < val_loss or self._equal(val_loss, self._prev_val_loss):
             return True
 
         self._prev_val_loss = val_loss

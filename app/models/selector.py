@@ -3,11 +3,13 @@ from app.memories import get_memory
 from app.representations import get_representation
 from app.stacks import get_stack
 
-def get_model(device, token_count, action_count, config):
+def get_model(device, token_count, action_count, non_terminal_count, action_set, config):
     """
     :type device: torch.device
     :type token_count: int
     :type action_count: int
+    :type non_terminal_count: int
+    :type action_set: app.data.action_set.ActionSet
     :type config: object
     :rtype: app.models.model.Model
     """
@@ -16,6 +18,8 @@ def get_model(device, token_count, action_count, config):
         from app.models.rnng import RNNG
         batch_size = config.iterator.batch_size
         action_embedding = get_embedding(action_count, config.embedding)
+        non_terminal_embedding = get_embedding(non_terminal_count, config.embedding)
+        non_terminal_compose_embedding = get_embedding(non_terminal_count, config.embedding)
         token_embedding = get_embedding(token_count, config.embedding)
         rnn_args = [device, config.embedding.size, batch_size, config.rnn]
         action_history = get_memory(config.memory, rnn_args=rnn_args)
@@ -27,11 +31,15 @@ def get_model(device, token_count, action_count, config):
             device,
             action_embedding,
             token_embedding,
+            non_terminal_embedding,
+            non_terminal_compose_embedding,
             action_history,
             token_buffer,
             stack,
             representation,
-            config.representation.size
+            config.representation.size,
+            non_terminal_count,
+            action_set
         ).to(device)
     else:
         raise Exception(f'Unknown model: {config_model.type}')

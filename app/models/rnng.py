@@ -1,44 +1,55 @@
-from app.data.actions.generative import Generative
+from app.constants import (
+    ACTION_REDUCE_INDEX, ACTION_SHIFT_INDEX, ACTION_GENERATE_INDEX, ACTION_NON_TERMINAL_INDEX,
+    ACTION_REDUCE_TYPE, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_NON_TERMINAL_TYPE
+)
 from app.models.model import Model
 import torch
 from torch import nn
 
-# base actions: REDUCE, GENERATE, NON_TERMINAL
+# base actions: (REDUCE, GENERATE, NON_TERMINAL) or (REDUCE, SHIFT, NON_TERMINAL)
 ACTIONS_COUNT = 3
 
 class RNNG(Model):
 
-    # TODO: how to handle generative vs. discriminative
     # TODO: composition function
 
-    def __init__(self, device, action_embedding, token_embedding, action_history, token_buffer, stack, representation, representation_size):
+    def __init__(
+        self, device,
+        action_embedding, token_embedding,
+        non_terminal_embedding, non_terminal_compose_embedding,
+        action_history, token_buffer, stack,
+        representation, representation_size,
+        non_terminal_count,
+        action_set
+    ):
         """
         :type device: torch.device
         :type action_embedding: torch.Embedding
         :type token_embedding: torch.Embedding
+        :type non_terminal_embedding: torch.Embedding
+        :type non_terminal_compose_embedding: torch.Embedding
         :type action_history: app.memories.memory.Memory
         :type token_buffer: app.memories.memory.Memory
         :type stack: app.stacks.stack.Stack
         :type representation: app.representations.representation.Representation
         :type representation_size: int
+        :type non_terminal_count: int
+        :type action_set: app.data.action_set.ActionSet
         """
         super().__init__()
         self._device = device
+        self._action_set = action_set
         self._action_embedding = action_embedding
+        self._non_terminal_embedding = non_terminal_embedding
+        self._non_terminal_compose_embedding = non_terminal_compose_embedding
         self._token_embedding = token_embedding
         self._action_history = action_history
         self._token_buffer = token_buffer
         self._stack = stack
         self._representation = representation
         self._representation2logits = nn.Linear(in_features=representation_size, out_features=ACTIONS_COUNT, bias=True)
-        self._logits2probits = nn.Softmax(dim=2)
-
-        # TODO: determine action set based on wheter task is discriminative or generative
-        self._action_set = Generative()
-
-        # TODO: remove this
-        self._tmp_action = nn.Linear(in_features=representation_size, out_features=1)
-        self._tmp_sigmoid = nn.Sigmoid()
+        self._logits2log_prob = nn.LogSoftmax(dim=2)
+        self._representation2non_terminal_logits = nn.Linear(in_features=representation_size, out_features=non_terminal_count, bias=True)
 
     def forward(self, tokens, actions):
         """
@@ -46,20 +57,20 @@ class RNNG(Model):
         :type actions: torch.Tensor, list of int, list of list of str
         :rtype: torch.Tensor
         """
-        return self.likelihood(tokens, actions)
+        return self.log_likelihood(tokens, actions)
 
-    def likelihood(self, tokens, actions):
+    def log_likelihood(self, batch_tokens, batch_actions):
         """
-        Compute likelihood of each sentence/tree in a batch.
+        Compute log likelihood of each sentence/tree in a batch.
 
         :type tokens: torch.Tensor, list of int, list of list of str
-        :type actions: torch.Tensor, list of int, list of list of str
+        :type actions: torch.Tensor, list of int, list of list of app.actions.action.Action
         :rtype: torch.Tensor
         """
         self._reset()
 
-        tokens_tensor, tokens_lengths, tokens_strings = tokens
-        actions_tensor, actions_lengths, actions_strings = actions
+        tokens_tensor, tokens_lengths, _ = batch_tokens
+        actions_tensor, actions_lengths, actions = batch_actions
         actions_embedding = self._action_embedding(actions_tensor)
         tokens_embedding = self._token_embedding(tokens_tensor)
 
@@ -69,51 +80,22 @@ class RNNG(Model):
         self._token_buffer.add(tokens_embedding)
 
         # stack operations
-        sequence_length, batch_size = actions_tensor.shape
-        batch_action_probabilities = torch.empty(
-            (sequence_length - 1, batch_size),
-            dtype=torch.float,
-            device=self._device,
-            requires_grad=False
-        )
+        max_sequence_length, batch_size = actions_tensor.shape
+        action_log_probs_shape = (max_sequence_length - 1, batch_size)
+        batch_action_log_probs = torch.empty(action_log_probs_shape, dtype=torch.float, device=self._device, requires_grad=False)
         for batch_index in range(batch_size):
-            self._stack.reset()
-            # first action is always NT(S), use this to initialize stack
-            self._push_to_stack(actions_embedding, 0, batch_index)
-            sequence_actions_strings = actions_strings[batch_index]
-            sequence_tokens_length = len(tokens_strings[batch_index])
-            sequence_length = actions_lengths[batch_index]
-            token_index = 0
-            for action_counter in range(1, sequence_length):
-                action_index = action_counter - 1
-                action_string = sequence_actions_strings[action_counter]
-                action = self._action_set.string2action(action_string)
-                representation = self._representation(
-                    self._action_history,
-                    self._stack,
-                    self._token_buffer,
-                    action_index,
-                    token_index,
-                    batch_index
-                )
-                output_base_logits = self._representation2logits(representation)
-                output_base_probits = self._logits2probits(output_base_logits)
-                # get probability of action
-                # TODO: only consider legal actions
-                if action.type == Generative.REDUCE:
-                    action_probability = self._reduce(output_base_probits)
-                elif action.type == Generative.GEN:
-                    action_probability = self._generate(output_base_probits, representation, action)
-                    token_index = min(token_index + 1, sequence_tokens_length - 1)
-                else:
-                    action_probability = self._non_terminal(output_base_probits, representation, action)
-                batch_action_probabilities[action_index, batch_index] = action_probability
-
-        return batch_action_probabilities
+            sequence_tokens_count = tokens_lengths[batch_index]
+            batch_action_log_probs[:, batch_index] = self._actions_log_probs(
+            max_sequence_length, batch_index,
+            actions_embedding, tokens_embedding,
+            actions[batch_index], actions_lengths,
+            sequence_tokens_count
+        )
+        return batch_action_log_probs
 
     def next_state(self, previous_state):
         """
-        Compute next state and action probabilities given the previous state.
+        Compute next state and action probs given the previous state.
 
         :returns: next state, next_actions
         """
@@ -129,23 +111,84 @@ class RNNG(Model):
         # TODO
         raise NotImplementedError('method must be implemented by a subclass')
 
+    def _actions_log_probs(self, max_sequence_length, batch_index, actions_embedding, tokens_embedding, actions, actions_lengths, sequence_tokens_count):
+        self._stack.reset()
+        sequence_length = actions_lengths[batch_index]
+        token_index = 0
+        # first action is always NT(S), use this to initialize stack
+        action_first = actions[0]
+        self._push_to_stack(actions_embedding, 0, batch_index, action_first)
+        open_non_terminals_count = 1
+        actions_log_probs = torch.zeros((max_sequence_length - 1,), dtype=torch.float, device=self._device, requires_grad=False)
+        for action_counter in range(1, sequence_length):
+            action_index = action_counter - 1
+            action = actions[action_counter]
+            representation = self._representation(
+                self._action_history, self._stack, self._token_buffer,
+                action_index, token_index, batch_index
+            )
+            valid_actions, action2index = self._action_set.valid_actions(
+                self._token_buffer, token_index,
+                self._stack, open_non_terminals_count
+            )
+            assert action.index() in action2index, f'{action} is not a valid action.'
+            logits_base = self._representation2logits(representation)
+            logits_base_valid = logits_base[:, :, valid_actions]
+            log_prob_base_valid = self._logits2log_prob(logits_base_valid)
+            # get log probability of action
+            action_type = action.type()
+            if action_type == ACTION_REDUCE_TYPE:
+                reduce_log_prob = log_prob_base_valid[:, :, action2index[ACTION_REDUCE_INDEX]]
+                action_log_prob, non_terminals_closed_count = self._reduce(reduce_log_prob)
+                open_non_terminals_count -= non_terminals_closed_count
+            elif action_type == ACTION_SHIFT_TYPE:
+                shift_log_prob = log_prob_base_valid[:, :, action2index[ACTION_SHIFT_INDEX]]
+                action_log_prob = self._shift(shift_log_prob, token_index, batch_index, action)
+                token_index = min(token_index + 1, sequence_tokens_count - 1)
+            elif action_type == ACTION_GENERATE_TYPE:
+                generate_log_prob = log_prob_base_valid[:, :, action2index[ACTION_GENERATE_INDEX]]
+                push_args = tokens_embedding, token_index, batch_index, action
+                action_log_prob = self._generate(generate_log_prob, representation, *push_args)
+                token_index = min(token_index + 1, sequence_tokens_count - 1)
+            elif action_type == ACTION_NON_TERMINAL_TYPE:
+                non_terminal_log_prob = log_prob_base_valid[:, :, action2index[ACTION_NON_TERMINAL_INDEX]]
+                action_log_prob = self._non_terminal(non_terminal_log_prob, representation, action)
+                open_non_terminals_count += 1
+            else:
+                raise Exception(f'Unknown action: {action.type}')
+            actions_log_probs[action_index] = action_log_prob
+        return actions_log_probs
+
     def _reset(self):
         self._action_history.reset()
         self._token_buffer.reset()
         self._stack.reset()
 
-    def _push_to_stack(self, embeddings, action_index, batch_index):
-        action = embeddings[action_index, batch_index].unsqueeze(dim=0).unsqueeze(dim=0)
-        return self._stack.push(action)
+    def _push_to_stack(self, embeddings, item_index, batch_index, action):
+        action_embedding = embeddings[item_index, batch_index].unsqueeze(dim=0).unsqueeze(dim=0)
+        return self._stack.push(action_embedding, action)
 
-    def _reduce(self, output_base_probits):
+    def _reduce(self, base_reduce_log_prob):
         # TODO: reduce
-        return output_base_probits[:, :, 0].unsqueeze(dim=0)
+        non_terminals_closed_count = 0
+        return base_reduce_log_prob, non_terminals_closed_count
 
-    def _generate(self, output_base_probits, representation, action):
-        # TODO: generate
-        return self._tmp_sigmoid(self._tmp_action(representation))
+    def _shift(self, base_shift_log_prob, token_index, batch_index, action):
+        embedding = self._token_buffer.get(token_index, batch_index)
+        self._stack.push(embedding, action)
+        return base_shift_log_prob
 
-    def _non_terminal(self, output_base_probits, representation, action):
-        # TODO: non terminal
-        return self._tmp_sigmoid(self._tmp_action(representation))
+    def _generate(self, base_generate_log_prob, representation, tokens_embedding, token_index, batch_index, action):
+        self._push_to_stack(tokens_embedding, token_index, batch_index, action)
+        # TODO: compute clustered conditional log probability
+        return base_generate_log_prob
+
+    def _non_terminal(self, base_non_terminal_log_prob, representation, action):
+        argument_index = action.argument_index_as_tensor()
+        non_terminal_embedding = self._non_terminal_embedding(argument_index).unsqueeze(dim=0).unsqueeze(dim=0)
+        self._stack.push(non_terminal_embedding, action)
+        non_terminal_logits = self._representation2non_terminal_logits(representation)
+        non_terminal_log_probs = self._logits2log_prob(non_terminal_logits)
+        conditional_non_terminal_log_prob = non_terminal_log_probs[:, :, argument_index]
+        action_log_prob = base_non_terminal_log_prob + conditional_non_terminal_log_prob
+        return action_log_prob

@@ -10,6 +10,18 @@ class Memory(nn.Module):
         """
         raise NotImplementedError('must be implemented by subclass')
 
+    def count(self):
+        """
+        :rtype: int
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
+    def empty(self):
+        """
+        :rtype: bool
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
     def get(self, sequence_index, batch_index):
         """
         :type sequence_index: int

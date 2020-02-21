@@ -12,7 +12,7 @@ defaults:
   - rnn: ${defaults.0.model_type}.${defaults.1.model}.lstm
   - iterator: unordered
   - loader: artificial.small.${defaults.0.model_type}.oracle
-  - loss: negative_likelihood
+  - loss: negative_log_likelihood
   - optimizer: adam
   - stopping_criterion: epochs
 hydra:

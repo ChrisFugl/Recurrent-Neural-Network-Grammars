@@ -1,5 +1,6 @@
-from app.data.actions.discriminative import Discriminative
-from app.data.actions.generative import Generative
+from app.constants import ACTION_NON_TERMINAL_TYPE, ACTION_GENERATE_TYPE, ACTION_SHIFT_TYPE, ACTION_REDUCE_TYPE
+from app.data.preprocessing.non_terminals import get_non_terminal_identifier
+from app.data.preprocessing.terminals import get_terminal_node, find_next_terminal_start_index, is_start_of_terminal_node
 from app.data.preprocessing.unknowns import constant_unknownifier, fine_grained_unknownifier
 from functools import partial
 
@@ -10,7 +11,7 @@ def brackets2oracle(brackets, known_terminals, generative, fine_grained_unknowns
     :type generative: bool
     :type fine_grained_unknowns: bool
     """
-    action_set = _get_action_set(generative)
+    token_type = _get_token_type(generative)
     unknownifier = _get_unknownifier(known_terminals, fine_grained_unknowns)
     brackets_stripped = []
     actions = []
@@ -18,21 +19,90 @@ def brackets2oracle(brackets, known_terminals, generative, fine_grained_unknowns
     tokens_unknownified = []
     for line in brackets:
         line_stripped = line.strip()
-        line_tokens = action_set.line2tokens(line_stripped)
+        line_tokens = _line2tokens(line_stripped)
         line_tokens_unknownified = list(map(unknownifier, line_tokens))
-        line_actions = action_set.line2actions(line_tokens_unknownified, line_stripped)
-        line_actions = list(map(action_set.action2string, line_actions))
+        line_actions = _line2actions(token_type, line_tokens_unknownified, line_stripped)
+        line_actions_strings = list(map(_action2string, line_actions))
         brackets_stripped.append(line_stripped)
-        actions.append(line_actions)
+        actions.append(line_actions_strings)
         tokens.append(line_tokens)
         tokens_unknownified.append(line_tokens_unknownified)
     return brackets_stripped, actions, tokens, tokens_unknownified
 
-def _get_action_set(generative):
+def _get_token_type(generative):
     if generative:
-        return Generative()
+        return ACTION_GENERATE_TYPE
     else:
-        return Discriminative()
+        return ACTION_SHIFT_TYPE
+
+def _line2tokens(line):
+    """
+    :type line: str
+    :rtype: list of str
+    """
+    tokens = []
+    line_index = find_next_terminal_start_index(line, 0)
+    while line_index != -1:
+        _, token, terminal_end_index = get_terminal_node(line, line_index)
+        line_index = find_next_terminal_start_index(line, terminal_end_index + 1)
+        tokens.append(token)
+    return tokens
+
+def _line2actions(token_type, unknownified_tokens, line):
+    """
+    :type token_type: str
+    :type unknownified_tokens: list of str
+    :type line: str
+    :rtype: list of (int, str)
+    """
+    assert line[0] == '(', 'Tree must start with "(".'
+    assert line[len(line) - 1] == ')', 'Tree must end with ")".'
+    actions = []
+    line_index = 0
+    token_index = 0
+    while line_index != -1:
+        if line[line_index] == ')':
+            action = ACTION_REDUCE_TYPE, None
+            search_index = line_index + 1
+        elif is_start_of_terminal_node(line, line_index):
+            _, _, terminal_end_index = get_terminal_node(line, line_index)
+            word = unknownified_tokens[token_index]
+            action = token_type, word
+            token_index += 1
+            search_index = terminal_end_index + 1
+        else:
+            non_terminal = get_non_terminal_identifier(line, line_index)
+            action = ACTION_NON_TERMINAL_TYPE, non_terminal
+            search_index = line_index + 1
+        line_index = _get_next_action_start_index(line, search_index)
+        actions.append(action)
+    return actions
+
+def _action2string(action):
+    type, argument = action
+    if type == ACTION_REDUCE_TYPE:
+        return 'REDUCE'
+    elif type == ACTION_GENERATE_TYPE:
+        return f'GEN({argument})'
+    elif type == ACTION_SHIFT_TYPE:
+        return 'SHIFT'
+    elif type == ACTION_NON_TERMINAL_TYPE:
+        return f'NT({argument})'
+    else:
+        raise Exception(f'Unknown action type: {type}')
+
+def _get_next_action_start_index(line, line_index):
+    """
+    :type line: str
+    :type line_index: int
+    :rtype: str
+    """
+    next_open_bracket_index = line.find('(', line_index)
+    next_close_bracket_index = line.find(')', line_index)
+    if next_open_bracket_index == -1 or next_close_bracket_index == -1:
+        return max(next_open_bracket_index, next_close_bracket_index)
+    else:
+        return min(next_open_bracket_index, next_close_bracket_index)
 
 def _get_unknownifier(known_terminals, fine_grained_unknowns):
     if fine_grained_unknowns:

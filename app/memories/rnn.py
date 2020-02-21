@@ -25,6 +25,18 @@ class RNNMemory(Memory):
             self._items.append(item)
         return output[sequence_length - 1]
 
+    def count(self):
+        """
+        :rtype: int
+        """
+        return len(self._items)
+
+    def empty(self):
+        """
+        :rtype: bool
+        """
+        return len(self._items) == 0
+
     def get(self, sequence_index, batch_index):
         """
         :type sequence_index: int

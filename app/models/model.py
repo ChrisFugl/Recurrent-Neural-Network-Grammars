@@ -14,11 +14,11 @@ class Model(nn.Module):
         :type actions: torch.Tensor
         :rtype: torch.Tensor
         """
-        return self.likelihood(tokens, actions)
+        return self.log_likelihood(tokens, actions)
 
-    def likelihood(self, tokens, actions):
+    def log_likelihood(self, tokens, actions):
         """
-        Compute likelihood of each sentence/tree in a batch.
+        Compute log likelihood of each sentence/tree in a batch.
 
         :type tokens: torch.Tensor
         :type actions: torch.Tensor

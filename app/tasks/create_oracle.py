@@ -6,22 +6,22 @@ import os
 
 class CreateOracleTask(Task):
 
-    def __init__(self, loader, data_dir, generative, fine_grained_unknowns):
+    def __init__(self, loader, data_dir, oracle_type, fine_grained_unknowns):
         """
         :type loader: app.data.loaders.loader.Loader
         :type data_dir: str
-        :type generative: bool
+        :type oracle_type: str
         :type fine_grained_unknowns: bool
         """
         super().__init__()
         absolute_data_dir = hydra.utils.to_absolute_path(data_dir)
-        save_dir_name = 'generative' if generative else 'discriminative'
+        save_dir_name = oracle_type
         self._save_dir_path = os.path.join(absolute_data_dir, save_dir_name)
         self._train_save_path = os.path.join(self._save_dir_path, 'train.oracle')
         self._val_save_path = os.path.join(self._save_dir_path, 'val.oracle')
         self._test_save_path = os.path.join(self._save_dir_path, 'test.oracle')
         self._loader = loader
-        self._generative = generative
+        self._generative = oracle_type == 'generative'
         self._fine_grained_unknowns = fine_grained_unknowns
 
     def run(self):

@@ -33,7 +33,7 @@ class VanillaRepresentation(Representation):
         :rtype: torch.Tensor
         """
         action_embedding = action_history.get(action_timestep, batch_index)
-        stack_embedding = stack.top()
+        stack_embedding, _ = stack.top()
         token_embedding = token_buffer.get(token_timestep, batch_index)
         embeddings = [token_embedding, stack_embedding, action_embedding]
         # concatenate along last dimension, as inputs have shape S, B, H (sequence length, batch size, hidden size)
