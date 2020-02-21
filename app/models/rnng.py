@@ -19,6 +19,7 @@ class RNNG(Model):
         non_terminal_embedding, non_terminal_compose_embedding,
         action_history, token_buffer, stack,
         representation, representation_size,
+        composer,
         non_terminal_count,
         action_set
     ):
@@ -33,6 +34,7 @@ class RNNG(Model):
         :type stack: app.stacks.stack.Stack
         :type representation: app.representations.representation.Representation
         :type representation_size: int
+        :type composer: app.composers.composer.Composer
         :type non_terminal_count: int
         :type action_set: app.data.action_set.ActionSet
         """
@@ -48,6 +50,7 @@ class RNNG(Model):
         self._stack = stack
         self._representation = representation
         self._representation2logits = nn.Linear(in_features=representation_size, out_features=ACTIONS_COUNT, bias=True)
+        self._composer = composer
         self._logits2log_prob = nn.LogSoftmax(dim=2)
         self._representation2non_terminal_logits = nn.Linear(in_features=representation_size, out_features=non_terminal_count, bias=True)
 
@@ -115,6 +118,7 @@ class RNNG(Model):
         self._stack.reset()
         sequence_length = actions_lengths[batch_index]
         token_index = 0
+        token_counter = 0
         # first action is always NT(S), use this to initialize stack
         action_first = actions[0]
         self._push_to_stack(actions_embedding, 0, batch_index, action_first)
@@ -128,10 +132,10 @@ class RNNG(Model):
                 action_index, token_index, batch_index
             )
             valid_actions, action2index = self._action_set.valid_actions(
-                self._token_buffer, token_index,
+                self._token_buffer, token_counter,
                 self._stack, open_non_terminals_count
             )
-            assert action.index() in action2index, f'{action} is not a valid action.'
+            assert action.index() in action2index, f'{action} is not a valid action. (action2index = {action2index})'
             logits_base = self._representation2logits(representation)
             logits_base_valid = logits_base[:, :, valid_actions]
             log_prob_base_valid = self._logits2log_prob(logits_base_valid)
@@ -139,17 +143,19 @@ class RNNG(Model):
             action_type = action.type()
             if action_type == ACTION_REDUCE_TYPE:
                 reduce_log_prob = log_prob_base_valid[:, :, action2index[ACTION_REDUCE_INDEX]]
-                action_log_prob, non_terminals_closed_count = self._reduce(reduce_log_prob)
-                open_non_terminals_count -= non_terminals_closed_count
+                action_log_prob = self._reduce(reduce_log_prob)
+                open_non_terminals_count -= 1
             elif action_type == ACTION_SHIFT_TYPE:
                 shift_log_prob = log_prob_base_valid[:, :, action2index[ACTION_SHIFT_INDEX]]
                 action_log_prob = self._shift(shift_log_prob, token_index, batch_index, action)
                 token_index = min(token_index + 1, sequence_tokens_count - 1)
+                token_counter += 1
             elif action_type == ACTION_GENERATE_TYPE:
                 generate_log_prob = log_prob_base_valid[:, :, action2index[ACTION_GENERATE_INDEX]]
                 push_args = tokens_embedding, token_index, batch_index, action
                 action_log_prob = self._generate(generate_log_prob, representation, *push_args)
                 token_index = min(token_index + 1, sequence_tokens_count - 1)
+                token_counter += 1
             elif action_type == ACTION_NON_TERMINAL_TYPE:
                 non_terminal_log_prob = log_prob_base_valid[:, :, action2index[ACTION_NON_TERMINAL_INDEX]]
                 action_log_prob = self._non_terminal(non_terminal_log_prob, representation, action)
@@ -169,9 +175,17 @@ class RNNG(Model):
         return self._stack.push(action_embedding, action)
 
     def _reduce(self, base_reduce_log_prob):
-        # TODO: reduce
-        non_terminals_closed_count = 0
-        return base_reduce_log_prob, non_terminals_closed_count
+        popped_items = []
+        action = None
+        while action is None or action.type() != ACTION_NON_TERMINAL_TYPE:
+            state, action = self._stack.pop()
+            popped_items.append(state)
+        popped_tensor = torch.cat(popped_items, dim=0)
+        action.close()
+        non_terminal_embedding, _ = self._get_non_terminal_embedding(action)
+        composed = self._composer(non_terminal_embedding, popped_tensor)
+        self._stack.push(composed, action)
+        return base_reduce_log_prob
 
     def _shift(self, base_shift_log_prob, token_index, batch_index, action):
         embedding = self._token_buffer.get(token_index, batch_index)
@@ -184,11 +198,15 @@ class RNNG(Model):
         return base_generate_log_prob
 
     def _non_terminal(self, base_non_terminal_log_prob, representation, action):
-        argument_index = action.argument_index_as_tensor()
-        non_terminal_embedding = self._non_terminal_embedding(argument_index).unsqueeze(dim=0).unsqueeze(dim=0)
+        non_terminal_embedding, argument_index = self._get_non_terminal_embedding(action)
         self._stack.push(non_terminal_embedding, action)
         non_terminal_logits = self._representation2non_terminal_logits(representation)
         non_terminal_log_probs = self._logits2log_prob(non_terminal_logits)
         conditional_non_terminal_log_prob = non_terminal_log_probs[:, :, argument_index]
         action_log_prob = base_non_terminal_log_prob + conditional_non_terminal_log_prob
         return action_log_prob
+
+    def _get_non_terminal_embedding(self, action):
+        argument_index = action.argument_index_as_tensor()
+        non_terminal_embedding = self._non_terminal_embedding(argument_index).unsqueeze(dim=0).unsqueeze(dim=0)
+        return non_terminal_embedding, argument_index

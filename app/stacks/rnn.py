@@ -51,7 +51,7 @@ class StackRNN(Stack):
         :returns: state of the stack after pop, data
         """
         if self.empty():
-            raise Exception('Pop operation is impossible since stack is empty.')
+            raise Exception('Pop operation is impossible on an empty stack.')
         else:
             output = self._top.output
             data = self._top.data

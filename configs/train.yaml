@@ -9,6 +9,8 @@ defaults:
     optional: true
   - stack: ${defaults.1.model}.rnn
     optional: true
+  - composer: ${defaults.1.model}.birnn
+    optional: true
   - rnn: ${defaults.0.model_type}.${defaults.1.model}.lstm
   - iterator: unordered
   - loader: artificial.small.${defaults.0.model_type}.oracle

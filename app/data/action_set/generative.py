@@ -20,7 +20,8 @@ class Generative(ActionSet):
         counter = 0
         _, top_action = stack.top()
         top_action_type = top_action.type()
-        if top_action_type != ACTION_NON_TERMINAL_TYPE and open_non_terminals_count >= 1:
+        is_non_terminal = top_action_type == ACTION_NON_TERMINAL_TYPE
+        if (not is_non_terminal or (is_non_terminal and not top_action.open)) and open_non_terminals_count >= 1:
             valid_actions.append(ACTION_REDUCE_INDEX)
             action2index[ACTION_REDUCE_INDEX] = counter
             counter += 1

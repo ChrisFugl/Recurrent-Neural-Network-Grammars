@@ -3,21 +3,29 @@ from app.data.actions.action import Action
 
 class NonTerminalAction(Action):
 
-    def __init__(self, device, argument, argument_index):
+    def __init__(self, device, argument, argument_index, open=True):
         """
         :type device: torch.device
         :type argument: str
         :type argument_index: int
+        :type open: bool
         """
         super().__init__(device)
         self.argument = argument
         self.argument_index = argument_index
+        self.open = open
 
     def argument_index_as_tensor(self):
         """
         :rtype: torch.Tensor
         """
         return self._to_long_tensor(self.argument_index)
+
+    def close(self):
+        """
+        Call this method when the non-terminal is completed after a reduce operation.
+        """
+        self.open = False
 
     def index(self):
         """
