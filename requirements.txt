@@ -1,4 +1,3 @@
-gtimer==1.0.0b5
 hydra-core==0.11.3
 ipykernel==5.1.4
 jupyter==1.0.0
