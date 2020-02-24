@@ -185,7 +185,7 @@ class RNNG(Model):
             popped_items.append(state)
         popped_tensor = torch.cat(popped_items, dim=0)
         action.close()
-        non_terminal_embedding, _ = self._get_non_terminal_embedding(action)
+        non_terminal_embedding, _ = self._get_non_terminal_embedding(self._non_terminal_compose_embedding, action)
         composed = self._composer(non_terminal_embedding, popped_tensor)
         self._stack.push(composed, action)
         return base_reduce_log_prob
@@ -201,7 +201,7 @@ class RNNG(Model):
         return base_generate_log_prob + token_log_prob
 
     def _non_terminal(self, base_non_terminal_log_prob, representation, action):
-        non_terminal_embedding, argument_index = self._get_non_terminal_embedding(action)
+        non_terminal_embedding, argument_index = self._get_non_terminal_embedding(self._non_terminal_embedding, action)
         self._stack.push(non_terminal_embedding, action)
         non_terminal_logits = self._representation2non_terminal_logits(representation)
         non_terminal_log_probs = self._logits2log_prob(non_terminal_logits)
@@ -209,7 +209,7 @@ class RNNG(Model):
         action_log_prob = base_non_terminal_log_prob + conditional_non_terminal_log_prob
         return action_log_prob
 
-    def _get_non_terminal_embedding(self, action):
+    def _get_non_terminal_embedding(self, embeddings, action):
         argument_index = action.argument_index_as_tensor()
-        non_terminal_embedding = self._non_terminal_embedding(argument_index).unsqueeze(dim=0).unsqueeze(dim=0)
+        non_terminal_embedding = embeddings(argument_index).unsqueeze(dim=0).unsqueeze(dim=0)
         return non_terminal_embedding, argument_index
