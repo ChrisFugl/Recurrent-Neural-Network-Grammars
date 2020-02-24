@@ -1,0 +1,3 @@
+distribution:
+  type: class_based_softmax
+  cluster: data/artificial/small/generative/brown_c7.cluster

@@ -1,4 +1,5 @@
 from app.composers import get_composer
+from app.distributions import get_distribution
 from app.embeddings import get_embedding
 from app.memories import get_memory
 from app.representations import get_representation
@@ -29,6 +30,7 @@ def get_model(device, token_count, action_count, non_terminal_count, action_set,
         stack = get_stack(config.stack, rnn_args=stack_rnn_args)
         representation = get_representation(config.embedding.size, config.representation)
         composer = get_composer(device, config)
+        token_distribution = get_distribution(config)
         return RNNG(
             device,
             action_embedding,
@@ -41,6 +43,7 @@ def get_model(device, token_count, action_count, non_terminal_count, action_set,
             representation,
             config.representation.size,
             composer,
+            token_distribution,
             non_terminal_count,
             action_set
         ).to(device)

@@ -20,6 +20,7 @@ class RNNG(Model):
         action_history, token_buffer, stack,
         representation, representation_size,
         composer,
+        token_distribution,
         non_terminal_count,
         action_set
     ):
@@ -35,6 +36,7 @@ class RNNG(Model):
         :type representation: app.representations.representation.Representation
         :type representation_size: int
         :type composer: app.composers.composer.Composer
+        :type token_distribution: app.distributions.distribution.Distribution
         :type non_terminal_count: int
         :type action_set: app.data.action_set.ActionSet
         """
@@ -51,6 +53,7 @@ class RNNG(Model):
         self._representation = representation
         self._representation2logits = nn.Linear(in_features=representation_size, out_features=ACTIONS_COUNT, bias=True)
         self._composer = composer
+        self._token_distribution = token_distribution
         self._logits2log_prob = nn.LogSoftmax(dim=2)
         self._representation2non_terminal_logits = nn.Linear(in_features=representation_size, out_features=non_terminal_count, bias=True)
 
@@ -194,8 +197,8 @@ class RNNG(Model):
 
     def _generate(self, base_generate_log_prob, representation, tokens_embedding, token_index, batch_index, action):
         self._push_to_stack(tokens_embedding, token_index, batch_index, action)
-        # TODO: compute clustered conditional log probability
-        return base_generate_log_prob
+        token_log_prob = self._token_distribution.log_prob(representation, action.argument)
+        return base_generate_log_prob + token_log_prob
 
     def _non_terminal(self, base_non_terminal_log_prob, representation, action):
         non_terminal_embedding, argument_index = self._get_non_terminal_embedding(action)

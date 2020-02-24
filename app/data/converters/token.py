@@ -1,4 +1,5 @@
 from app.constants import PAD_INDEX, PAD_SYMBOL
+import pandas as pd
 
 class TokenConverter:
     """
@@ -11,15 +12,19 @@ class TokenConverter:
         """
         :type sentences: list of list of str
         """
-        self._token2integer = {PAD_SYMBOL: PAD_INDEX}
-        self._integer2token = [PAD_SYMBOL]
+        self._token2integer, self._integer2token = self._get_token_converters(sentences)
+
+    def _get_token_converters(self, sentences):
+        token2integer = {PAD_SYMBOL: PAD_INDEX}
+        integer2token = [PAD_SYMBOL]
         counter = PAD_INDEX + 1
         for sentence in sentences:
             for token in sentence:
-                if not token in self._token2integer:
-                    self._token2integer[token] = counter
-                    self._integer2token.append(token)
+                if not token in token2integer:
+                    token2integer[token] = counter
+                    integer2token.append(token)
                     counter += 1
+        return token2integer, integer2token
 
     def count(self):
         """
