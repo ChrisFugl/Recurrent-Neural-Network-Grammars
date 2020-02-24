@@ -16,11 +16,11 @@ def _main(config):
     loader = get_loader(config.loader)
     _, actions_train, _, unknownified_tokens_train = loader.load_train()
     _, actions_val, _, unknownified_tokens_val = loader.load_val()
-    is_generative = config.model_type == 'generative'
+    is_generative = config.type == 'generative'
     device = _get_device()
     token_converter = TokenConverter(unknownified_tokens_train)
     action_converter = ActionConverter(token_converter, is_generative, actions_train)
-    action_set = get_action_set(config.model_type)
+    action_set = get_action_set(config.type)
     iterator_train = get_iterator(device, action_converter, token_converter, unknownified_tokens_train, actions_train, config.iterator)
     iterator_val = get_iterator(device, action_converter, token_converter, unknownified_tokens_val, actions_val, config.iterator)
     token_count = token_converter.count()

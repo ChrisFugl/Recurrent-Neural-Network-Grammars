@@ -1,11 +1,12 @@
 defaults:
-  - model_type: generative
-  - model: ${defaults.0.model_type}.rnng
+  - type: generative
+  - model: ${defaults.0.type}.rnng
   - iterator: unordered
-  - loader: artificial.small.${defaults.0.model_type}.oracle
+  - loader: artificial.small.${defaults.0.type}.oracle
   - loss: negative_log_likelihood
   - optimizer: adam
   - stopping_criterion: epochs
+name: rnng
 hydra:
   run:
-    dir: ./outputs/train/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ./outputs/train/${name}/${now:%Y-%m-%d_%H-%M-%S}
