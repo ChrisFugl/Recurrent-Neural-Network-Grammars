@@ -7,12 +7,12 @@ def get_composer(device, config):
     :type config: object
     :rtype: app.composers.composer.Composer
     """
-    type = config.composer.type
+    type = config.model.composer.type
     if type == 'birnn':
         from app.composers.birnn import BiRNNComposer
-        rnn_config = deepcopy(config.rnn)
+        rnn_config = deepcopy(config.model.rnn)
         rnn_config['bidirectional'] = True
-        birnn = get_rnn(device, config.embedding.size, 1, rnn_config)
-        return BiRNNComposer(birnn, config.embedding.size)
+        birnn = get_rnn(device, config.model.embedding.size, 1, rnn_config)
+        return BiRNNComposer(birnn, config.model.embedding.size)
     else:
         raise Exception(f'Unknown composer: {type}')

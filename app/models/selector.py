@@ -15,20 +15,20 @@ def get_model(device, token_count, action_count, non_terminal_count, action_set,
     :type config: object
     :rtype: app.models.model.Model
     """
-    config_model = config.model
-    if config_model.type == 'rnng':
+    model_config = config.model
+    if model_config.type == 'rnng':
         from app.models.rnng import RNNG
         batch_size = config.iterator.batch_size
-        action_embedding = get_embedding(action_count, config.embedding)
-        non_terminal_embedding = get_embedding(non_terminal_count, config.embedding)
-        non_terminal_compose_embedding = get_embedding(non_terminal_count, config.embedding)
-        token_embedding = get_embedding(token_count, config.embedding)
-        rnn_args = [device, config.embedding.size, batch_size, config.rnn]
-        action_history = get_memory(config.memory, rnn_args=rnn_args)
-        token_buffer = get_memory(config.memory, rnn_args=rnn_args)
-        stack_rnn_args = [device, config.embedding.size, 1, config.rnn]
-        stack = get_stack(config.stack, rnn_args=stack_rnn_args)
-        representation = get_representation(config.embedding.size, config.representation)
+        action_embedding = get_embedding(action_count, model_config.embedding)
+        non_terminal_embedding = get_embedding(non_terminal_count, model_config.embedding)
+        non_terminal_compose_embedding = get_embedding(non_terminal_count, model_config.embedding)
+        token_embedding = get_embedding(token_count, model_config.embedding)
+        rnn_args = [device, model_config.embedding.size, batch_size, model_config.rnn]
+        action_history = get_memory(model_config.memory, rnn_args=rnn_args)
+        token_buffer = get_memory(model_config.memory, rnn_args=rnn_args)
+        stack_rnn_args = [device, model_config.embedding.size, 1, model_config.rnn]
+        stack = get_stack(model_config.stack, rnn_args=stack_rnn_args)
+        representation = get_representation(model_config.embedding.size, model_config.representation)
         composer = get_composer(device, config)
         token_distribution = get_distribution(device, config)
         return RNNG(
@@ -41,11 +41,11 @@ def get_model(device, token_count, action_count, non_terminal_count, action_set,
             token_buffer,
             stack,
             representation,
-            config.representation.size,
+            model_config.representation.size,
             composer,
             token_distribution,
             non_terminal_count,
             action_set
         ).to(device)
     else:
-        raise Exception(f'Unknown model: {config_model.type}')
+        raise Exception(f'Unknown model: {model_config.type}')

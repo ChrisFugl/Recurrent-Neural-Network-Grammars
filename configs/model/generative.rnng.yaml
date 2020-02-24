@@ -1,0 +1,27 @@
+model:
+  type: rnng
+  composer:
+    type: birnn
+  distribution:
+    type: class_based_softmax
+    cluster: data/artificial/small/generative/brown_c7.cluster
+  embedding:
+    size: 256
+    max_norm: null
+    norm_type: 2.0
+    scale_grad_by_freq: false
+    sparse: false
+  memory:
+    type: 'rnn'
+  representation:
+    type: vanilla
+    size: 128
+  rnn:
+    type: lstm
+    hidden_size: 256
+    num_layers: 2
+    bias: true
+    dropout: 0.3
+    bidirectional: false
+  stack:
+    type: 'rnn'

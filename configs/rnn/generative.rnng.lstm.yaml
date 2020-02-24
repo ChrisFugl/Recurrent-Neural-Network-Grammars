@@ -1,7 +1,0 @@
-rnn:
-  type: lstm
-  hidden_size: 256
-  num_layers: 2
-  bias: true
-  dropout: 0.3
-  bidirectional: false

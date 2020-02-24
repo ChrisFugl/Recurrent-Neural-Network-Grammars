@@ -1,19 +1,6 @@
 defaults:
   - model_type: generative
-  - model: rnng
-  - memory: ${defaults.1.model}.rnn
-    optional: true
-  - embedding: ${defaults.0.model_type}.${defaults.1.model}
-    optional: true
-  - representation: ${defaults.1.model}.vanilla
-    optional: true
-  - stack: ${defaults.1.model}.rnn
-    optional: true
-  - composer: ${defaults.1.model}.birnn
-    optional: true
-  - distribution: ${defaults.0.model_type}.${defaults.1.model}.class_based_softmax
-    optional: true
-  - rnn: ${defaults.0.model_type}.${defaults.1.model}.lstm
+  - model: ${defaults.0.model_type}.rnng
   - iterator: unordered
   - loader: artificial.small.${defaults.0.model_type}.oracle
   - loss: negative_log_likelihood

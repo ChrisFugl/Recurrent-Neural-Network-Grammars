@@ -1,6 +1,0 @@
-embedding:
-  size: 256
-  max_norm: null
-  norm_type: 2.0
-  scale_grad_by_freq: false
-  sparse: false
