@@ -30,7 +30,7 @@ def get_model(device, token_count, action_count, non_terminal_count, action_set,
         stack = get_stack(config.stack, rnn_args=stack_rnn_args)
         representation = get_representation(config.embedding.size, config.representation)
         composer = get_composer(device, config)
-        token_distribution = get_distribution(config)
+        token_distribution = get_distribution(device, config)
         return RNNG(
             device,
             action_embedding,

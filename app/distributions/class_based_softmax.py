@@ -3,8 +3,9 @@ from torch import nn
 
 class ClassBasedSoftmax(Distribution):
 
-    def __init__(self, cluster_converter, representation_size):
+    def __init__(self, device, cluster_converter, representation_size):
         """
+        :type device: torch.device
         :type cluster_converter: app.data.converters.cluster.ClusterConverter
         :type representation_size: int
         """
@@ -16,7 +17,7 @@ class ClassBasedSoftmax(Distribution):
         self._cluster2logits = []
         for cluster_index in range(clusters_count):
             tokens_count = cluster_converter.count_tokens(cluster_index)
-            cluster = nn.Linear(in_features=representation_size, out_features=tokens_count, bias=True)
+            cluster = nn.Linear(in_features=representation_size, out_features=tokens_count, bias=True).to(device)
             self._cluster2logits.append(cluster)
 
     def log_prob(self, representation, token):
