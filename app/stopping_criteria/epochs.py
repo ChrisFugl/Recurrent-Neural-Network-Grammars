@@ -16,3 +16,16 @@ class EpochsStoppingCriterion(StoppingCriterion):
         :rtype: bool
         """
         return self._epochs < epoch
+
+    def state_dict(self):
+        """
+        :rtype: object
+        """
+        pass
+
+    def load_state_dict(self, state_dict):
+        """
+        :type state_dict: object
+        :rtype: object
+        """
+        pass

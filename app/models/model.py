@@ -41,3 +41,19 @@ class Model(nn.Module):
         :type tokens: torch.Tensor
         """
         raise NotImplementedError('method must be implemented by a subclass')
+
+    def save(self, path):
+        """
+        Save model parameters.
+
+        :type path: str
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
+    def load(self, path):
+        """
+        Load model parameters from file.
+
+        :type path: str
+        """
+        raise NotImplementedError('must be implemented by subclass')

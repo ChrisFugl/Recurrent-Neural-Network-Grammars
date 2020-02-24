@@ -1,0 +1,3 @@
+checkpoint:
+  type: epoch
+  epoch: 1

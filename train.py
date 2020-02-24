@@ -1,4 +1,5 @@
 from app.data.action_set import get_action_set
+from app.checkpoints import get_checkpoint
 from app.data.iterators import get_iterator
 from app.data.loaders import get_loader
 from app.data.converters.action import ActionConverter
@@ -30,7 +31,8 @@ def _main(config):
     loss = get_loss(device, config.loss)
     optimizer = get_optimizer(config.optimizer, model.parameters())
     stopping_criterion = get_stopping_criterion(config.stopping_criterion)
-    task = TrainTask(device, iterator_train, iterator_val, model, loss, optimizer, stopping_criterion)
+    checkpoint = get_checkpoint(config.checkpoint)
+    task = TrainTask(device, iterator_train, iterator_val, model, loss, optimizer, stopping_criterion, checkpoint, config.load_checkpoint)
     task.run()
 
 def _get_device():

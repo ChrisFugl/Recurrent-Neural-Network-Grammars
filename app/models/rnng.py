@@ -11,8 +11,6 @@ ACTIONS_COUNT = 3
 
 class RNNG(Model):
 
-    # TODO: composition function
-
     def __init__(
         self, device,
         action_embedding, token_embedding,
@@ -106,7 +104,7 @@ class RNNG(Model):
         :returns: next state, next_actions
         """
         # TODO
-        raise NotImplementedError('method must be implemented by a subclass')
+        raise NotImplementedError('not implemented yet')
 
     def parse(self, tokens):
         """
@@ -115,7 +113,25 @@ class RNNG(Model):
         :type tokens: torch.Tensor
         """
         # TODO
-        raise NotImplementedError('method must be implemented by a subclass')
+        raise NotImplementedError('not implemented yet')
+
+    def save(self, path):
+        """
+        Save model parameters.
+
+        :type path: str
+        """
+        state_dict = self.state_dict()
+        torch.save(state_dict, path)
+
+    def load(self, path):
+        """
+        Load model parameters from file.
+
+        :type path: str
+        """
+        state_dict = torch.load(path)
+        self.load_state_dict(state_dict)
 
     def _actions_log_probs(self, max_sequence_length, batch_index, actions_embedding, tokens_embedding, actions, actions_lengths, sequence_tokens_count):
         self._stack.reset()

@@ -1,0 +1,3 @@
+checkpoint:
+  type: time
+  interval_s: 3600

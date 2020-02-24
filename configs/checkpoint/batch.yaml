@@ -1,0 +1,3 @@
+checkpoint:
+  type: batch
+  batch: 32

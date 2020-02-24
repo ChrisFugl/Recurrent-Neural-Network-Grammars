@@ -10,3 +10,16 @@ class StoppingCriterion:
         :rtype: bool
         """
         raise NotImplementedError('must be implemented by subclass')
+
+    def state_dict(self):
+        """
+        :rtype: object
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
+    def load_state_dict(self, state_dict):
+        """
+        :type state_dict: object
+        :rtype: object
+        """
+        raise NotImplementedError('must be implemented by subclass')

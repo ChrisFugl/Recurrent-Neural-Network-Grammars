@@ -6,7 +6,9 @@ defaults:
   - loss: negative_log_likelihood
   - optimizer: adam
   - stopping_criterion: epochs
+  - checkpoint: never
 name: rnng
+load_checkpoint: null
 hydra:
   run:
     dir: ./outputs/train/${name}/${now:%Y-%m-%d_%H-%M-%S}

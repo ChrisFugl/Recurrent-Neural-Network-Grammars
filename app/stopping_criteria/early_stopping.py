@@ -26,5 +26,20 @@ class EarlyStoppingStoppingCriterion(StoppingCriterion):
         self._prev_val_loss = val_loss
         return False
 
+    def state_dict(self):
+        """
+        :rtype: object
+        """
+        return {
+            'prev_val_loss': self._prev_val_loss,
+        }
+
+    def load_state_dict(self, state_dict):
+        """
+        :type state_dict: object
+        :rtype: object
+        """
+        self._prev_val_loss = state_dict['prev_val_loss']
+
     def _equal(self, val_loss, prev_val_loss):
         return abs(val_loss - prev_val_loss) < self._epsilon

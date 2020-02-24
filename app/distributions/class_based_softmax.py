@@ -14,11 +14,12 @@ class ClassBasedSoftmax(Distribution):
         self._logits2log_prob = nn.LogSoftmax(dim=2)
         clusters_count = cluster_converter.count()
         self._representation2clusters = nn.Linear(in_features=representation_size, out_features=clusters_count, bias=True)
-        self._cluster2logits = []
+        cluster2logits = []
         for cluster_index in range(clusters_count):
             tokens_count = cluster_converter.count_tokens(cluster_index)
             cluster = nn.Linear(in_features=representation_size, out_features=tokens_count, bias=True).to(device)
-            self._cluster2logits.append(cluster)
+            cluster2logits.append(cluster)
+        self._cluster2logits = nn.ModuleList(cluster2logits)
 
     def log_prob(self, representation, token):
         """
