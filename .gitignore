@@ -6,4 +6,5 @@ __pycache__/
 /scripts/
 .DS_STORE
 *.o
+*.tmp
 tools/percyliang_browncluster/wcluster
