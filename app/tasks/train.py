@@ -1,5 +1,6 @@
 from app.tasks.task import Task
 import hydra
+import logging
 import os
 import time
 import torch
@@ -40,20 +41,24 @@ class TrainTask(Task):
         self._start_epoch = 0
         self._start_batch_count = 0
 
+        self._logger = logging.getLogger('train')
+
         if load_checkpoint is not None:
             self._load_checkpoint(load_checkpoint)
 
     def run(self):
         time_start = time.time()
+        self._logger.info('Start training')
+        self._logger.info(f'Saving output in {os.getcwd()}')
         batch_count = self._start_batch_count
         epoch = self._start_epoch
         loss_val = self._validate(batch_count)
-        print(f'Epoch={epoch}, loss_val={loss_val:0.4f}')
+        self._logger.info(f'Epoch={epoch}, loss_val={loss_val:0.4f}')
         self._writer_train.add_scalar('epoch', epoch, batch_count)
         while not self._stopping_criterion.is_done(epoch, loss_val):
             epoch, batch_count, loss_train = self._train_epoch(time_start, epoch, batch_count)
             loss_val = self._validate(batch_count)
-            print(f'Epoch={epoch}, loss_train={loss_train:0.4f} loss_val={loss_val:0.4f}')
+            self._logger.info(f'Epoch={epoch}, loss_train={loss_train:0.4f} loss_val={loss_val:0.4f}')
         self._save()
 
     def _train_epoch(self, time_start, epoch, batch_count):
@@ -122,7 +127,7 @@ class TrainTask(Task):
         os.makedirs(checkpoints_directory, exist_ok=True)
         checkpoint_name = f'epoch_{epoch}_batch_{batch_count}.pt'
         checkpoint_path = os.path.join(checkpoints_directory, checkpoint_name)
-        print(f'Saving checkpoint at {checkpoint_path}')
+        self._logger.info(f'Saving checkpoint at {checkpoint_path}')
         checkpoint = {
             'batch_count': batch_count,
             'epoch': epoch,
@@ -137,7 +142,7 @@ class TrainTask(Task):
 
     def _load_checkpoint(self, path):
         absolute_path = hydra.utils.to_absolute_path(path)
-        print(f'Loading checkpoint from {absolute_path}')
+        self._logger.info(f'Loading checkpoint from {absolute_path}')
         checkpoint = torch.load(absolute_path)
         self._start_batch_count = checkpoint['batch_count']
         self._start_epoch = checkpoint['epoch']
