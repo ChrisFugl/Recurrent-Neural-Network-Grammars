@@ -32,7 +32,13 @@ def _main(config):
     optimizer = get_optimizer(config.optimizer, model.parameters())
     stopping_criterion = get_stopping_criterion(config.stopping_criterion)
     checkpoint = get_checkpoint(config.checkpoint)
-    task = TrainTask(device, iterator_train, iterator_val, model, loss, optimizer, stopping_criterion, checkpoint, config.load_checkpoint)
+    task = TrainTask(
+        device,
+        iterator_train, iterator_val,
+        model, loss, optimizer,
+        stopping_criterion, checkpoint,
+        config.load_checkpoint,
+    )
     task.run()
 
 def _get_device():

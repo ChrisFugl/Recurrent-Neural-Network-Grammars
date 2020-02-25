@@ -9,7 +9,8 @@ class RNNMemory(Memory):
         """
         super().__init__()
         self._rnn = rnn
-        self.reset()
+        self._items = []
+        self._previous_state = rnn.initial_state()
 
     def add(self, items):
         """
@@ -54,6 +55,12 @@ class RNNMemory(Memory):
         items_count = len(self._items)
         return self._items[items_count - 1].unsqueeze(dim=0).unsqueeze(dim=0)
 
+    def new(self):
+        """
+        :rtype: app.memories.rnn.RNNMemory
+        """
+        return RNNMemory(self._rnn)
+
     def upto(self, timestep):
         """
         Get embedding of every item in the embedding until a timestep.
@@ -64,10 +71,3 @@ class RNNMemory(Memory):
         items_sliced = self._items[:timestep]
         items_tensor = torch.stack(items_sliced, dim=0)
         return items_tensor
-
-    def reset(self):
-        """
-        Reset embedding state.
-        """
-        self._items = []
-        self._previous_state = self._rnn.initial_state()

@@ -8,7 +8,13 @@ from torch.utils.tensorboard import SummaryWriter
 
 class TrainTask(Task):
 
-    def __init__(self, device, iterator_train, iterator_val, model, loss, optimizer, stopping_criterion, checkpoint, load_checkpoint):
+    def __init__(self,
+        device,
+        iterator_train, iterator_val,
+        model, loss, optimizer,
+        stopping_criterion, checkpoint,
+        load_checkpoint,
+    ):
         """
         :type device: torch.device
         :type iterator_train: app.data.iterators.iterator.Iterator
@@ -48,7 +54,7 @@ class TrainTask(Task):
 
     def run(self):
         time_start = time.time()
-        self._logger.info('Start training')
+        self._logger.info('Starting training')
         self._logger.info(f'Saving output in {os.getcwd()}')
         batch_count = self._start_batch_count
         epoch = self._start_epoch

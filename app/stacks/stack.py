@@ -15,6 +15,12 @@ class Stack(nn.Module):
         """
         raise NotImplementedError('must be implemented by subclass')
 
+    def new(self):
+        """
+        :rtype: app.stacks.stack.Stack
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
     def push(self, item, data=None):
         """
         :type item: torch.Tensor
@@ -28,12 +34,6 @@ class Stack(nn.Module):
         """
         :rtype: torch.Tensor, object
         :returns: state of the stack after pop, data
-        """
-        raise NotImplementedError('must be implemented by subclass')
-
-    def reset(self):
-        """
-        Empty the stack.
         """
         raise NotImplementedError('must be implemented by subclass')
 

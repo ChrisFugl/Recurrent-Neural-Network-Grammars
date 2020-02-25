@@ -25,3 +25,4 @@ model:
     bidirectional: false
   stack:
     type: 'rnn'
+  threads: 1

@@ -9,7 +9,7 @@ class StackRNN(Stack):
         """
         super().__init__()
         self._rnn = rnn
-        self.reset()
+        self._top = None
 
     def contents(self):
         """
@@ -29,6 +29,12 @@ class StackRNN(Stack):
         :rtype: bool
         """
         return self._top is None
+
+    def new(self):
+        """
+        :rtype: app.stacks.rnn.StackRNN
+        """
+        return StackRNN(self._rnn)
 
     def push(self, item, data=None):
         """
@@ -57,12 +63,6 @@ class StackRNN(Stack):
             data = self._top.data
             self._top = self._top.parent
             return output, data
-
-    def reset(self):
-        """
-        Empty the stack.
-        """
-        self._top = None
 
     def top(self):
         """

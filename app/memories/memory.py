@@ -38,17 +38,17 @@ class Memory(nn.Module):
         """
         raise NotImplementedError('must be implemented by subclass')
 
+    def new(self):
+        """
+        :rtype: app.memories.memory.Memory
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
     def upto(self, timestep):
         """
         Get memory of every item in the memory until a given timestep.
 
         :type timestep: int
         :rtype: torch.Tensor
-        """
-        raise NotImplementedError('must be implemented by subclass')
-
-    def reset(self):
-        """
-        Reset memory state.
         """
         raise NotImplementedError('must be implemented by subclass')

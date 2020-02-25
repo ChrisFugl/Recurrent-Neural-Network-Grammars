@@ -15,7 +15,7 @@ class EpochsStoppingCriterion(StoppingCriterion):
         :type val_loss: float
         :rtype: bool
         """
-        return self._epochs < epoch
+        return self._epochs == epoch
 
     def state_dict(self):
         """
