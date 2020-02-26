@@ -8,16 +8,11 @@ def get_iterator(device, action_converter, token_converter, tokens, actions_stri
     :type config: object
     :rtype: app.iterators.iterator.Iterator
     """
-    if config.type == 'unordered':
+    if config.type == 'ordered':
+        from app.data.iterators.ordered import OrderedIterator
+        return OrderedIterator(device, action_converter, token_converter, config.batch_size, config.shuffle, tokens, actions_strings)
+    elif config.type == 'unordered':
         from app.data.iterators.unordered import UnorderedIterator
-        return UnorderedIterator(
-            device,
-            action_converter,
-            token_converter,
-            config.batch_size,
-            config.shuffle,
-            tokens,
-            actions_strings
-        )
+        return UnorderedIterator(device, action_converter, token_converter, config.batch_size, config.shuffle, tokens, actions_strings)
     else:
         raise Exception(f'Unknown iterator: {config.type}')

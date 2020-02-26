@@ -67,7 +67,7 @@ class TrainTask(Task):
             epoch, batch_count, done = self._train_epoch(time_start, epoch, batch_count)
             if done:
                 break
-            if self._evaluator.should_evaluate(epoch, batch_count):
+            if self._evaluator.should_evaluate(epoch, batch_count, end_of_epoch=True):
                 self._evaluate(epoch, batch_count)
             self._stopping_criterion.add_epoch(epoch)
             if self._stopping_criterion.is_done():
@@ -130,7 +130,7 @@ class TrainTask(Task):
         self._writer_val.add_scalar('time_s/val', self._get_seconds(time_val_start, time_val_stop), batch_count)
         self._model.train()
         self._stopping_criterion.add_val_loss(loss_val)
-        self._logger.info(f'epoch={epoch}, batch={batch_count}, loss_val={loss_val:0.4f}')
+        self._logger.info(f'epoch={epoch}, batch={batch_count}, loss_val={loss_val:0.8f}')
 
     def _get_seconds(self, start, stop):
         seconds = stop - start
