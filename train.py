@@ -10,11 +10,14 @@ from app.models import get_model
 from app.optimizers import get_optimizer
 from app.stopping_criteria import get_stopping_criterion
 from app.tasks.train import TrainTask
+import numpy as np
 import hydra
+import random
 import torch
 
 @hydra.main(config_path='configs/train.yaml')
 def _main(config):
+    _set_seed(config.seed)
     loader = get_loader(config.loader)
     _, actions_train, _, unknownified_tokens_train = loader.load_train()
     _, actions_val, _, unknownified_tokens_val = loader.load_val()
@@ -48,6 +51,12 @@ def _get_device(gpu):
         return torch.device(gpu)
     else:
         return torch.device('cpu')
+
+def _set_seed(seed):
+    if seed is not None:
+        np.random.seed(seed)
+        random.seed(seed)
+        torch.manual_seed(seed)
 
 if __name__ == '__main__':
     _main()
