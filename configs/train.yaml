@@ -5,11 +5,12 @@ defaults:
   - loader: artificial.small.${defaults.0.type}.oracle
   - loss: negative_log_likelihood
   - optimizer: adam
-  - stopping_criterion: epochs
+  - stopping_criterion: early_stopping
   - checkpoint: never
   - evaluator: epoch
 name: rnng
 load_checkpoint: null
+gpu: null
 hydra:
   run:
     dir: ./outputs/train/${name}/${now:%Y-%m-%d_%H-%M-%S}

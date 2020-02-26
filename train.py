@@ -19,7 +19,7 @@ def _main(config):
     _, actions_train, _, unknownified_tokens_train = loader.load_train()
     _, actions_val, _, unknownified_tokens_val = loader.load_val()
     is_generative = config.type == 'generative'
-    device = _get_device()
+    device = _get_device(config.gpu)
     token_converter = TokenConverter(unknownified_tokens_train)
     action_converter = ActionConverter(token_converter, is_generative, actions_train)
     action_set = get_action_set(config.type)
@@ -43,9 +43,9 @@ def _main(config):
     )
     task.run()
 
-def _get_device():
-    if torch.cuda.is_available():
-        return torch.device(0)
+def _get_device(gpu):
+    if torch.cuda.is_available() and gpu is not None:
+        return torch.device(gpu)
     else:
         return torch.device('cpu')
 

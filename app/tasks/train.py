@@ -58,6 +58,7 @@ class TrainTask(Task):
         time_start = time.time()
         self._logger.info('Starting training')
         self._logger.info(f'Saving output in {os.getcwd()}')
+        self._logger.info(f'Using device: {self._device}')
         batch_count = self._start_batch_count
         epoch = self._start_epoch
         if self._evaluator.should_evaluate(epoch, batch_count, pretraining=True):
@@ -75,6 +76,12 @@ class TrainTask(Task):
         if self._evaluator.should_evaluate(epoch, batch_count, posttraining=True):
             self._evaluate(epoch, batch_count)
         self._save()
+        time_stop = time.time()
+        time_seconds = self._get_seconds(time_start, time_stop)
+        time_hours = time_seconds / 3600
+        time_days = time_hours / 24
+        self._logger.info(f'Training time: {time_seconds:0.2f} s/{time_hours:0.2f} h/{time_days:0.2f} d')
+        self._logger.info('Finished training')
 
     def _train_epoch(self, time_start, epoch, batch_count):
         time_epoch_start = time.time()
@@ -140,6 +147,7 @@ class TrainTask(Task):
         file_name = 'model.pt'
         directory = hydra.utils.to_absolute_path(os.getcwd())
         file_path = os.path.join(directory, file_name)
+        self._logger.info(f'Saving model at {file_path}')
         self._model.save(file_path)
 
     def _save_checkpoint(self, time_start, epoch, batch_count):
