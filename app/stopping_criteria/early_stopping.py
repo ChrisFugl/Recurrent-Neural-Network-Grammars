@@ -8,23 +8,30 @@ class EarlyStoppingStoppingCriterion(StoppingCriterion):
         """
         super().__init__()
         self._epsilon = epsilon
+        self._done = False
         self._prev_val_loss = None
 
-    def is_done(self, epoch, val_loss):
+    def is_done(self):
+        """
+        :rtype: bool
+        """
+        return self._done
+
+    def add_epoch(self, epoch):
         """
         :type epoch: int
+        """
+        pass
+
+    def add_val_loss(self, val_loss):
+        """
         :type val_loss: float
-        :rtype: bool
         """
         if self._prev_val_loss is None:
             self._prev_val_loss = val_loss
-            return False
-
-        if self._prev_val_loss < val_loss or self._equal(val_loss, self._prev_val_loss):
-            return True
-
+            return
+        self._done = self._done or self._prev_val_loss < val_loss or self._equal(val_loss, self._prev_val_loss)
         self._prev_val_loss = val_loss
-        return False
 
     def state_dict(self):
         """

@@ -12,7 +12,7 @@ class TrainTask(Task):
         device,
         iterator_train, iterator_val,
         model, loss, optimizer,
-        stopping_criterion, checkpoint,
+        stopping_criterion, checkpoint, evaluator,
         load_checkpoint,
     ):
         """
@@ -24,6 +24,7 @@ class TrainTask(Task):
         :type optimizer: torch.optim.Optimizer
         :type stopping_criterion: app.stopping_criteria.stopping_criterion.StoppingCriterion
         :type checkpoint: app.checkpoints.checkpoint.Checkpoint
+        :type evaluator: app.evaluators.evaluator.Evaluator
         :type load_checkpoint: str
         """
         super().__init__()
@@ -35,6 +36,7 @@ class TrainTask(Task):
         self._optimizer = optimizer
         self._stopping_criterion = stopping_criterion
         self._checkpoint = checkpoint
+        self._evaluator = evaluator
 
         working_directory = os.getcwd()
         tensorboard_directory = os.path.join(working_directory, 'tb')
@@ -58,13 +60,20 @@ class TrainTask(Task):
         self._logger.info(f'Saving output in {os.getcwd()}')
         batch_count = self._start_batch_count
         epoch = self._start_epoch
-        loss_val = self._validate(batch_count)
-        self._logger.info(f'Epoch={epoch}, loss_val={loss_val:0.4f}')
+        if self._evaluator.should_evaluate(epoch, batch_count, pretraining=True):
+            loss_val = self._evaluate(epoch, batch_count)
         self._writer_train.add_scalar('epoch', epoch, batch_count)
-        while not self._stopping_criterion.is_done(epoch, loss_val):
-            epoch, batch_count, loss_train = self._train_epoch(time_start, epoch, batch_count)
-            loss_val = self._validate(batch_count)
-            self._logger.info(f'Epoch={epoch}, loss_train={loss_train:0.4f} loss_val={loss_val:0.4f}')
+        while True:
+            epoch, batch_count, done = self._train_epoch(time_start, epoch, batch_count)
+            if done:
+                break
+            if self._evaluator.should_evaluate(epoch, batch_count):
+                self._evaluate(epoch, batch_count)
+            self._stopping_criterion.add_epoch(epoch)
+            if self._stopping_criterion.is_done():
+                break
+        if self._evaluator.should_evaluate(epoch, batch_count, posttraining=True):
+            self._evaluate(epoch, batch_count)
         self._save()
 
     def _train_epoch(self, time_start, epoch, batch_count):
@@ -73,6 +82,11 @@ class TrainTask(Task):
         for batch in self._iterator_train:
             batch_count += 1
             loss_train = self._train_batch(batch, batch_count)
+            if self._evaluator.should_evaluate(epoch, batch_count):
+                self._evaluate(epoch, batch_count)
+                # check if stopping criterion necessitates an early stopping
+                if self._stopping_criterion.is_done():
+                    return epoch, batch_count, True
             if self._checkpoint.should_save_checkpoint(epoch, batch_count, start_of_epoch):
                 self._save_checkpoint(time_start, epoch, batch_count)
             start_of_epoch = False
@@ -82,7 +96,7 @@ class TrainTask(Task):
         self._writer_train.add_scalar('epoch', epoch, batch_count)
         self._writer_train.add_scalar('time_s/epoch', self._get_seconds(time_epoch_start, time_epoch_stop), batch_count)
         self._writer_train.add_scalar('time_s/total', time_total, batch_count)
-        return epoch, batch_count, loss_train
+        return epoch, batch_count, False
 
     def _train_batch(self, batch, batch_count):
         time_batch_start = time.time()
@@ -101,7 +115,7 @@ class TrainTask(Task):
         loss.backward()
         self._optimizer.step()
 
-    def _validate(self, batch_count):
+    def _evaluate(self, epoch, batch_count):
         time_val_start = time.time()
         self._model.eval()
         losses = []
@@ -115,7 +129,8 @@ class TrainTask(Task):
         self._writer_val.add_scalar('loss', loss_val, batch_count)
         self._writer_val.add_scalar('time_s/val', self._get_seconds(time_val_start, time_val_stop), batch_count)
         self._model.train()
-        return loss_val
+        self._stopping_criterion.add_val_loss(loss_val)
+        self._logger.info(f'epoch={epoch}, batch={batch_count}, loss_val={loss_val:0.4f}')
 
     def _get_seconds(self, start, stop):
         seconds = stop - start

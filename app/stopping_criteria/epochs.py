@@ -8,14 +8,25 @@ class EpochsStoppingCriterion(StoppingCriterion):
         """
         super().__init__()
         self._epochs = epochs
+        self._done = False
 
-    def is_done(self, epoch, val_loss):
+    def is_done(self):
         """
-        :type epoch: int
-        :type val_loss: float
         :rtype: bool
         """
-        return self._epochs == epoch
+        return self._done
+
+    def add_epoch(self, epoch):
+        """
+        :type epoch: int
+        """
+        self._done = self._done or self._epochs == epoch
+
+    def add_val_loss(self, val_loss):
+        """
+        :type val_loss: float
+        """
+        pass
 
     def state_dict(self):
         """

@@ -4,6 +4,7 @@ from app.data.iterators import get_iterator
 from app.data.loaders import get_loader
 from app.data.converters.action import ActionConverter
 from app.data.converters.token import TokenConverter
+from app.evaluators import get_evaluator
 from app.losses import get_loss
 from app.models import get_model
 from app.optimizers import get_optimizer
@@ -32,11 +33,12 @@ def _main(config):
     optimizer = get_optimizer(config.optimizer, model.parameters())
     stopping_criterion = get_stopping_criterion(config.stopping_criterion)
     checkpoint = get_checkpoint(config.checkpoint)
+    evaluator = get_evaluator(config.evaluator)
     task = TrainTask(
         device,
         iterator_train, iterator_val,
         model, loss, optimizer,
-        stopping_criterion, checkpoint,
+        stopping_criterion, checkpoint, evaluator,
         config.load_checkpoint,
     )
     task.run()

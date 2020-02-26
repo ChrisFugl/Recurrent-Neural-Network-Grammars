@@ -1,0 +1,5 @@
+evaluator:
+  type: batch
+  batch: 32
+  pretraining: true
+  posttraining: true

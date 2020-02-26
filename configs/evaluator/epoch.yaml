@@ -1,0 +1,5 @@
+evaluator:
+  type: epoch
+  epoch: 1
+  pretraining: true
+  posttraining: true
