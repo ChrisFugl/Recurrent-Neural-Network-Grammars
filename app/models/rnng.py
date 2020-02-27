@@ -4,9 +4,7 @@ from app.constants import (
 )
 from app.models.model import Model
 from joblib import Parallel, delayed
-import threading
 import torch
-# import torch.multiprocessing as mp
 from torch import nn
 
 # base actions: (REDUCE, GENERATE, NON_TERMINAL) or (REDUCE, SHIFT, NON_TERMINAL)
@@ -60,6 +58,8 @@ class RNNG(Model):
         self._token_distribution = token_distribution
         self._logits2log_prob = nn.LogSoftmax(dim=2)
         self._representation2non_terminal_logits = nn.Linear(in_features=representation_size, out_features=non_terminal_count, bias=True)
+
+        # TODO: initialize
 
     def forward(self, tokens, actions):
         """

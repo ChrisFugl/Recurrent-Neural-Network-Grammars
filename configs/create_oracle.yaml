@@ -1,6 +1,7 @@
 defaults:
-  - loader: artificial.small.raw
-  - misc/create_oracle
+  - loader: wsj.penn
+type: generative
+fine_grained_unknowns: true
 hydra:
   run:
     dir: ./outputs/create_oracle/${now:%Y-%m-%d}/${now:%H-%M-%S}

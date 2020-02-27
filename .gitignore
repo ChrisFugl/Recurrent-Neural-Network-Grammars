@@ -1,6 +1,7 @@
 __pycache__/
 /data/
 /env/
+/notebooks/
 /outputs/
 /saved/
 /scripts/

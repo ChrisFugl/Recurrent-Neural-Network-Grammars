@@ -50,6 +50,12 @@ class OrderedIterator(Iterator):
             tokens_integers, tokens_strings = flattened[2], flattened[3]
         return Iterable(tokens_integers, tokens_strings, actions_integers, actions, self._device, self._batch_size)
 
+    def size(self):
+        """
+        :rtype: int
+        """
+        return len(self._actions)
+
     def _order_by_actions_count(self, action_ints, actions, token_ints, token_strs):
         actions_counts = list(map(len, actions))
         zipped_lists = zip(actions_counts, action_ints, actions, token_ints, token_strs)

@@ -42,7 +42,7 @@ def _main(config):
         iterator_train, iterator_val,
         model, loss, optimizer,
         stopping_criterion, checkpoint, evaluator,
-        config.load_checkpoint,
+        config.load_checkpoint, token_count, non_terminal_count, action_count,
     )
     task.run()
 

@@ -2,6 +2,7 @@ from app.data.preprocessing.oracles import brackets2oracle
 from app.data.preprocessing.terminals import get_terminals
 from app.tasks.task import Task
 import hydra
+import logging
 import os
 
 class CreateOracleTask(Task):
@@ -23,16 +24,24 @@ class CreateOracleTask(Task):
         self._loader = loader
         self._generative = oracle_type == 'generative'
         self._fine_grained_unknowns = fine_grained_unknowns
+        self._logger = logging.getLogger('create_oracle')
 
     def run(self):
+        self._logger.info(f'Saving output to {self._save_dir_path}')
         os.makedirs(self._save_dir_path, exist_ok=True)
         train_bracket_lines = self._loader.load_train()
+        self._logger.info('Finished loading training data')
         val_bracket_lines = self._loader.load_val()
+        self._logger.info('Finished loading validation data')
         test_bracket_lines = self._loader.load_test()
+        self._logger.info('Finished loading test data')
         terminals, terminals_counter = get_terminals(train_bracket_lines)
         train_oracle = brackets2oracle(train_bracket_lines, terminals, self._generative, self._fine_grained_unknowns)
+        self._logger.info('Finished converting training data')
         val_oracle = brackets2oracle(val_bracket_lines, terminals, self._generative, self._fine_grained_unknowns)
+        self._logger.info('Finished converting validation data')
         test_oracle = brackets2oracle(test_bracket_lines, terminals, self._generative, self._fine_grained_unknowns)
+        self._logger.info('Finished converting test data')
         self._save(train_oracle, self._train_save_path)
         self._save(val_oracle, self._val_save_path)
         self._save(test_oracle, self._test_save_path)

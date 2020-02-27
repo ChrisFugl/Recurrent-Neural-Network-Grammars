@@ -41,7 +41,7 @@ class OracleStatsTask(Task):
         return ['Sequences', *counts]
 
     def _count_tokens(self, data):
-        counts = map(lambda trees: sum(map(len, trees)), data)
+        counts = map(lambda tokens: sum(map(len, tokens)), data)
         return ['Tokens', *counts]
 
     def _count_unique_tokens(self, data):

@@ -7,6 +7,7 @@ from app.data.preprocessing.oracles import (
     read_oracle
 )
 import hydra
+import logging
 import os
 
 class OracleLoader(Loader):
@@ -22,6 +23,8 @@ class OracleLoader(Loader):
         :type data_dir: str
         """
         absolute_data_dir = hydra.utils.to_absolute_path(data_dir)
+        self._logger = logging.getLogger('loader')
+        self._logger.info(f'Loading data from {absolute_data_dir}')
         self._train_path = os.path.join(absolute_data_dir, 'train.oracle')
         self._val_path = os.path.join(absolute_data_dir, 'val.oracle')
         self._test_path = os.path.join(absolute_data_dir, 'test.oracle')
@@ -31,21 +34,27 @@ class OracleLoader(Loader):
         :rtype: list of str, list of list of str, list of list of str, list of list of str
         :returns: trees, actions, tokens, unknownified tokens
         """
-        return self._load(self._train_path)
+        data = self._load(self._train_path)
+        self._logger.info('Finished loading training data')
+        return data
 
     def load_val(self):
         """
         :rtype: list of str, list of list of str, list of list of str, list of list of str
         :returns: trees, actions, tokens, unknownified tokens
         """
-        return self._load(self._val_path)
+        data = self._load(self._val_path)
+        self._logger.info('Finished loading validation data')
+        return data
 
     def load_test(self):
         """
         :rtype: list of str, list of list of str, list of list of str, list of list of str
         :returns: trees, actions, tokens, unknownified tokens
         """
-        return self._load(self._test_path)
+        data = self._load(self._test_path)
+        self._logger.info('Finished loading test data')
+        return data
 
     def _load(self, path):
         oracle = read_oracle(path)

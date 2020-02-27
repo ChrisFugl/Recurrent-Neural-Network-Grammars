@@ -19,8 +19,11 @@ def brackets2oracle(brackets, known_terminals, generative, fine_grained_unknowns
     tokens_unknownified = []
     for line in brackets:
         line_stripped = line.strip()
-        line_tokens = _line2tokens(line_stripped)
-        line_tokens_unknownified = list(map(unknownifier, line_tokens))
+        line_tags, line_tokens = _line2tokens(line_stripped)
+        # TODO: should this be lowercased
+        # line_tokens_lower = list(map(lambda token: token.lower(), line_tokens))
+        # line_tokens_unknownified = list(map(unknownifier, zip(line_tags, line_tokens_lower)))
+        line_tokens_unknownified = list(map(unknownifier, zip(line_tags, line_tokens)))
         line_actions = _line2actions(token_type, line_tokens_unknownified, line_stripped)
         line_actions_strings = list(map(_action2string, line_actions))
         brackets_stripped.append(line_stripped)
@@ -40,13 +43,15 @@ def _line2tokens(line):
     :type line: str
     :rtype: list of str
     """
+    tags = []
     tokens = []
     line_index = find_next_terminal_start_index(line, 0)
     while line_index != -1:
-        _, token, terminal_end_index = get_terminal_node(line, line_index)
+        tag, token, terminal_end_index = get_terminal_node(line, line_index)
         line_index = find_next_terminal_start_index(line, terminal_end_index + 1)
+        tags.append(tag)
         tokens.append(token)
-    return tokens
+    return tags, tokens
 
 def _line2actions(token_type, unknownified_tokens, line):
     """

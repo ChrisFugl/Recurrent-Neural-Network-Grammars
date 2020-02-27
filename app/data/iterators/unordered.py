@@ -37,3 +37,9 @@ class UnorderedIterator(Iterator):
             tokens_integers = self._tokens_integers
             tokens_strings = self._tokens_strings
         return Iterable(tokens_integers, tokens_strings, actions_integers, actions, self._device, self._batch_size)
+
+    def size(self):
+        """
+        :rtype: int
+        """
+        return len(self._actions)

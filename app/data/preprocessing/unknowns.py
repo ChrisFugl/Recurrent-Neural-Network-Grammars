@@ -1,26 +1,28 @@
 from app.constants import UNKNOWN_IDENTIFIER
 
-def constant_unknownifier(known_terminals, token):
+def constant_unknownifier(known_terminals, terminal):
     """
     :type known_terminals: list of str
-    :type token: str
+    :type terminal: str, str
     :rtype: str
     """
+    _, token = terminal
     if token in known_terminals:
         return token
     else:
         return UNKNOWN_IDENTIFIER
 
 # https://github.com/clab/rnng/blob/master/get_oracle_gen.py
-def fine_grained_unknownifier(known_terminals, token):
+def fine_grained_unknownifier(known_terminals, terminal):
     """
     :type known_terminals: list of str
-    :type token: str
+    :type terminal: str, str
     :rtype: str
     """
-    if token in known_terminals:
-        return token
-    else:
+    _, token = terminal
+    if len(token) == 0:
+        return UNKNOWN_IDENTIFIER
+    elif not token in known_terminals:
         caps_count = 0
         has_digit = False
         has_dash = False
@@ -77,3 +79,5 @@ def fine_grained_unknownifier(known_terminals, token):
             elif lower[-2:] == 'al':
                 result += '-al'
         return result + '>'
+    else:
+        return token

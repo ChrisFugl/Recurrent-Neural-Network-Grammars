@@ -13,7 +13,7 @@ class TrainTask(Task):
         iterator_train, iterator_val,
         model, loss, optimizer,
         stopping_criterion, checkpoint, evaluator,
-        load_checkpoint,
+        load_checkpoint, token_count, non_terminal_count, action_count
     ):
         """
         :type device: torch.device
@@ -26,6 +26,9 @@ class TrainTask(Task):
         :type checkpoint: app.checkpoints.checkpoint.Checkpoint
         :type evaluator: app.evaluators.evaluator.Evaluator
         :type load_checkpoint: str
+        :type token_count: int
+        :type non_terminal_count: int
+        :type action_count: int
         """
         super().__init__()
         self._device = device
@@ -37,6 +40,10 @@ class TrainTask(Task):
         self._stopping_criterion = stopping_criterion
         self._checkpoint = checkpoint
         self._evaluator = evaluator
+
+        self._token_count = token_count
+        self._non_terminal_count = non_terminal_count
+        self._action_count = action_count
 
         working_directory = os.getcwd()
         tensorboard_directory = os.path.join(working_directory, 'tb')
@@ -57,12 +64,15 @@ class TrainTask(Task):
     def run(self):
         time_start = time.time()
         self._logger.info('Starting training')
-        self._logger.info(f'Saving output in {os.getcwd()}')
+        self._logger.info(f'Saving output to {os.getcwd()}')
         self._logger.info(f'Using device: {self._device}')
+        self._logger.info(f'Tokens: {self._token_count}')
+        self._logger.info(f'Non-terminals: {self._non_terminal_count}')
+        self._logger.info(f'Actions: {self._action_count}')
         batch_count = self._start_batch_count
         epoch = self._start_epoch
         if self._evaluator.should_evaluate(epoch, batch_count, pretraining=True):
-            loss_val = self._evaluate(epoch, batch_count)
+            self._evaluate(epoch, batch_count)
         self._writer_train.add_scalar('epoch', epoch, batch_count)
         while True:
             epoch, batch_count, done = self._train_epoch(time_start, epoch, batch_count)
@@ -88,7 +98,7 @@ class TrainTask(Task):
         start_of_epoch = True
         for batch in self._iterator_train:
             batch_count += 1
-            loss_train = self._train_batch(batch, batch_count)
+            self._train_batch(batch, batch_count)
             if self._evaluator.should_evaluate(epoch, batch_count):
                 self._evaluate(epoch, batch_count)
                 # check if stopping criterion necessitates an early stopping

@@ -1,4 +1,4 @@
-from app.constants import SENTENCE_NON_TERMINAL
+from app.constants import ROOT_NON_TERMINAL
 
 def get_non_terminal_identifier(line, line_index):
     """
@@ -10,6 +10,6 @@ def get_non_terminal_identifier(line, line_index):
     non_terminal_end_index = line.find(' ', non_terminal_start_index)
     non_terminal = line[non_terminal_start_index:non_terminal_end_index].strip()
     if len(non_terminal) == 0:
-        return SENTENCE_NON_TERMINAL
+        return ROOT_NON_TERMINAL
     else:
         return non_terminal

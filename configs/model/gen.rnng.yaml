@@ -4,7 +4,7 @@ model:
     type: birnn
   distribution:
     type: class_based_softmax
-    cluster: data/artificial/small/generative/brown_c7.cluster
+    cluster: data/penn_english_treebank/wsj/generative/brown_c140.cluster
   embedding:
     size: 256
     max_norm: null
@@ -15,7 +15,7 @@ model:
     type: 'rnn'
   representation:
     type: vanilla
-    size: 128
+    size: 256
   rnn:
     type: lstm
     hidden_size: 256

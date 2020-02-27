@@ -88,16 +88,18 @@ class ActionConverter:
                 argument_index = self._terminal2index[argument]
                 return GenerateAction(device, argument, argument_index)
             else:
-                argument_index = self._non_terminal2index[argument]
-                return NonTerminalAction(device, argument, argument_index)
+                non_terminal = self._get_non_terminal(argument)
+                argument_index = self._non_terminal2index[non_terminal]
+                return NonTerminalAction(device, non_terminal, argument_index)
         else:
             if type == ACTION_REDUCE_TYPE:
                 return ReduceAction(device)
             elif type == ACTION_SHIFT_TYPE:
                 return ShiftAction(device)
             else:
-                argument_index = self._non_terminal2index[argument]
-                return NonTerminalAction(device, argument, argument_index)
+                non_terminal = self._get_non_terminal(argument)
+                argument_index = self._non_terminal2index[non_terminal]
+                return NonTerminalAction(device, non_terminal, argument_index)
 
     def string2integer(self, action_string):
         """
@@ -113,14 +115,16 @@ class ActionConverter:
             elif type == ACTION_GENERATE_TYPE:
                 return self._singleton_count + self._terminal2index[argument]
             else:
-                return self._singleton_count + self._terminal_count + self._non_terminal2index[argument]
+                non_terminal = self._get_non_terminal(argument)
+                return self._singleton_count + self._terminal_count + self._non_terminal2index[non_terminal]
         else:
             if type == ACTION_REDUCE_TYPE:
                 return self._singleton2index['REDUCE']
             elif type == ACTION_SHIFT_TYPE:
                 return self._singleton2index['SHIFT']
             else:
-                return self._singleton_count + self._non_terminal2index[argument]
+                non_terminal = self._get_non_terminal(argument)
+                return self._singleton_count + self._non_terminal2index[non_terminal]
 
     def _get_singleton_actions(self, generative):
         if generative:
@@ -155,3 +159,13 @@ class ActionConverter:
                         action2index[non_terminal] = counter
                         counter += 1
         return action2index, index2action
+
+    def _get_non_terminal(self, argument):
+        # heuristic for dealing with non-terminals that are not in trainingset
+        splitted = argument.split('-')
+        length = len(splitted)
+        for end in range(length, 0, -1):
+            joined = '-'.join(splitted[:end])
+            if joined in self._non_terminal2index:
+                return joined
+        raise Exception(f'Unknown non-terminal: {argument}')

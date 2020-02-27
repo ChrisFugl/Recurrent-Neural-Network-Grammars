@@ -1,8 +1,8 @@
 defaults:
-  - type: generative
+  - type: gen
   - model: ${defaults.0.type}.rnng
   - iterator: unordered
-  - loader: artificial.small.${defaults.0.type}.oracle
+  - loader: wsj.${defaults.0.type}.oracle
   - loss: negative_log_likelihood
   - optimizer: adam
   - stopping_criterion: early_stopping
