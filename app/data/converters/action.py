@@ -162,6 +162,7 @@ class ActionConverter:
 
     def _get_non_terminal(self, argument):
         # heuristic for dealing with non-terminals that are not in trainingset
+        # only used when non-terminals have not been unknownified in advance
         splitted = argument.split('-')
         length = len(splitted)
         for end in range(length, 0, -1):

@@ -1,15 +1,17 @@
-from app.constants import ACTION_NON_TERMINAL_TYPE, ACTION_GENERATE_TYPE, ACTION_SHIFT_TYPE, ACTION_REDUCE_TYPE
+from app.constants import ACTION_NON_TERMINAL_TYPE, ACTION_GENERATE_TYPE, ACTION_SHIFT_TYPE, ACTION_REDUCE_TYPE, UNKNOWN_IDENTIFIER
 from app.data.preprocessing.non_terminals import get_non_terminal_identifier
 from app.data.preprocessing.terminals import get_terminal_node, find_next_terminal_start_index, is_start_of_terminal_node
 from app.data.preprocessing.unknowns import constant_unknownifier, fine_grained_unknownifier
 from functools import partial
 
-def brackets2oracle(brackets, known_terminals, generative, fine_grained_unknowns):
+def brackets2oracle(known_non_terminals, known_terminals, generative, fine_grained_unknowns, unknown_non_terminals, brackets):
     """
-    :type brackets: list of str
+    :type known_non_terminals: list of str
     :type known_terminals: list of str
     :type generative: bool
     :type fine_grained_unknowns: bool
+    :type unknown_non_terminals: bool
+    :type brackets: list of str
     """
     token_type = _get_token_type(generative)
     unknownifier = _get_unknownifier(known_terminals, fine_grained_unknowns)
@@ -20,12 +22,10 @@ def brackets2oracle(brackets, known_terminals, generative, fine_grained_unknowns
     for line in brackets:
         line_stripped = line.strip()
         line_tags, line_tokens = _line2tokens(line_stripped)
-        # TODO: should this be lowercased
-        # line_tokens_lower = list(map(lambda token: token.lower(), line_tokens))
-        # line_tokens_unknownified = list(map(unknownifier, zip(line_tags, line_tokens_lower)))
         line_tokens_unknownified = list(map(unknownifier, zip(line_tags, line_tokens)))
         line_actions = _line2actions(token_type, line_tokens_unknownified, line_stripped)
-        line_actions_strings = list(map(_action2string, line_actions))
+        action2string = partial(_action2string, known_non_terminals, unknown_non_terminals)
+        line_actions_strings = list(map(action2string, line_actions))
         brackets_stripped.append(line_stripped)
         actions.append(line_actions_strings)
         tokens.append(line_tokens)
@@ -83,7 +83,7 @@ def _line2actions(token_type, unknownified_tokens, line):
         actions.append(action)
     return actions
 
-def _action2string(action):
+def _action2string(known_non_terminals, unknown_non_terminals, action):
     type, argument = action
     if type == ACTION_REDUCE_TYPE:
         return 'REDUCE'
@@ -92,7 +92,11 @@ def _action2string(action):
     elif type == ACTION_SHIFT_TYPE:
         return 'SHIFT'
     elif type == ACTION_NON_TERMINAL_TYPE:
-        return f'NT({argument})'
+        if unknown_non_terminals and argument not in known_non_terminals:
+            non_terminal = UNKNOWN_IDENTIFIER
+        else:
+            non_terminal = argument
+        return f'NT({non_terminal})'
     else:
         raise Exception(f'Unknown action type: {type}')
 
