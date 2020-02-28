@@ -1,4 +1,3 @@
-from app.data.converters.token import TokenConverter
 from app.tasks.task import Task
 from functools import reduce
 from operator import iconcat
@@ -35,6 +34,9 @@ class OracleStatsTask(Task):
             self._count_unique_tokens('Unique unknownified tokens', [unknownified_terms_train, unknownified_terms_val, unknownified_terms_test]),
             self._count_unique_tokens_without_punctuation('Unique unknownified tokens without punctuation', [unknownified_terms_train, unknownified_terms_val, unknownified_terms_test]),
             self._count_unknown_types([unknownified_terms_train, unknownified_terms_val, unknownified_terms_test]),
+            self._count_non_terminals([actions_train, actions_val, actions_test]),
+            self._count_unique_non_terminals([actions_train, actions_val, actions_test]),
+            self._count_unknown_non_terminals_types([actions_train, actions_val, actions_test]),
         ]
 
         colalign = ['left', 'right', 'right', 'right']
@@ -82,8 +84,38 @@ class OracleStatsTask(Task):
             counts[index] = f'{len(unknown_tokens_set):,}'
         return ['Unknown types', *counts]
 
+    def _count_non_terminals(self, data):
+        counts = [0, 0, 0]
+        for index, actions in enumerate(data):
+            flattened = reduce(iconcat, actions, [])
+            non_terminals = list(filter(self._is_non_terminal, flattened))
+            counts[index] = f'{len(non_terminals):,}'
+        return ['Non-terminals', *counts]
+
+    def _count_unique_non_terminals(self, data):
+        counts = [0, 0, 0]
+        for index, actions in enumerate(data):
+            flattened = reduce(iconcat, actions, [])
+            non_terminals = set(filter(self._is_non_terminal, flattened))
+            counts[index] = f'{len(non_terminals):,}'
+        return ['Unique non-terminals', *counts]
+
+    def _count_unknown_non_terminals_types(self, data):
+        counts = [0, 0, 0]
+        for index, actions in enumerate(data):
+            flattened = reduce(iconcat, actions, [])
+            unknown_non_terminals = set(filter(self._is_unknown_non_terminal, flattened))
+            counts[index] = f'{len(unknown_non_terminals):,}'
+        return ['Unknown non-terminal types', *counts]
+
     def _is_not_punctuation(self, token):
         return token not in ['.', '?', '!', ',', ';', ':', '--', '-', '(', ')', '[', ']', '{', '}', "'", '"', '...']
 
     def _is_unknown_token(self, token):
         return token.startswith('<UNK')
+
+    def _is_non_terminal(self, action):
+        return action.startswith('NT(')
+
+    def _is_unknown_non_terminal(self, action):
+        return action.startswith('NT(<UNK')
