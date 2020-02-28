@@ -11,7 +11,16 @@ def get_optimizer(config, parameters):
             betas=[config.beta1, config.beta2],
             eps=config.epsilon,
             weight_decay=config.weight_decay,
-            amsgrad=config.amsgrad
+            amsgrad=config.amsgrad,
+        )
+    elif config.type == 'sgd':
+        return optim.SGD(
+            parameters,
+            lr=config.learning_rate,
+            momentum=config.momentum,
+            dampening=config.dampening,
+            weight_decay=config.weight_decay,
+            nesterov=config.nesterov,
         )
     else:
         raise Exception(f'Unknown optimizer: {config.type}')
