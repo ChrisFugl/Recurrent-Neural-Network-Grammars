@@ -1,0 +1,3 @@
+lr_scheduler:
+  type: inverse_additive_decay
+  decay: 0.08

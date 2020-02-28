@@ -11,7 +11,7 @@ class TrainTask(Task):
     def __init__(self,
         device,
         iterator_train, iterator_val,
-        model, loss, optimizer,
+        model, loss, optimizer, learning_rate_scheduler,
         stopping_criterion, checkpoint, evaluator,
         load_checkpoint, token_count, non_terminal_count, action_count
     ):
@@ -21,6 +21,7 @@ class TrainTask(Task):
         :type iterator_val: app.data.iterators.iterator.Iterator
         :type model: app.models.model.Model
         :type loss: app.losses.loss.Loss
+        :type learning_rate_scheduler: torch.optim.lr_scheduler._LRScheduler
         :type optimizer: torch.optim.Optimizer
         :type stopping_criterion: app.stopping_criteria.stopping_criterion.StoppingCriterion
         :type checkpoint: app.checkpoints.checkpoint.Checkpoint
@@ -36,6 +37,7 @@ class TrainTask(Task):
         self._iterator_val = iterator_val
         self._model = model
         self._loss = loss
+        self._learning_rate_scheduler = learning_rate_scheduler
         self._optimizer = optimizer
         self._stopping_criterion = stopping_criterion
         self._checkpoint = checkpoint
@@ -73,7 +75,9 @@ class TrainTask(Task):
         epoch = self._start_epoch
         if self._evaluator.should_evaluate(epoch, batch_count, pretraining=True):
             self._evaluate(epoch, batch_count)
-        self._writer_train.add_scalar('epoch', epoch, batch_count)
+        # assumes a single learning rate for all parameters
+        learning_rate = self._optimizer.param_groups[0]['lr']
+        self._log_epoch(epoch, batch_count, learning_rate)
         while True:
             epoch, batch_count, done = self._train_epoch(time_start, epoch, batch_count)
             if done:
@@ -107,10 +111,13 @@ class TrainTask(Task):
             if self._checkpoint.should_save_checkpoint(epoch, batch_count, start_of_epoch):
                 self._save_checkpoint(time_start, epoch, batch_count)
             start_of_epoch = False
+        self._learning_rate_scheduler.step()
+        # assumes a single learning rate for all parameters
+        learning_rate = self._learning_rate_scheduler.get_last_lr()[0]
         epoch += 1
         time_epoch_stop = time.time()
         time_total = self._total_time_offset + self._get_seconds(time_start, time_epoch_stop)
-        self._writer_train.add_scalar('epoch', epoch, batch_count)
+        self._log_epoch(epoch, batch_count, learning_rate)
         self._writer_train.add_scalar('time_s/epoch', self._get_seconds(time_epoch_start, time_epoch_stop), batch_count)
         self._writer_train.add_scalar('time_s/total', time_total, batch_count)
         return epoch, batch_count, False
@@ -123,7 +130,7 @@ class TrainTask(Task):
         loss_train = self._loss(batch_log_probs, batch_actions_lengths)
         self._optimize(loss_train)
         time_batch_stop = time.time()
-        self._writer_train.add_scalar('loss', loss_train, batch_count)
+        self._writer_train.add_scalar('training/loss', loss_train, batch_count)
         self._writer_train.add_scalar('time_s/batch', self._get_seconds(time_batch_start, time_batch_stop), batch_count)
         return loss_train
 
@@ -142,10 +149,10 @@ class TrainTask(Task):
             loss = self._loss(log_probs, actions_lengths)
             losses.append(loss)
         loss_val = sum(losses) / len(losses)
-        time_val_stop = time.time()
-        self._writer_val.add_scalar('loss', loss_val, batch_count)
-        self._writer_val.add_scalar('time_s/val', self._get_seconds(time_val_start, time_val_stop), batch_count)
         self._model.train()
+        time_val_stop = time.time()
+        self._writer_val.add_scalar('training/loss', loss_val, batch_count)
+        self._writer_val.add_scalar('time_s/val', self._get_seconds(time_val_start, time_val_stop), batch_count)
         self._stopping_criterion.add_val_loss(loss_val)
         self._logger.info(f'epoch={epoch}, batch={batch_count}, loss_val={loss_val:0.8f}')
 
@@ -170,6 +177,7 @@ class TrainTask(Task):
         checkpoint = {
             'batch_count': batch_count,
             'epoch': epoch,
+            'learning_rate_scheduler': self._learning_rate_scheduler.state_dict(),
             'model': self._model.state_dict(),
             'optimizer': self._optimizer.state_dict(),
             'stopping_criterion': self._stopping_criterion.state_dict(),
@@ -188,4 +196,10 @@ class TrainTask(Task):
         self._total_time_offset = checkpoint['time_elapsed']
         self._model.load_state_dict(checkpoint['model'])
         self._optimizer.load_state_dict(checkpoint['optimizer'])
+        self._learning_rate_scheduler.load_state_dict(checkpoint['learning_rate_scheduler'])
         self._stopping_criterion.load_state_dict(checkpoint['stopping_criterion'])
+
+    def _log_epoch(self, epoch, batch_count, learning_rate):
+        self._logger.info(f'epoch={epoch}, batch={batch_count}, learning rate={learning_rate}')
+        self._writer_train.add_scalar('training/epoch', epoch, batch_count)
+        self._writer_train.add_scalar('training/learning_rate', learning_rate, batch_count)
