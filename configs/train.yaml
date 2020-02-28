@@ -7,7 +7,7 @@ defaults:
   - optimizer: adam
   - stopping_criterion: early_stopping
   - checkpoint: never
-  - evaluator: epoch
+  - evaluator: batch
 name: rnng
 load_checkpoint: null
 gpu: null

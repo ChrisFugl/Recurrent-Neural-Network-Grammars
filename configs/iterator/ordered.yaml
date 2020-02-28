@@ -1,4 +1,4 @@
 iterator:
   type: 'ordered'
-  batch_size: 32
+  batch_size: 64
   shuffle: true

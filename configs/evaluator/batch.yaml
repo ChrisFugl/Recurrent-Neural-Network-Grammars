@@ -1,5 +1,5 @@
 evaluator:
   type: batch
-  batch: 300
+  batch: 150
   pretraining: true
   posttraining: true
