@@ -2,7 +2,7 @@ defaults:
   - loader: wsj.penn
 type: generative
 fine_grained_unknowns: true
-unknown_non_terminals: true
+unknown_non_terminals: false
 hydra:
   run:
     dir: ./outputs/create_oracle/${now:%Y-%m-%d}/${now:%H-%M-%S}

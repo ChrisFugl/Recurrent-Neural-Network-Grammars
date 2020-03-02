@@ -43,4 +43,12 @@ class RawLoader(Loader):
     def _load(self, path):
         with open(path, 'r') as file:
             trees = file.read().split('\n')
-        return trees
+        stripped = map(self._strip, trees)
+        non_empty = filter(self._is_not_empty, stripped)
+        return list(non_empty)
+
+    def _strip(self, line):
+        return line.strip()
+
+    def _is_not_empty(self, line):
+        return len(line) != 0

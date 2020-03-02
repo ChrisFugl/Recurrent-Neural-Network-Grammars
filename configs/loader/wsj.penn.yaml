@@ -1,6 +1,6 @@
 loader:
   type: penn
-  data_dir: data/penn_english_treebank/wsj/
+  data_dir: data/pet/wsj/
   train_sections:
     - 2
     - 3

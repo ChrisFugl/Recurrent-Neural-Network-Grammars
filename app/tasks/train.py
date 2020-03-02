@@ -1,6 +1,7 @@
 from app.tasks.task import Task
 import hydra
 import logging
+import numpy as np
 import os
 import time
 import torch
@@ -68,9 +69,10 @@ class TrainTask(Task):
         self._logger.info('Starting training')
         self._logger.info(f'Saving output to {os.getcwd()}')
         self._logger.info(f'Using device: {self._device}')
-        self._logger.info(f'Tokens: {self._token_count}')
-        self._logger.info(f'Non-terminals: {self._non_terminal_count}')
-        self._logger.info(f'Actions: {self._action_count}')
+        self._logger.info(f'Tokens: {self._token_count:,}')
+        self._logger.info(f'Non-terminals: {self._non_terminal_count:,}')
+        self._logger.info(f'Actions: {self._action_count:,}')
+        self._logger.info(f'Parameters: {self._count_parameters():,}')
         batch_count = self._start_batch_count
         epoch = self._start_epoch
         if self._evaluator.should_evaluate(epoch, batch_count, pretraining=True):
@@ -203,3 +205,8 @@ class TrainTask(Task):
         self._logger.info(f'epoch={epoch}, batch={batch_count}, learning rate={learning_rate}')
         self._writer_train.add_scalar('training/epoch', epoch, batch_count)
         self._writer_train.add_scalar('training/learning_rate', learning_rate, batch_count)
+
+    def _count_parameters(self):
+        parameters = filter(lambda p: p.requires_grad, self._model.parameters())
+        count = sum([np.prod(parameter.size()) for parameter in parameters])
+        return count

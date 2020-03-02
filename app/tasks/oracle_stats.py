@@ -24,19 +24,24 @@ class OracleStatsTask(Task):
         trees_val, actions_val, terms_val, unknownified_terms_val = self._loader.load_val()
         trees_test, actions_test, terms_test, unknownified_terms_test = self._loader.load_test()
 
+        trees = [trees_train, trees_val, trees_test]
+        actions = [actions_train, actions_val, actions_test]
+        terms = [terms_train, terms_val, terms_test]
+        unknown_terms = [unknownified_terms_train, unknownified_terms_val, unknownified_terms_test]
+
         headers = ['Train', 'Val', 'Test']
         rows = [
-            self._count_sequences([trees_train, trees_val, trees_test]),
-            self._count_tokens([unknownified_terms_train, unknownified_terms_val, unknownified_terms_test]),
-            self._count_tokens_without_punctuation([unknownified_terms_train, unknownified_terms_val, unknownified_terms_test]),
-            self._count_unique_tokens('Unique tokens', [terms_train, terms_val, terms_test]),
-            self._count_unique_tokens_without_punctuation('Unique tokens without punctuation', [terms_train, terms_val, terms_test]),
-            self._count_unique_tokens('Unique unknownified tokens', [unknownified_terms_train, unknownified_terms_val, unknownified_terms_test]),
-            self._count_unique_tokens_without_punctuation('Unique unknownified tokens without punctuation', [unknownified_terms_train, unknownified_terms_val, unknownified_terms_test]),
-            self._count_unknown_types([unknownified_terms_train, unknownified_terms_val, unknownified_terms_test]),
-            self._count_non_terminals([actions_train, actions_val, actions_test]),
-            self._count_unique_non_terminals([actions_train, actions_val, actions_test]),
-            self._count_unknown_non_terminals_types([actions_train, actions_val, actions_test]),
+            self._count_sequences(trees),
+            self._count_tokens(unknown_terms),
+            self._count_tokens_without_punctuation(unknown_terms),
+            self._count_unique_tokens('Unique tokens', terms),
+            self._count_unique_tokens_without_punctuation('Unique tokens without punctuation', terms),
+            self._count_unique_tokens('Unique unknownified tokens', unknown_terms),
+            self._count_unique_tokens_without_punctuation('Unique unknownified tokens without punctuation', unknown_terms),
+            self._count_unknown_types(unknown_terms),
+            self._count_non_terminals(actions),
+            self._count_unique_non_terminals(actions),
+            self._count_unknown_non_terminals_types(actions),
         ]
 
         colalign = ['left', 'right', 'right', 'right']

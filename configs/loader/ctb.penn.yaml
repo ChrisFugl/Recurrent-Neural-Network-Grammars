@@ -1,6 +1,6 @@
 loader:
   type: penn
-  data_dir: data/penn_chinese_treebank/
+  data_dir: data/pct/
   test_sections:
   - 271
   - 272

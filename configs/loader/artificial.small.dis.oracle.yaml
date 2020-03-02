@@ -1,3 +1,0 @@
-loader:
-  type: 'oracle'
-  data_dir: data/artificial/small/discriminative/

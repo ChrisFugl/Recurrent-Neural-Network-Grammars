@@ -164,4 +164,7 @@ def read_oracle(path):
     :rtype: list of str
     """
     with open(path, 'r') as input_file:
-        return input_file.read().split('\n')
+        oracle = input_file.read().split('\n')
+    stripped = map(lambda line: line.strip(), oracle)
+    non_empty = filter(lambda line: len(line) != 0, stripped)
+    return list(non_empty)

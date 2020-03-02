@@ -1,0 +1,3 @@
+loader:
+  type: raw
+  data_dir: data/artificial/

@@ -6,7 +6,7 @@ max_determiners: 5
 max_nouns: 20
 max_particles: 5
 max_verbs: 20
-save_dir: data/artificial/small/
+save_dir: data/artificial/
 hydra:
   run:
     dir: ./outputs/create_artificial_data/${now:%Y-%m-%d}/${now:%H-%M-%S}
