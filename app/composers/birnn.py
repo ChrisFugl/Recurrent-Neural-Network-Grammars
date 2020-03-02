@@ -28,3 +28,6 @@ class BiRNNComposer(Composer):
         affine_input = birnn_output[sequence_length - 1].unsqueeze(dim=0)
         output = self._activation(self._affine(affine_input))
         return output
+
+    def __str__(self):
+        return f'BiRNN(birnn={self._birnn})'

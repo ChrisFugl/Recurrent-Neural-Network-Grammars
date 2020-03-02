@@ -236,3 +236,15 @@ class RNNG(Model):
         argument_index = action.argument_index_as_tensor()
         non_terminal_embedding = embeddings(argument_index).unsqueeze(dim=0).unsqueeze(dim=0)
         return non_terminal_embedding, argument_index
+
+    def __str__(self):
+        return (
+            'RNNG(\n'
+            + f'  action_history={self._action_history}\n'
+            + f'  token_buffer={self._token_buffer}\n'
+            + f'  stack={self._stack}\n'
+            + f'  representation={self._representation}\n'
+            + f'  composer={self._composer}\n'
+            + f'  token_distribution={self._token_distribution}\n'
+            + ')'
+        )

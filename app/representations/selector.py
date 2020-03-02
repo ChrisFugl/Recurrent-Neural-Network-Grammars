@@ -5,7 +5,7 @@ def get_representation(embedding_size, config):
     """
     if config.type == 'stack_only':
         from app.representations.stack_only import StackOnlyRepresentation
-        return StackOnlyRepresentation(config.size)
+        return StackOnlyRepresentation(embedding_size, config.size)
     elif config.type == 'vanilla':
         from app.representations.vanilla import VanillaRepresentation
         return VanillaRepresentation(embedding_size, config.size)

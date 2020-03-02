@@ -71,6 +71,9 @@ class StackRNN(Stack):
         """
         return self._top.output, self._top.data
 
+    def __str__(self):
+        return f'StackRNN(rnn={self._rnn})'
+
 class StackCell:
 
     def __init__(self, output, state, parent, data):

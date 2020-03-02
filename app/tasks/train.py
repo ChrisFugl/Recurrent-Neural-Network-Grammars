@@ -73,6 +73,7 @@ class TrainTask(Task):
         self._logger.info(f'Non-terminals: {self._non_terminal_count:,}')
         self._logger.info(f'Actions: {self._action_count:,}')
         self._logger.info(f'Parameters: {self._count_parameters():,}')
+        self._logger.info(f'Model:\n{self._model}')
         batch_count = self._start_batch_count
         epoch = self._start_epoch
         if self._evaluator.should_evaluate(epoch, batch_count, pretraining=True):

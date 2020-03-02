@@ -14,12 +14,9 @@ class VanillaRepresentation(Representation):
         """
         super().__init__()
         # token, stack, action
+        self._representation_size = representation_size
         input_size = 3 * embedding_size
-        self._feedforward = nn.Linear(
-            in_features=input_size,
-            out_features=representation_size,
-            bias=True
-        )
+        self._feedforward = nn.Linear(in_features=input_size, out_features=representation_size, bias=True)
         self._activation = nn.Tanh()
 
     def forward(self, action_history, stack, token_buffer, action_timestep, token_timestep, batch_index):
@@ -41,3 +38,6 @@ class VanillaRepresentation(Representation):
         output = self._feedforward(feedforward_input)
         output = self._activation(output)
         return output
+
+    def __str__(self):
+        return f'Vanilla(size={self._representation_size})'

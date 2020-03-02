@@ -71,3 +71,6 @@ class RNNMemory(Memory):
         items_sliced = self._items[:timestep]
         items_tensor = torch.stack(items_sliced, dim=0)
         return items_tensor
+
+    def __str__(self):
+        return f'RNN(rnn={self._rnn})'

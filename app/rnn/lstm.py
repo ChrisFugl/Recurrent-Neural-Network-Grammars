@@ -18,6 +18,7 @@ class LSTM(RNN):
         super().__init__()
         self._device = device
         self._batch_size = batch_size
+        self._input_size = input_size
         self._hidden_size = hidden_size
         self._num_layers = num_layers
         self._bidirectional = bidirectional
@@ -49,3 +50,6 @@ class LSTM(RNN):
         cell = torch.zeros(shape, device=self._device, requires_grad=True)
         hidden = torch.zeros(shape, device=self._device, requires_grad=True)
         return cell, hidden
+
+    def __str__(self):
+        return f'LSTM(input_size={self._input_size}, hidden_size={self._hidden_size}, num_layers={self._num_layers})'

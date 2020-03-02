@@ -49,3 +49,6 @@ class ClassBasedSoftmax(Distribution):
         """
         # TODO
         raise NotImplementedError('not implemented yet')
+
+    def __str__(self):
+        return f'ClassBasedSoftmax(n_clusters={self._cluster_converter.count()})'
