@@ -10,10 +10,11 @@ class RNN(nn.Module):
         """
         raise NotImplementedError('must be implemented by subclass')
 
-    def initial_state(self):
+    def initial_state(self, batch_size):
         """
         Get initial hidden state.
 
+        :type batch_size: int
         :rtype: object
         """
         raise NotImplementedError('must be implemented by subclass')

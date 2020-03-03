@@ -1,8 +1,7 @@
-def get_rnn(device, input_size, batch_size, config):
+def get_rnn(device, input_size, config):
     """
     :type device: torch.device
     :type input_size: int
-    :type batch_size: int
     :type config: object
     :rtype: app.rnn.rnn.RNN
     """
@@ -10,7 +9,6 @@ def get_rnn(device, input_size, batch_size, config):
         from app.rnn.lstm import LSTM
         return LSTM(
             device,
-            batch_size,
             input_size,
             config.hidden_size,
             config.num_layers,

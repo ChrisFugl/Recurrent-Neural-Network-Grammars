@@ -44,7 +44,7 @@ class StackRNN(Stack):
         :returns: output of the stack after push
         """
         if self.empty():
-            previous_state = self._rnn.initial_state()
+            previous_state = self._rnn.initial_state(1)
         else:
             previous_state = self._top.state
         output, next_state = self._rnn(item, previous_state)

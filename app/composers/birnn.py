@@ -23,7 +23,7 @@ class BiRNNComposer(Composer):
         """
         tensors = torch.cat((non_terminal_embedding, popped_stack_items), dim=0)
         sequence_length, _, _ = tensors.shape
-        birnn_hidden_state = self._birnn.initial_state()
+        birnn_hidden_state = self._birnn.initial_state(1)
         birnn_output, _ = self._birnn(tensors, birnn_hidden_state)
         affine_input = birnn_output[sequence_length - 1].unsqueeze(dim=0)
         output = self._activation(self._affine(affine_input))

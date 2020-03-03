@@ -33,15 +33,7 @@ class Iterable:
             tokens_strings = list(self._tokens_strings[start:end])
             actions_integers = list(map(self._to_tensor, self._actions_integers[start:end]))
             actions = list(self._actions[start:end])
-            # loop back to beginning if batch exceeds final observation
-            # this ensures that batches always have a fixed length
-            remaining = self._batch_size - (end - start)
-            if 0 < remaining:
-                self._extend(tokens_integers, self._tokens_integers, remaining, self._to_tensor)
-                self._extend(tokens_strings, self._tokens_strings, remaining)
-                self._extend(actions_integers, self._actions_integers, remaining, self._to_tensor)
-                self._extend(actions, self._actions, remaining)
-            self._counter += self._batch_size
+            self._counter += end - start
             tokens_integers_padded, tokens_lengths = self._pad(tokens_integers)
             actions_integers_padded, actions_lengths = self._pad(actions_integers)
             output_tokens = (tokens_integers_padded, tokens_lengths, tokens_strings)

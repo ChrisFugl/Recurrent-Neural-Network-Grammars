@@ -23,10 +23,10 @@ def get_model(device, token_count, action_count, non_terminal_count, action_set,
         non_terminal_embedding = get_embedding(non_terminal_count, model_config.embedding)
         non_terminal_compose_embedding = get_embedding(non_terminal_count, model_config.embedding)
         token_embedding = get_embedding(token_count, model_config.embedding)
-        rnn_args = [device, model_config.embedding.size, batch_size, model_config.rnn]
+        rnn_args = [device, model_config.embedding.size, model_config.rnn]
         action_history = get_memory(model_config.memory, rnn_args=rnn_args)
         token_buffer = get_memory(model_config.memory, rnn_args=rnn_args)
-        stack_rnn_args = [device, model_config.embedding.size, 1, model_config.rnn]
+        stack_rnn_args = [device, model_config.embedding.size, model_config.rnn]
         stack = get_stack(model_config.stack, rnn_args=stack_rnn_args)
         representation = get_representation(model_config.embedding.size, model_config.representation)
         composer = get_composer(device, config)

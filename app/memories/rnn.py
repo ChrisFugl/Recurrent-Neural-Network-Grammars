@@ -10,7 +10,7 @@ class RNNMemory(Memory):
         super().__init__()
         self._rnn = rnn
         self._items = []
-        self._previous_state = rnn.initial_state()
+        self._previous_state = None
 
     def add(self, items):
         """
@@ -18,6 +18,9 @@ class RNNMemory(Memory):
         :rtype: torch.Tensor
         :returns: last item of embedding
         """
+        if self._previous_state is None:
+            _, batch_size, _ = items.shape
+            self._previous_state = self._rnn.initial_state(batch_size)
         state = self._previous_state
         output, self._previous_state = self._rnn(items, state)
         sequence_length, _, _ = output.shape

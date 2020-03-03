@@ -12,7 +12,7 @@ def get_composer(device, config):
         from app.composers.birnn import BiRNNComposer
         rnn_config = deepcopy(config.model.rnn)
         rnn_config['bidirectional'] = True
-        birnn = get_rnn(device, config.model.embedding.size, 1, rnn_config)
+        birnn = get_rnn(device, config.model.embedding.size, rnn_config)
         return BiRNNComposer(birnn, config.model.embedding.size)
     else:
         raise Exception(f'Unknown composer: {type}')
