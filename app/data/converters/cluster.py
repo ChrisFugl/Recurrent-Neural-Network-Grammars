@@ -1,3 +1,4 @@
+import csv
 import hydra
 import pandas as pd
 
@@ -34,7 +35,7 @@ class ClusterConverter:
         headers = ['cluster', 'token', 'count']
         dtypes = {'cluster': str, 'token': str, 'count': int}
         absolute_file_path = hydra.utils.to_absolute_path(cluster_file_path)
-        data = pd.read_csv(absolute_file_path, sep='\t', header=None, names=headers, dtype=dtypes)
+        data = pd.read_csv(absolute_file_path, sep='\t', header=None, names=headers, dtype=dtypes, quoting=csv.QUOTE_NONE)
         return data
 
     def count(self):
