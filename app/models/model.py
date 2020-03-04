@@ -8,20 +8,18 @@ class Model(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, tokens, actions):
+    def forward(self, batch):
         """
-        :type tokens: torch.Tensor
-        :type actions: torch.Tensor
+        :type batch: app.data.batch.Batch
         :rtype: torch.Tensor
         """
-        return self.log_likelihood(tokens, actions)
+        return self.log_likelihood(batch)
 
-    def log_likelihood(self, tokens, actions, posterior_scaling=1.0):
+    def log_likelihood(self, batch, posterior_scaling=1.0):
         """
         Compute log likelihood of each sentence/tree in a batch.
 
-        :type tokens: torch.Tensor
-        :type actions: torch.Tensor
+        :type batch: app.data.batch.Batch
         :type posterior_scaling: float
         :rtype: torch.Tensor
         """

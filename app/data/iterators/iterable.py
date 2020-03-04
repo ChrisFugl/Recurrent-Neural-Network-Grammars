@@ -1,4 +1,5 @@
 from app.constants import PAD_INDEX
+from app.data.batch import Batch
 import torch
 from torch.nn.utils.rnn import pad_sequence
 
@@ -36,9 +37,8 @@ class Iterable:
             self._counter += end - start
             tokens_integers_padded, tokens_lengths = self._pad(tokens_integers)
             actions_integers_padded, actions_lengths = self._pad(actions_integers)
-            output_tokens = (tokens_integers_padded, tokens_lengths, tokens_strings)
-            output_actions = (actions_integers_padded, actions_lengths, actions)
-            return output_tokens, output_actions
+            batch = Batch(actions_integers_padded, actions_lengths, actions, tokens_integers_padded, tokens_lengths, tokens_strings)
+            return batch
         else:
             raise StopIteration()
 

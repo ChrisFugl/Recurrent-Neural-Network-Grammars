@@ -43,24 +43,24 @@ class EvaluateTask(Task):
         tree_groundtruths = []
         tree_predictions = []
         for batch in self._iterator:
-            batch_tokens, batch_actions = batch
-            batch_actions_tensor, batch_actions_length, _ = batch_actions
-            batch_tokens_tensor, _, _ = batch_tokens
-            _, batch_size, _ = batch_tokens_tensor.shape
-            for batch_index in range(batch_size):
-                actions_length = batch_actions_length[batch_index]
-                tokens_tensor = batch_tokens_tensor[:, batch_index, :].unsqueeze(dim=1)
-                tree, score = self._inferer.infer(tokens_tensor)
-                for name, value in score.items():
-                    scores[name].append(value)
-                tree_groundtruth = batch_actions_tensor[0:actions_length, batch_index, :].unsqueeze(dim=1)
-                tree_groundtruths.append(tree_groundtruth)
-                tree_predictions.append(tree)
-                # TODO: do not break
-                break
+            self._infer_batch(tree_groundtruths, tree_predictions, scores, batch)
             # TODO: do not break
             break
-        return tree_groundtruth, tree_predictions, scores
+        return tree_groundtruths, tree_predictions, scores
+
+    def _infer_batch(self, tree_groundtruths, tree_predictions, scores, batch):
+        """
+        :type batch: app.data.batch.Batch
+        """
+        for batch_index in range(batch.size):
+            element = batch.get(batch_index)
+            tree, score = self._inferer.infer(element.tokens.tensor)
+            for name, value in score.items():
+                scores[name].append(value)
+            tree_groundtruths.append(element.actions.tensor.squeeze())
+            tree_predictions.append(tree)
+            # TODO: do not break
+            break
 
     def _bracket_scores(self, groundtruths, predictions):
         # TODO

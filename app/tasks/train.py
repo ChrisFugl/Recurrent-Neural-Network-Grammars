@@ -127,10 +127,8 @@ class TrainTask(Task):
 
     def _train_batch(self, batch, batch_count):
         time_batch_start = time.time()
-        batch_tokens, batch_actions = batch
-        _, batch_actions_lengths, _ = batch_actions
-        batch_log_probs = self._model(batch_tokens, batch_actions)
-        loss_train = self._loss(batch_log_probs, batch_actions_lengths)
+        batch_log_probs = self._model(batch)
+        loss_train = self._loss(batch_log_probs, batch.actions.lengths)
         self._optimize(loss_train)
         time_batch_stop = time.time()
         self._writer_train.add_scalar('training/loss', loss_train, batch_count)
@@ -146,10 +144,9 @@ class TrainTask(Task):
         time_val_start = time.time()
         self._model.eval()
         losses = []
-        for tokens, actions in self._iterator_val:
-            _, actions_lengths, _ = actions
-            log_probs = self._model(tokens, actions)
-            loss = self._loss(log_probs, actions_lengths)
+        for batch in self._iterator_val:
+            log_probs = self._model(batch)
+            loss = self._loss(log_probs, batch.actions.lengths)
             losses.append(loss)
         loss_val = sum(losses) / len(losses)
         self._model.train()
