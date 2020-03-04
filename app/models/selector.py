@@ -5,9 +5,10 @@ from app.memories import get_memory
 from app.representations import get_representation
 from app.stacks import get_stack
 
-def get_model(device, token_count, action_count, non_terminal_count, action_set, config):
+def get_model(device, generative, token_count, action_count, non_terminal_count, action_set, config):
     """
     :type device: torch.device
+    :type generative: bool
     :type token_count: int
     :type action_count: int
     :type non_terminal_count: int
@@ -28,9 +29,10 @@ def get_model(device, token_count, action_count, non_terminal_count, action_set,
         stack = get_stack(config.stack, rnn_args=stack_rnn_args)
         representation = get_representation(config.embedding.size, config.representation)
         composer = get_composer(device, config)
-        token_distribution = get_distribution(device, config)
+        token_distribution = None if not generative else get_distribution(device, config)
         return RNNG(
             device,
+            generative,
             action_embedding,
             token_embedding,
             non_terminal_embedding,

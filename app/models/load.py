@@ -4,9 +4,10 @@ from app.utils import get_training_config
 import hydra
 import os
 
-def load_saved_model(device, token_count, action_count, non_terminal_count, load_dir):
+def load_saved_model(device, generative, token_count, action_count, non_terminal_count, load_dir):
     """
     :type device: torch.device
+    :type generative: bool
     :type token_count: int
     :type action_count: int
     :type non_terminal_count: int
@@ -15,7 +16,7 @@ def load_saved_model(device, token_count, action_count, non_terminal_count, load
     """
     training_config = get_training_config(load_dir)
     action_set = get_action_set(training_config.type)
-    model = get_model(device, token_count, action_count, non_terminal_count, action_set, training_config.model)
+    model = get_model(device, generative, token_count, action_count, non_terminal_count, action_set, training_config.model)
     _load_model_params(model, load_dir)
     return model
 

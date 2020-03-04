@@ -32,8 +32,8 @@ def _main(config):
     _, actions_evaluate, _, unknownified_tokens_evaluate = _load_evaluation_data(loader_evaluate, config.data)
     iterator = get_iterator(device, action_converter, token_converter, unknownified_tokens_evaluate, actions_evaluate, config.iterator)
 
-    model = load_saved_model(device, token_count, action_count, non_terminal_count, config.load_dir)
-    sampler = get_sampler(device, token_count, action_count, non_terminal_count, config)
+    model = load_saved_model(device, generative, token_count, action_count, non_terminal_count, config.load_dir)
+    sampler = get_sampler(device, generative, token_count, action_count, non_terminal_count, config)
     inferer = get_inferer(device, model, sampler, config.inferer)
     task = EvaluateTask(device, inferer, sampler, iterator)
     task.run()

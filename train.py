@@ -30,7 +30,7 @@ def _main(config):
     token_count = token_converter.count()
     action_count = action_converter.count()
     non_terminal_count = action_converter.count_non_terminals()
-    model = get_model(device, token_count, action_count, non_terminal_count, action_set, config.model)
+    model = get_model(device, generative, token_count, action_count, non_terminal_count, action_set, config.model)
     loss = get_loss(device, config.loss)
     optimizer = get_optimizer(config.optimizer, model.parameters())
     learning_rate_scheduler = get_learning_rate_scheduler(optimizer, config.lr_scheduler)

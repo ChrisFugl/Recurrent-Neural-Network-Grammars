@@ -13,7 +13,7 @@ ACTIONS_COUNT = 3
 class RNNG(Model):
 
     def __init__(
-        self, device,
+        self, device, generative,
         action_embedding, token_embedding,
         non_terminal_embedding, non_terminal_compose_embedding,
         action_history, token_buffer, stack,
@@ -26,6 +26,7 @@ class RNNG(Model):
     ):
         """
         :type device: torch.device
+        :type generative: bool
         :type action_embedding: torch.Embedding
         :type token_embedding: torch.Embedding
         :type non_terminal_embedding: torch.Embedding
@@ -43,6 +44,7 @@ class RNNG(Model):
         """
         super().__init__()
         self._device = device
+        self._generative = generative
         self._threads = threads
         self._action_set = action_set
         self._action_embedding = action_embedding
@@ -55,9 +57,10 @@ class RNNG(Model):
         self._representation = representation
         self._representation2logits = nn.Linear(in_features=representation_size, out_features=ACTIONS_COUNT, bias=True)
         self._composer = composer
-        self._token_distribution = token_distribution
         self._logits2log_prob = nn.LogSoftmax(dim=2)
         self._representation2non_terminal_logits = nn.Linear(in_features=representation_size, out_features=non_terminal_count, bias=True)
+        if self._generative:
+            self._token_distribution = token_distribution
 
         # TODO: initialize
 
@@ -231,6 +234,6 @@ class RNNG(Model):
             + f'  stack={self._stack}\n'
             + f'  representation={self._representation}\n'
             + f'  composer={self._composer}\n'
-            + f'  token_distribution={self._token_distribution}\n'
+            + ('' if not self._generative else f'  token_distribution={self._token_distribution}\n')
             + ')'
         )
