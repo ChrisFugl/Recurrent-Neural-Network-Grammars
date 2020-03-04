@@ -16,12 +16,13 @@ class Model(nn.Module):
         """
         return self.log_likelihood(tokens, actions)
 
-    def log_likelihood(self, tokens, actions):
+    def log_likelihood(self, tokens, actions, posterior_scaling=1.0):
         """
         Compute log likelihood of each sentence/tree in a batch.
 
         :type tokens: torch.Tensor
         :type actions: torch.Tensor
+        :type posterior_scaling: float
         :rtype: torch.Tensor
         """
         raise NotImplementedError('method must be implemented by a subclass')

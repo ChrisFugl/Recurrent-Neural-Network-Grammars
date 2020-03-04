@@ -61,20 +61,13 @@ class RNNG(Model):
 
         # TODO: initialize
 
-    def forward(self, tokens, actions):
-        """
-        :type tokens: torch.Tensor, list of int, list of list of str
-        :type actions: torch.Tensor, list of int, list of list of str
-        :rtype: torch.Tensor
-        """
-        return self.log_likelihood(tokens, actions)
-
-    def log_likelihood(self, batch_tokens, batch_actions):
+    def log_likelihood(self, batch_tokens, batch_actions, posterior_scaling=1.0):
         """
         Compute log likelihood of each sentence/tree in a batch.
 
         :type tokens: torch.Tensor, list of int, list of list of str
         :type actions: torch.Tensor, list of int, list of list of app.actions.action.Action
+        posterior_scaling=1.0
         :rtype: torch.Tensor
         """
         action_history = self._action_history.new()

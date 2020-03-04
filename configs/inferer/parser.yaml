@@ -1,0 +1,3 @@
+inferer:
+  type: parser
+  samples: 100
