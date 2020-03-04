@@ -1,8 +1,5 @@
-from app.constants import (
-    ACTION_REDUCE_INDEX, ACTION_SHIFT_INDEX, ACTION_GENERATE_INDEX, ACTION_NON_TERMINAL_INDEX,
-    ACTION_REDUCE_TYPE, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_NON_TERMINAL_TYPE
-)
 from app.models.model import Model
+from app.models.rnng.actions import call_action, ActionArgs, ActionOutputs, ActionFunctions, ActionEmbeddings, ActionStructures
 from joblib import Parallel, delayed
 import torch
 from torch import nn
@@ -61,6 +58,9 @@ class RNNG(Model):
         self._representation2non_terminal_logits = nn.Linear(in_features=representation_size, out_features=non_terminal_count, bias=True)
         if self._generative:
             self._token_distribution = token_distribution
+
+        self._action_embeddings = ActionEmbeddings(self._non_terminal_embedding, self._non_terminal_compose_embedding)
+        self._action_functions = ActionFunctions(self._representation2non_terminal_logits, self._logits2log_prob, composer, token_distribution)
 
         # TODO: initialize
 
@@ -143,13 +143,16 @@ class RNNG(Model):
         :type element: app.data.batch.BatchElement
         """
         stack = self._stack.new()
+        action_structures = ActionStructures(stack, token_buffer)
         token_index = 0
         token_counter = 0
+
         # first action is always NT(S), use this to initialize stack
         action_first = element.actions.actions[0]
         self._push_to_stack(stack, actions_embedding, 0, element.index, action_first)
         open_non_terminals_count = 1
         log_probs = torch.zeros((element.actions.max_length - 1,), dtype=torch.float, device=self._device, requires_grad=False)
+
         for action_counter in range(1, element.actions.length):
             action_index = action_counter - 1
             action = element.actions.actions[action_counter]
@@ -159,72 +162,21 @@ class RNNG(Model):
             logits_base = self._representation2logits(representation)
             logits_base_valid = logits_base[:, :, valid_actions]
             log_prob_base_valid = self._logits2log_prob(logits_base_valid)
+
             # get log probability of action
-            action_type = action.type()
-            if action_type == ACTION_REDUCE_TYPE:
-                reduce_log_prob = log_prob_base_valid[:, :, action2index[ACTION_REDUCE_INDEX]]
-                action_log_prob = self._reduce(reduce_log_prob, stack)
-                open_non_terminals_count -= 1
-            elif action_type == ACTION_SHIFT_TYPE:
-                shift_log_prob = log_prob_base_valid[:, :, action2index[ACTION_SHIFT_INDEX]]
-                action_log_prob = self._shift(shift_log_prob, stack, token_buffer, token_index, element.index, action)
-                token_index = min(token_index + 1, element.tokens.length - 1)
-                token_counter += 1
-            elif action_type == ACTION_GENERATE_TYPE:
-                generate_log_prob = log_prob_base_valid[:, :, action2index[ACTION_GENERATE_INDEX]]
-                push_args = tokens_embedding, token_index, element.index, action
-                action_log_prob = self._generate(generate_log_prob, stack, representation, *push_args)
-                token_index = min(token_index + 1, element.tokens.length - 1)
-                token_counter += 1
-            elif action_type == ACTION_NON_TERMINAL_TYPE:
-                non_terminal_log_prob = log_prob_base_valid[:, :, action2index[ACTION_NON_TERMINAL_INDEX]]
-                action_log_prob = self._non_terminal(non_terminal_log_prob, stack, representation, action)
-                open_non_terminals_count += 1
-            else:
-                raise Exception(f'Unknown action: {action.type}')
+            action_outputs = ActionOutputs(open_non_terminals_count, token_index, token_counter)
+            action_args = ActionArgs(
+                self._action_embeddings, self._action_functions, action_structures, action_outputs,
+                tokens_embedding, representation, log_prob_base_valid, action2index, element, action
+            )
+            action_log_prob, open_non_terminals_count, token_index, token_counter = call_action(action.type(), action_args)
             log_probs[action_index] = action_log_prob
+
         return log_probs
 
     def _push_to_stack(self, stack, embeddings, item_index, batch_index, action):
         action_embedding = embeddings[item_index, batch_index].unsqueeze(dim=0).unsqueeze(dim=0)
         return stack.push(action_embedding, action)
-
-    def _reduce(self, base_reduce_log_prob, stack):
-        popped_items = []
-        action = None
-        while action is None or action.type() != ACTION_NON_TERMINAL_TYPE:
-            state, action = stack.pop()
-            popped_items.append(state)
-        popped_tensor = torch.cat(popped_items, dim=0)
-        action.close()
-        non_terminal_embedding, _ = self._get_non_terminal_embedding(self._non_terminal_compose_embedding, action)
-        composed = self._composer(non_terminal_embedding, popped_tensor)
-        stack.push(composed, action)
-        return base_reduce_log_prob
-
-    def _shift(self, base_shift_log_prob, stack, token_buffer, token_index, batch_index, action):
-        embedding = token_buffer.get(token_index, batch_index)
-        stack.push(embedding, action)
-        return base_shift_log_prob
-
-    def _generate(self, base_generate_log_prob, stack, representation, tokens_embedding, token_index, batch_index, action):
-        self._push_to_stack(stack, tokens_embedding, token_index, batch_index, action)
-        token_log_prob = self._token_distribution.log_prob(representation, action.argument)
-        return base_generate_log_prob + token_log_prob
-
-    def _non_terminal(self, base_non_terminal_log_prob, stack, representation, action):
-        non_terminal_embedding, argument_index = self._get_non_terminal_embedding(self._non_terminal_embedding, action)
-        stack.push(non_terminal_embedding, action)
-        non_terminal_logits = self._representation2non_terminal_logits(representation)
-        non_terminal_log_probs = self._logits2log_prob(non_terminal_logits)
-        conditional_non_terminal_log_prob = non_terminal_log_probs[:, :, argument_index]
-        action_log_prob = base_non_terminal_log_prob + conditional_non_terminal_log_prob
-        return action_log_prob
-
-    def _get_non_terminal_embedding(self, embeddings, action):
-        argument_index = action.argument_index_as_tensor()
-        non_terminal_embedding = embeddings(argument_index).unsqueeze(dim=0).unsqueeze(dim=0)
-        return non_terminal_embedding, argument_index
 
     def __str__(self):
         return (
