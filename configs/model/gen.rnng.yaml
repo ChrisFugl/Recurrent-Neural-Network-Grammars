@@ -2,6 +2,7 @@ model:
   type: rnng
   composer:
     type: birnn
+    num_layers: 1
   distribution:
     type: class_based_softmax
     cluster: data/pet/wsj/generative/brown_c140.cluster

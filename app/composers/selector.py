@@ -12,6 +12,7 @@ def get_composer(device, config):
         from app.composers.birnn import BiRNNComposer
         rnn_config = deepcopy(config.rnn)
         rnn_config['bidirectional'] = True
+        rnn_config['num_layers'] = config.composer.num_layers
         birnn = get_rnn(device, config.embedding.size, rnn_config)
         return BiRNNComposer(birnn, config.embedding.size)
     else:
