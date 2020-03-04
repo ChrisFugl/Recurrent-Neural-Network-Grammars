@@ -13,6 +13,8 @@ def get_composer(device, config):
         rnn_config = deepcopy(config.rnn)
         rnn_config['bidirectional'] = True
         rnn_config['num_layers'] = config.composer.num_layers
+        if config.composer.num_layers == 1:
+            rnn_config['dropout'] = 0.0
         birnn = get_rnn(device, config.embedding.size, rnn_config)
         return BiRNNComposer(birnn, config.embedding.size)
     else:

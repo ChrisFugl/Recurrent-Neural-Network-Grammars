@@ -46,7 +46,8 @@ def get_model(device, generative, token_count, action_count, non_terminal_count,
             token_distribution,
             non_terminal_count,
             action_set,
-            config.threads
+            config.threads,
+            config.reverse_tokens,
         ).to(device)
     else:
         raise Exception(f'Unknown model: {config.type}')

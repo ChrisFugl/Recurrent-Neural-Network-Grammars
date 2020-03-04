@@ -19,7 +19,8 @@ class RNNG(Model):
         token_distribution,
         non_terminal_count,
         action_set,
-        threads
+        threads,
+        reverse_tokens,
     ):
         """
         :type device: torch.device
@@ -38,11 +39,13 @@ class RNNG(Model):
         :type non_terminal_count: int
         :type action_set: app.data.action_set.ActionSet
         :type threads: int
+        :type reverse_tokens: bool
         """
         super().__init__()
         self._device = device
         self._generative = generative
         self._threads = threads
+        self._reverse_tokens = reverse_tokens
         self._action_set = action_set
         self._action_embedding = action_embedding
         self._non_terminal_embedding = non_terminal_embedding
@@ -77,6 +80,9 @@ class RNNG(Model):
 
         actions_embedding = self._action_embedding(batch.actions.tensor)
         tokens_embedding = self._token_embedding(batch.tokens.tensor)
+
+        if self._reverse_tokens:
+            tokens_embedding = tokens_embedding.flip([0])
 
         # add to action history and token buffer
         actions_after_first_embedding = actions_embedding[1:]
@@ -144,7 +150,7 @@ class RNNG(Model):
         """
         stack = self._stack.new()
         action_structures = ActionStructures(stack, token_buffer)
-        token_index = 0
+        token_index = 0 if not self._reverse_tokens else element.tokens.max_length - 1
         token_counter = 0
 
         # first action is always NT(S), use this to initialize stack

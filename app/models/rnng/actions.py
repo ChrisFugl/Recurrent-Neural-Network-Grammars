@@ -66,7 +66,7 @@ def shift(args):
     structures.stack.push(embedding, args.action)
 
     action_log_prob = args.log_prob_base[:, :, args.action2index[ACTION_SHIFT_INDEX]]
-    token_index = min(outputs.token_index + 1, args.element.tokens.length - 1)
+    token_index = max(outputs.token_index - 1, 0)
     return action_log_prob, outputs.open_non_terminals_count, token_index, outputs.token_counter + 1
 
 def generate(args):

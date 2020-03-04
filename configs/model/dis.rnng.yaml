@@ -27,3 +27,4 @@ model:
   stack:
     type: 'rnn'
   threads: 1
+  reverse_tokens: true
