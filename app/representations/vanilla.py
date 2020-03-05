@@ -18,7 +18,7 @@ class VanillaRepresentation(Representation):
         self._representation_size = representation_size
         input_size = 3 * embedding_size
         self._feedforward = nn.Linear(in_features=input_size, out_features=representation_size, bias=True)
-        self._activation = nn.Tanh()
+        self._activation = nn.ReLU()
         self._dropout = nn.Dropout(p=dropout)
 
     def forward(self, action_history, stack, token_buffer, action_timestep, token_timestep, batch_index):

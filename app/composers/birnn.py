@@ -13,7 +13,7 @@ class BiRNNComposer(Composer):
         super().__init__()
         self._birnn = birnn
         self._affine = nn.Linear(in_features=2 * output_size, out_features=output_size, bias=True)
-        self._activation = nn.Tanh()
+        self._activation = nn.ReLU()
 
     def forward(self, non_terminal_embedding, popped_stack_items):
         """

@@ -15,7 +15,7 @@ class StackOnlyRepresentation(Representation):
         super().__init__()
         self._representation_size = representation_size
         self._feedforward = nn.Linear(in_features=embedding_size, out_features=representation_size, bias=True)
-        self._activation = nn.Tanh()
+        self._activation = nn.ReLU()
         self._dropout = nn.Dropout(p=dropout)
 
     def forward(self, action_history, stack, token_buffer, action_timestep, token_timestep, batch_index):
