@@ -21,4 +21,4 @@ class BatchEvaluator(Evaluator):
         :type posttraining: bool
         :type end_of_epoch: bool
         """
-        return (self._pretraining and pretraining) or (self._posttraining and posttraining) or batch % self._batch == 0
+        return (self._pretraining and pretraining) or (self._posttraining and posttraining) or (not end_of_epoch and batch % self._batch == 0)
