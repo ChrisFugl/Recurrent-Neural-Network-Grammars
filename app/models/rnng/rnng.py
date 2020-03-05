@@ -212,24 +212,3 @@ class RNNG(Model):
             + ('' if not self._generative else f'  token_distribution={self._token_distribution}\n')
             + ')'
         )
-
-    # override train and eval methods to ensure that subcomponents are also put in train/eval mode
-    def train(self, mode=True):
-        super().train(mode=mode)
-        self._action_history.train(mode=mode)
-        self._token_buffer.train(mode=mode)
-        self._stack.train(mode=mode)
-        self._representation.train(mode=mode)
-        self._composer.train(mode=mode)
-        if self._generative:
-            self._token_distribution.train(mode=mode)
-
-    def eval(self):
-        super().eval()
-        self._action_history.eval()
-        self._token_buffer.eval()
-        self._stack.eval()
-        self._representation.eval()
-        self._composer.eval()
-        if self._generative:
-            self._token_distribution.eval()

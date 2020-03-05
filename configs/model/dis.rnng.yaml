@@ -17,6 +17,7 @@ model:
   representation:
     type: vanilla
     size: 128
+    dropout: 0.2
   rnn:
     type: lstm
     hidden_size: 128
