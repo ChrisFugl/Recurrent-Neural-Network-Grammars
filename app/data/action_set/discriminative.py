@@ -7,7 +7,7 @@ from app.data.action_set.action_set import ActionSet
 
 class Discriminative(ActionSet):
 
-    def valid_actions(self, token_buffer, token_counter, stack, open_non_terminals_count):
+    def valid_actions(self, tokens_length, token_counter, stack, open_non_terminals_count):
         """
         :type token_buffer: app.memories.memory.Memory
         :type token_counter: int
@@ -18,7 +18,7 @@ class Discriminative(ActionSet):
         valid_actions = []
         action2index = {}
         counter = 0
-        buffer_is_empty = token_counter == token_buffer.count()
+        buffer_is_empty = token_counter == tokens_length
         _, top_action = stack.top()
         top_action_type = top_action.type()
         is_non_terminal = top_action_type == ACTION_NON_TERMINAL_TYPE

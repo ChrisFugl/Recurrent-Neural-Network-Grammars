@@ -1,8 +1,8 @@
 class ActionSet:
 
-    def valid_actions(self, token_buffer, token_counter, stack, open_non_terminals_count):
+    def valid_actions(self, tokens_length, token_counter, stack, open_non_terminals_count):
         """
-        :type token_buffer: app.memories.memory.Memory
+        :type tokens_length: int
         :type token_counter: int
         :type stack: app.stacks.stack.Stack
         :type open_non_terminals_count: int

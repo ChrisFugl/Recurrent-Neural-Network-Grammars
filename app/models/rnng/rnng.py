@@ -104,23 +104,40 @@ class RNNG(Model):
 
         return log_probs
 
-    def next_state(self, previous_state):
+    def initial_state(self, tokens):
         """
-        Compute next state and action probs given the previous state.
-
-        :returns: next state, next_actions
-        """
-        # TODO
-        raise NotImplementedError('not implemented yet')
-
-    def parse(self, tokens):
-        """
-        Generate a parse of a sentence.
+        Get initial state of model in a parse.
 
         :type tokens: torch.Tensor
+        :returns: initial state
+        :rtype: app.models.rnng.state.RNNGState
         """
+        stack = self._stack.new()
+        action_history = self._action_history.new()
+        token_buffer = self._token_buffer.new()
+        tokens_embedding = self._token_embedding(tokens)
+        token_buffer.add(tokens_embedding)
+        tokens_length = tokens.size(0)
         # TODO
-        raise NotImplementedError('not implemented yet')
+        return None
+
+    def next_state(self, previous_state, action):
+        """
+        Advance state of the model to the next state.
+
+        :param previous_state: model specific previous state
+        :type action: app.data.actions.action.Action
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
+    def next_action_log_probs(self, state, posterior_scaling=1.0):
+        """
+        Compute log probability of every action given the current state.
+
+        :param state: state of a parse
+        :rtype: torch.Tensor
+        """
+        raise NotImplementedError('must be implemented by subclass')
 
     def save(self, path):
         """
@@ -163,7 +180,7 @@ class RNNG(Model):
             action_index = action_counter - 1
             action = element.actions.actions[action_counter]
             representation = self._representation(action_history, stack, token_buffer, action_index, token_index, element.index)
-            valid_actions, action2index = self._action_set.valid_actions(token_buffer, token_counter, stack, open_non_terminals_count)
+            valid_actions, action2index = self._action_set.valid_actions(element.tokens.length, token_counter, stack, open_non_terminals_count)
             assert action.index() in action2index, f'{action} is not a valid action. (action2index = {action2index})'
             logits_base = self._representation2logits(representation)
             logits_base_valid = logits_base[:, :, valid_actions]
