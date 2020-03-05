@@ -1,3 +1,4 @@
+from app.constants import START_ACTION_INDEX, START_TOKEN_INDEX
 from app.models.model import Model
 from app.models.rnng.actions import call_action, ActionArgs, ActionOutputs, ActionFunctions, ActionEmbeddings, ActionStructures
 from joblib import Parallel, delayed
@@ -75,18 +76,22 @@ class RNNG(Model):
         posterior_scaling=1.0
         :rtype: torch.Tensor
         """
-        action_history = self._action_history.new()
-        token_buffer = self._token_buffer.new()
-
+        # initialize action history and token buffer with start action and start terminal, respectively
+        start_action = torch.tensor([START_ACTION_INDEX] * batch.size, device=self._device, dtype=torch.long).view(1, batch.size)
+        start_action_embedding = self._action_embedding(start_action)
+        start_token = torch.tensor([START_TOKEN_INDEX] * batch.size, device=self._device, dtype=torch.long).view(1, batch.size)
+        start_token_embedding = self._token_embedding(start_token)
         actions_embedding = self._action_embedding(batch.actions.tensor)
+        actions_embedding = torch.cat((start_action_embedding, actions_embedding), dim=0)
         tokens_embedding = self._token_embedding(batch.tokens.tensor)
-
+        tokens_embedding = torch.cat((start_token_embedding, tokens_embedding), dim=0)
         if self._reverse_tokens:
             tokens_embedding = tokens_embedding.flip([0])
 
         # add to action history and token buffer
-        actions_after_first_embedding = actions_embedding[1:]
-        action_history.add(actions_after_first_embedding)
+        action_history = self._action_history.new()
+        token_buffer = self._token_buffer.new()
+        action_history.add(actions_embedding)
         token_buffer.add(tokens_embedding)
 
         # stack operations
@@ -161,24 +166,22 @@ class RNNG(Model):
         """
         :type action_history: app.memories.memory.Memory
         :type token_buffer: app.memories.memory.Memory
-        :type actions_embedding: torch.nn.Embedding
-        :type tokens_embedding: torch.nn.Embedding
+        :type actions_embedding: torch.Tensor
+        :type tokens_embedding: torch.Tensor
         :type element: app.data.batch.BatchElement
         """
         stack = self._stack.new()
         action_structures = ActionStructures(stack, token_buffer)
-        token_index = 0 if not self._reverse_tokens else element.tokens.max_length - 1
+        # first action is always the start-action, use this to initialize stack
+        start_action_embedding = actions_embedding[0:1, element.index:element.index+1, :]
+        stack.push(start_action_embedding, None)
+
+        token_index = 1 if not self._reverse_tokens else element.tokens.max_length
         token_counter = 0
-
-        # first action is always NT(S), use this to initialize stack
-        action_first = element.actions.actions[0]
-        self._push_to_stack(stack, actions_embedding, 0, element.index, action_first)
-        open_non_terminals_count = 1
-        log_probs = torch.zeros((element.actions.max_length - 1,), dtype=torch.float, device=self._device, requires_grad=False)
-
-        for action_counter in range(1, element.actions.length):
-            action_index = action_counter - 1
-            action = element.actions.actions[action_counter]
+        open_non_terminals_count = 0
+        log_probs = torch.zeros((element.actions.max_length,), dtype=torch.float, device=self._device, requires_grad=False)
+        for action_index in range(element.actions.length):
+            action = element.actions.actions[action_index]
             representation = self._representation(action_history, stack, token_buffer, action_index, token_index, element.index)
             valid_actions, action2index = self._action_set.valid_actions(element.tokens.length, token_counter, stack, open_non_terminals_count)
             assert action.index() in action2index, f'{action} is not a valid action. (action2index = {action2index})'
@@ -196,10 +199,6 @@ class RNNG(Model):
             log_probs[action_index] = action_log_prob
 
         return log_probs
-
-    def _push_to_stack(self, stack, embeddings, item_index, batch_index, action):
-        action_embedding = embeddings[item_index, batch_index].unsqueeze(dim=0).unsqueeze(dim=0)
-        return stack.push(action_embedding, action)
 
     def __str__(self):
         return (

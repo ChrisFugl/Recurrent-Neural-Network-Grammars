@@ -1,3 +1,4 @@
+from app.constants import ACTION_EMBEDDING_OFFSET, TOKEN_EMBEDDING_OFFETSET
 from app.data.action_set import get_action_set
 from app.checkpoints import get_checkpoint
 from app.data.iterators import get_iterator
@@ -27,10 +28,7 @@ def _main(config):
     action_set = get_action_set(config.type)
     iterator_train = get_iterator(device, action_converter, token_converter, unknownified_tokens_train, actions_train, config.iterator)
     iterator_val = get_iterator(device, action_converter, token_converter, unknownified_tokens_val, actions_val, config.iterator)
-    token_count = token_converter.count()
-    action_count = action_converter.count()
-    non_terminal_count = action_converter.count_non_terminals()
-    model = get_model(device, generative, token_count, action_count, non_terminal_count, action_set, config.model)
+    model = get_model(device, generative, token_converter, action_converter, action_set, config.model)
     loss = get_loss(device, config.loss)
     optimizer = get_optimizer(config.optimizer, model.parameters())
     learning_rate_scheduler = get_learning_rate_scheduler(optimizer, config.lr_scheduler)
@@ -39,10 +37,19 @@ def _main(config):
     evaluator = get_evaluator(config.evaluator)
     task = TrainTask(
         device,
-        iterator_train, iterator_val,
-        model, loss, optimizer, learning_rate_scheduler,
-        stopping_criterion, checkpoint, evaluator,
-        config.load_checkpoint, token_count, non_terminal_count, action_count,
+        iterator_train,
+        iterator_val,
+        model,
+        loss,
+        optimizer,
+        learning_rate_scheduler,
+        stopping_criterion,
+        checkpoint,
+        evaluator,
+        config.load_checkpoint,
+        token_converter.count() - TOKEN_EMBEDDING_OFFETSET,
+        action_converter.count_non_terminals(),
+        action_converter.count() - ACTION_EMBEDDING_OFFSET,
     )
     task.run()
 

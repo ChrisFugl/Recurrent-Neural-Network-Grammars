@@ -23,23 +23,34 @@ class Model(nn.Module):
         :type posterior_scaling: float
         :rtype: torch.Tensor
         """
-        raise NotImplementedError('method must be implemented by a subclass')
+        raise NotImplementedError('must be implemented by subclass')
 
-    def next_state(self, previous_state):
+    def initial_state(self, tokens):
         """
-        Compute next state and action probabilities given the previous state.
-
-        :returns: next state, next_actions
-        """
-        raise NotImplementedError('method must be implemented by a subclass')
-
-    def parse(self, tokens):
-        """
-        Generate a parse of a sentence.
+        Get initial state of model in a parse.
 
         :type tokens: torch.Tensor
+        :returns: initial state
         """
-        raise NotImplementedError('method must be implemented by a subclass')
+        raise NotImplementedError('must be implemented by subclass')
+
+    def next_state(self, previous_state, action):
+        """
+        Advance state of the model to the next state.
+
+        :param previous_state: model specific previous state
+        :type action: app.data.actions.action.Action
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
+    def next_action_log_probs(self, state, posterior_scaling=1.0):
+        """
+        Compute log probability of every action given the current state.
+
+        :param state: state of a parse
+        :rtype: torch.Tensor
+        """
+        raise NotImplementedError('must be implemented by subclass')
 
     def save(self, path):
         """

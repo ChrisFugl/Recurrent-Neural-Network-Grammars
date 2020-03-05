@@ -62,7 +62,7 @@ class CreateArtificialDataTask(Task):
         # s --> np , vp
         noun_phrase = self._create_noun_phrase()
         verb_phrase = self._create_verb_phrase(next_depth)
-        return f'( {noun_phrase} {verb_phrase})'
+        return f'(S {noun_phrase} {verb_phrase})'
 
     def _create_noun_phrase(self):
         # np --> det, n

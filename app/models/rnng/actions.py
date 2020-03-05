@@ -31,7 +31,6 @@ def reduce(args):
     non_terminal_embedding, _ = _get_non_terminal_embedding(args.embeddings.non_terminal_compose, action)
     composed = args.functions.composer(non_terminal_embedding, popped_tensor)
     stack.push(composed, action)
-
     outputs = args.outputs
     action_log_prob = args.log_prob_base[:, :, args.action2index[ACTION_REDUCE_INDEX]]
     return action_log_prob, outputs.open_non_terminals_count - 1, outputs.token_index, outputs.token_counter
@@ -48,7 +47,6 @@ def non_terminal(args):
     non_terminal_logits = functions.representation2non_terminal_logits(args.representation)
     non_terminal_log_probs = functions.logits2log_prob(non_terminal_logits)
     conditional_non_terminal_log_prob = non_terminal_log_probs[:, :, argument_index]
-
     outputs = args.outputs
     non_terminal_log_prob = args.log_prob_base[:, :, args.action2index[ACTION_NON_TERMINAL_INDEX]]
     action_log_prob = non_terminal_log_prob + conditional_non_terminal_log_prob
@@ -64,9 +62,8 @@ def shift(args):
     structures = args.structures
     embedding = structures.token_buffer.get(outputs.token_index, args.element.index)
     structures.stack.push(embedding, args.action)
-
     action_log_prob = args.log_prob_base[:, :, args.action2index[ACTION_SHIFT_INDEX]]
-    token_index = max(outputs.token_index - 1, 0)
+    token_index = max(outputs.token_index - 1, 1)
     return action_log_prob, outputs.open_non_terminals_count, token_index, outputs.token_counter + 1
 
 def generate(args):
@@ -77,11 +74,10 @@ def generate(args):
     """
     outputs = args.outputs
     _push_to_stack(args.structures.stack, args.tokens_embedding, outputs.token_index, args.element.index, args.action)
-    token_log_prob = args.functions.token_distribution.log_prob(args.representation, args.action.argument)
-
     generate_log_prob = args.log_prob_base[:, :, args.action2index[ACTION_GENERATE_INDEX]]
+    token_log_prob = args.functions.token_distribution.log_prob(args.representation, args.action.argument)
     action_log_prob = generate_log_prob + token_log_prob
-    token_index = min(outputs.token_index + 1, args.element.tokens.length - 1)
+    token_index = min(outputs.token_index + 1, args.element.tokens.length)
     return action_log_prob, outputs.open_non_terminals_count, token_index, outputs.token_counter + 1
 
 def _get_non_terminal_embedding(embeddings, action):

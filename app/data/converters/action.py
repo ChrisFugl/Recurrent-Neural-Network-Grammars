@@ -1,4 +1,7 @@
-from app.constants import ACTION_REDUCE_TYPE, ACTION_GENERATE_TYPE, ACTION_NON_TERMINAL_TYPE, ACTION_SHIFT_TYPE, PAD_INDEX, PAD_SYMBOL
+from app.constants import (
+    ACTION_REDUCE_TYPE, ACTION_GENERATE_TYPE, ACTION_NON_TERMINAL_TYPE, ACTION_SHIFT_TYPE,
+    ACTION_EMBEDDING_OFFSET, PAD_INDEX, PAD_SYMBOL, START_ACTION_INDEX, START_ACTION_SYMBOL
+)
 from app.data.actions.generate import GenerateAction
 from app.data.actions.non_terminal import NonTerminalAction
 from app.data.actions.reduce import ReduceAction
@@ -10,6 +13,7 @@ class ActionConverter:
     Converts actions to integers and back again in a deterministic manner.
 
     Actions come in the following order:
+    * padding
     * singletons (REDUCE, SHIFT)
     * terminals (GEN)
     * non-terminals (NT)
@@ -28,7 +32,7 @@ class ActionConverter:
         self._terminal_count = len(self._index2terminal)
         self._non_terminal2index, self._index2non_terminal = self._get_non_terminal_actions(self._generative, trees)
         self._non_terminal_count = len(self._index2non_terminal)
-        self._actions_count = 1 + self._singleton_count + self._terminal_count + self._non_terminal_count
+        self._actions_count = ACTION_EMBEDDING_OFFSET + self._singleton_count + self._terminal_count + self._non_terminal_count
 
     def count(self):
         """
@@ -56,6 +60,15 @@ class ActionConverter:
         """
         return self._terminal_count
 
+    def integer2action(self, index):
+        """
+        :type integer: int
+        :rtype: app.data.actions.action.Action
+        """
+        string = self.integer2string(index)
+        action = self.string2action(string)
+        return action
+
     def integer2string(self, index):
         """
         :type integer: int
@@ -63,9 +76,11 @@ class ActionConverter:
         """
         if index == PAD_INDEX:
             return PAD_SYMBOL
-        elif index < 1 + self._singleton_count:
+        elif index == START_ACTION_INDEX:
+            return START_ACTION_SYMBOL
+        elif index < ACTION_EMBEDDING_OFFSET + self._singleton_count:
             return self._index2singleton[index]
-        elif index < 1 + self._singleton_count + self._terminal_count:
+        elif index < ACTION_EMBEDDING_OFFSET + self._singleton_count + self._terminal_count:
             terminal = self._index2terminal[index - self._singleton_count]
             return f'GEN({terminal})'
         else:
@@ -80,6 +95,8 @@ class ActionConverter:
         """
         if action_string == PAD_SYMBOL:
             raise Exception('Cannot convert padding symbol to action.')
+        if action_string == START_ACTION_SYMBOL:
+            raise Exception('Cannot convert start symbol to action.')
         type, argument = parse_action(action_string)
         if self._generative:
             if type == ACTION_REDUCE_TYPE:
@@ -88,18 +105,16 @@ class ActionConverter:
                 argument_index = self._terminal2index[argument]
                 return GenerateAction(device, argument, argument_index)
             else:
-                non_terminal = self._get_non_terminal(argument)
-                argument_index = self._non_terminal2index[non_terminal]
-                return NonTerminalAction(device, non_terminal, argument_index)
+                argument_index = self._non_terminal2index[argument]
+                return NonTerminalAction(device, argument, argument_index)
         else:
             if type == ACTION_REDUCE_TYPE:
                 return ReduceAction(device)
             elif type == ACTION_SHIFT_TYPE:
                 return ShiftAction(device)
             else:
-                non_terminal = self._get_non_terminal(argument)
-                argument_index = self._non_terminal2index[non_terminal]
-                return NonTerminalAction(device, non_terminal, argument_index)
+                argument_index = self._non_terminal2index[argument]
+                return NonTerminalAction(device, argument, argument_index)
 
     def string2integer(self, action_string):
         """
@@ -108,6 +123,8 @@ class ActionConverter:
         """
         if action_string == PAD_SYMBOL:
             return PAD_INDEX
+        if action_string == START_ACTION_SYMBOL:
+            return START_ACTION_INDEX
         type, argument = parse_action(action_string)
         if self._generative:
             if type == ACTION_REDUCE_TYPE:
@@ -115,16 +132,14 @@ class ActionConverter:
             elif type == ACTION_GENERATE_TYPE:
                 return self._singleton_count + self._terminal2index[argument]
             else:
-                non_terminal = self._get_non_terminal(argument)
-                return self._singleton_count + self._terminal_count + self._non_terminal2index[non_terminal]
+                return self._singleton_count + self._terminal_count + self._non_terminal2index[argument]
         else:
             if type == ACTION_REDUCE_TYPE:
                 return self._singleton2index['REDUCE']
             elif type == ACTION_SHIFT_TYPE:
                 return self._singleton2index['SHIFT']
             else:
-                non_terminal = self._get_non_terminal(argument)
-                return self._singleton_count + self._non_terminal2index[non_terminal]
+                return self._singleton_count + self._non_terminal2index[argument]
 
     def _get_singleton_actions(self, generative):
         if generative:
@@ -159,14 +174,3 @@ class ActionConverter:
                         action2index[non_terminal] = counter
                         counter += 1
         return action2index, index2action
-
-    def _get_non_terminal(self, argument):
-        # heuristic for dealing with non-terminals that are not in trainingset
-        # only used when non-terminals have not been unknownified in advance
-        splitted = argument.split('-')
-        length = len(splitted)
-        for end in range(length, 0, -1):
-            joined = '-'.join(splitted[:end])
-            if joined in self._non_terminal2index:
-                return joined
-        raise Exception(f'Unknown non-terminal: {argument}')
