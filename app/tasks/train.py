@@ -77,24 +77,25 @@ class TrainTask(Task):
         batch_count = self._start_batch_count
         epoch = self._start_epoch
         training_losses = []
+        best_loss_val = None
         if self._evaluator.should_evaluate(epoch, batch_count, pretraining=True):
-            self._evaluate(epoch, batch_count, training_losses)
+            best_loss_val = self._evaluate(epoch, batch_count, training_losses, best_loss_val)
         # assumes a single learning rate for all parameters
         learning_rate = self._optimizer.param_groups[0]['lr']
         self._log_epoch(epoch, batch_count, learning_rate)
         while True:
-            epoch, batch_count, done, training_losses = self._train_epoch(time_start, epoch, batch_count, training_losses)
+            epoch, batch_count, done, training_losses, best_loss_val = self._train_epoch(
+                time_start, epoch, batch_count, training_losses, best_loss_val
+            )
             if done:
                 break
             if self._evaluator.should_evaluate(epoch, batch_count, end_of_epoch=True):
-                self._evaluate(epoch, batch_count, training_losses)
+                best_loss_val = self._evaluate(epoch, batch_count, training_losses, best_loss_val)
                 training_losses = []
             self._stopping_criterion.add_epoch(epoch)
             if self._stopping_criterion.is_done():
                 break
-        if self._evaluator.should_evaluate(epoch, batch_count, training_losses, posttraining=True):
-            self._evaluate(epoch, batch_count, training_losses)
-        self._save()
+        self._evaluate(epoch, batch_count, training_losses, best_loss_val)
         time_stop = time.time()
         time_seconds = self._get_seconds(time_start, time_stop)
         time_hours = time_seconds / 3600
@@ -102,7 +103,7 @@ class TrainTask(Task):
         self._logger.info(f'Training time: {time_seconds:0.2f} s/{time_hours:0.2f} h/{time_days:0.2f} d')
         self._logger.info('Finished training')
 
-    def _train_epoch(self, time_start, epoch, batch_count, training_losses):
+    def _train_epoch(self, time_start, epoch, batch_count, training_losses, best_loss_val):
         time_epoch_start = time.time()
         start_of_epoch = True
         for batch in self._iterator_train:
@@ -110,10 +111,10 @@ class TrainTask(Task):
             loss_train = self._train_batch(batch, batch_count)
             training_losses.append(loss_train)
             if self._evaluator.should_evaluate(epoch, batch_count):
-                self._evaluate(epoch, batch_count, training_losses)
+                best_loss_val = self._evaluate(epoch, batch_count, training_losses, best_loss_val)
                 training_losses = []
             if self._stopping_criterion.is_done():
-                return epoch, batch_count, True, training_losses
+                return epoch, batch_count, True, training_losses, best_loss_val
             if self._checkpoint.should_save_checkpoint(epoch, batch_count, start_of_epoch):
                 self._save_checkpoint(time_start, epoch, batch_count)
             start_of_epoch = False, training_losses
@@ -126,7 +127,7 @@ class TrainTask(Task):
         self._log_epoch(epoch, batch_count, learning_rate)
         self._writer_train.add_scalar('time_s/epoch', self._get_seconds(time_epoch_start, time_epoch_stop), batch_count)
         self._writer_train.add_scalar('time_s/total', time_total, batch_count)
-        return epoch, batch_count, False, training_losses
+        return epoch, batch_count, False, training_losses, best_loss_val
 
     def _train_batch(self, batch, batch_count):
         time_batch_start = time.time()
@@ -142,7 +143,7 @@ class TrainTask(Task):
         loss.backward()
         self._optimizer.step()
 
-    def _evaluate(self, epoch, batch_count, training_losses):
+    def _evaluate(self, epoch, batch_count, training_losses, best_loss_val):
         time_val_start = time.time()
         self._model.eval()
         losses = []
@@ -162,6 +163,14 @@ class TrainTask(Task):
             self._logger.info(f'epoch={epoch}, batch={batch_count}, loss_train={loss_train:0.8f}, loss_val={loss_val:0.8f}')
         else:
             self._logger.info(f'epoch={epoch}, batch={batch_count}, loss_val={loss_val:0.8f}')
+
+        # save model with best performing validation loss
+        if best_loss_val is None or loss_val < best_loss_val:
+            if best_loss_val is not None:
+                self._save()
+            return loss_val
+        else:
+            return best_loss_val
 
     def _get_seconds(self, start, stop):
         seconds = stop - start

@@ -5,9 +5,9 @@ def get_evaluator(config):
     """
     if config.type == 'epoch':
         from app.evaluators.epoch import EpochEvaluator
-        return EpochEvaluator(config.epoch, config.pretraining, config.posttraining)
+        return EpochEvaluator(config.epoch, config.pretraining)
     elif config.type == 'batch':
         from app.evaluators.batch import BatchEvaluator
-        return BatchEvaluator(config.batch, config.pretraining, config.posttraining)
+        return BatchEvaluator(config.batch, config.pretraining)
     else:
         raise Exception(f'Unknown evaluator: {config.type}')

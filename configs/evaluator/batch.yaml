@@ -2,4 +2,3 @@ evaluator:
   type: batch
   batch: 150
   pretraining: true
-  posttraining: true
