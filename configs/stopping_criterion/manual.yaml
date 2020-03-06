@@ -1,0 +1,2 @@
+stopping_criterion:
+  type: manual

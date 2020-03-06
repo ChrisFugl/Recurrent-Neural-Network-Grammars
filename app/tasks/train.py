@@ -108,9 +108,8 @@ class TrainTask(Task):
             self._train_batch(batch, batch_count)
             if self._evaluator.should_evaluate(epoch, batch_count):
                 self._evaluate(epoch, batch_count)
-                # check if stopping criterion necessitates an early stopping
-                if self._stopping_criterion.is_done():
-                    return epoch, batch_count, True
+            if self._stopping_criterion.is_done():
+                return epoch, batch_count, True
             if self._checkpoint.should_save_checkpoint(epoch, batch_count, start_of_epoch):
                 self._save_checkpoint(time_start, epoch, batch_count)
             start_of_epoch = False
