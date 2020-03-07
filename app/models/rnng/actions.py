@@ -7,7 +7,7 @@ import torch
 def call_action(type, args):
     """
     :type type: int
-    :type args: ActionArguments
+    :type args: ActionArgs
     :rtype: torch.Tensor, int, int, int
     :returns: action log prob, open non-terminals count, token index, token count
     """
@@ -16,11 +16,11 @@ def call_action(type, args):
 
 def reduce(args):
     """
-    :type args: ActionArguments
+    :type args: ActionArgs
     :rtype: torch.Tensor, int, int, int
     :returns: action log prob, open non-terminals count, token index, token count
     """
-    stack = args.structures.stack
+    stack = args.stack
     popped_items = []
     action = None
     while action is None or action.type() != ACTION_NON_TERMINAL_TYPE:
@@ -32,52 +32,59 @@ def reduce(args):
     composed = args.functions.composer(non_terminal_embedding, popped_tensor)
     stack.push(composed, action)
     outputs = args.outputs
-    action_log_prob = args.log_prob_base[:, :, args.action2index[ACTION_REDUCE_INDEX]]
+    action_log_prob = _get_base_log_prop(args, ACTION_REDUCE_INDEX)
     return action_log_prob, outputs.open_non_terminals_count - 1, outputs.token_index, outputs.token_counter
 
 def non_terminal(args):
     """
-    :type args: ActionArguments
+    :type args: ActionArgs
     :rtype: torch.Tensor, int, int, int
     :returns: action log prob, open non-terminals count, token index, token count
     """
     functions = args.functions
     non_terminal_embedding, argument_index = _get_non_terminal_embedding(args.embeddings.non_terminal, args.action)
-    args.structures.stack.push(non_terminal_embedding, args.action)
-    non_terminal_logits = functions.representation2non_terminal_logits(args.representation)
-    non_terminal_log_probs = functions.logits2log_prob(non_terminal_logits)
-    conditional_non_terminal_log_prob = non_terminal_log_probs[:, :, argument_index]
+    args.stack.push(non_terminal_embedding, args.action)
     outputs = args.outputs
-    non_terminal_log_prob = args.log_prob_base[:, :, args.action2index[ACTION_NON_TERMINAL_INDEX]]
-    action_log_prob = non_terminal_log_prob + conditional_non_terminal_log_prob
+    if args.log_probs is None:
+        action_log_prob = None
+    else:
+        non_terminal_log_prob = _get_base_log_prop(args, ACTION_NON_TERMINAL_INDEX)
+        non_terminal_logits = functions.representation2non_terminal_logits(args.log_probs.representation)
+        conditional_non_terminal_log_probs = functions.logits2log_prob(non_terminal_logits)
+        conditional_non_terminal_log_prob = conditional_non_terminal_log_probs[:, :, argument_index]
+        action_log_prob = non_terminal_log_prob + conditional_non_terminal_log_prob
     return action_log_prob, outputs.open_non_terminals_count + 1, outputs.token_index, outputs.token_counter
 
 def shift(args):
     """
-    :type args: ActionArguments
+    :type args: ActionArgs
     :rtype: torch.Tensor, int, int, int
     :returns: action log prob, open non-terminals count, token index, token count
     """
     outputs = args.outputs
-    structures = args.structures
-    embedding = structures.token_buffer.get(outputs.token_index, args.element.index)
-    structures.stack.push(embedding, args.action)
-    action_log_prob = args.log_prob_base[:, :, args.action2index[ACTION_SHIFT_INDEX]]
+    embedding = args.tokens_embedding[outputs.token_index, args.batch_index].unsqueeze(dim=0).unsqueeze(dim=0)
+    args.stack.push(embedding, args.action)
+    action_log_prob = _get_base_log_prop(args, ACTION_SHIFT_INDEX)
     token_index = max(outputs.token_index - 1, 1)
     return action_log_prob, outputs.open_non_terminals_count, token_index, outputs.token_counter + 1
 
 def generate(args):
     """
-    :type args: ActionArguments
+    :type args: ActionArgs
     :rtype: torch.Tensor, int, int, int
     :returns: action log prob, open non-terminals count, token index, token count
     """
     outputs = args.outputs
-    _push_to_stack(args.structures.stack, args.tokens_embedding, outputs.token_index, args.element.index, args.action)
-    generate_log_prob = args.log_prob_base[:, :, args.action2index[ACTION_GENERATE_INDEX]]
-    token_log_prob = args.functions.token_distribution.log_prob(args.representation, args.action.argument)
-    action_log_prob = generate_log_prob + token_log_prob
-    token_index = min(outputs.token_index + 1, args.element.tokens.length)
+    stack = args.stack
+    action_embedding = args.tokens_embedding[outputs.token_index, args.batch_index].unsqueeze(dim=0).unsqueeze(dim=0)
+    stack.push(action_embedding, args.action)
+    if args.log_probs is None:
+        action_log_prob = None
+    else:
+        generate_log_prob = _get_base_log_prop(args, ACTION_GENERATE_INDEX)
+        token_log_prob = args.functions.token_distribution.log_prob(args.log_probs.representation, args.action.argument)
+        action_log_prob = generate_log_prob + token_log_prob
+    token_index = min(outputs.token_index + 1, args.tokens_length)
     return action_log_prob, outputs.open_non_terminals_count, token_index, outputs.token_counter + 1
 
 def _get_non_terminal_embedding(embeddings, action):
@@ -85,9 +92,11 @@ def _get_non_terminal_embedding(embeddings, action):
     non_terminal_embedding = embeddings(argument_index).unsqueeze(dim=0).unsqueeze(dim=0)
     return non_terminal_embedding, argument_index
 
-def _push_to_stack(stack, embeddings, item_index, batch_index, action):
-    action_embedding = embeddings[item_index, batch_index].unsqueeze(dim=0).unsqueeze(dim=0)
-    return stack.push(action_embedding, action)
+def _get_base_log_prop(args, action_index):
+    if args.log_probs is None:
+        return None
+    else:
+        return args.log_probs.log_prob_base[:, :, args.log_probs.action2index[action_index]]
 
 _action2function = {
     ACTION_REDUCE_TYPE: reduce,
@@ -98,28 +107,26 @@ _action2function = {
 
 class ActionArgs:
 
-    def __init__(self, embeddings, functions, structures, outputs, tokens_embedding, representation, log_prob_base, action2index, element, action):
+    def __init__(self, embeddings, functions, stack, log_probs, outputs, tokens_embedding, batch_index, tokens_length, action):
         """
         :type embeddings: ActionEmbeddings
         :type functions: ActionFunctions
-        :type structures: ActionStructures
+        :type stack: app.stacks.stack.Stack
+        :type log_probs: ActionLogProbs
         :type outputs: ActionOutputs
         :type tokens_embedding: torch.Tensor
-        :type representation: torch.Tensor
-        :type log_prob_base: torch.Tensor
-        :type action2index: dict
-        :type element: app.data.batch.BatchElement
+        :type batch_index: int
+        :type tokens_length: int
         :type action: app.data.actions.action.Action
         """
         self.embeddings = embeddings
         self.functions = functions
-        self.structures = structures
+        self.stack = stack
         self.outputs = outputs
+        self.log_probs = log_probs
         self.tokens_embedding = tokens_embedding
-        self.representation = representation
-        self.log_prob_base = log_prob_base
-        self.action2index = action2index
-        self.element = element
+        self.batch_index = batch_index
+        self.tokens_length = tokens_length
         self.action = action
 
 class ActionEmbeddings:
@@ -146,15 +153,17 @@ class ActionFunctions:
         self.composer = composer
         self.token_distribution = token_distribution
 
-class ActionStructures:
+class ActionLogProbs:
 
-    def __init__(self, stack, token_buffer):
+    def __init__(self, representation, log_prob_base, action2index):
         """
-        :type stack: app.stacks.stack.Stack
-        :type token_buffer: app.memories.memory.Memory
+        :type representation: torch.Tensor
+        :type log_prob_base: torch.Tensor
+        :type action2index: dict
         """
-        self.stack = stack
-        self.token_buffer = token_buffer
+        self.representation = representation
+        self.log_prob_base = log_prob_base
+        self.action2index = action2index
 
 class ActionOutputs:
 

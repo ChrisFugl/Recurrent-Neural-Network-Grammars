@@ -78,6 +78,7 @@ class TrainTask(Task):
         epoch = self._start_epoch
         training_losses = []
         best_loss_val = None
+        self._model.train()
         if self._evaluator.should_evaluate(epoch, batch_count, pretraining=True):
             best_loss_val = self._evaluate(epoch, batch_count, training_losses, best_loss_val)
         # assumes a single learning rate for all parameters
@@ -131,7 +132,7 @@ class TrainTask(Task):
 
     def _train_batch(self, batch, batch_count):
         time_batch_start = time.time()
-        batch_log_probs = self._model(batch)
+        batch_log_probs = self._model.batch_log_likelihood(batch)
         loss_train = self._loss(batch_log_probs, batch.actions.lengths)
         self._optimize(loss_train)
         time_batch_stop = time.time()
@@ -148,7 +149,7 @@ class TrainTask(Task):
         self._model.eval()
         losses = []
         for batch in self._iterator_val:
-            log_probs = self._model(batch)
+            log_probs = self._model.batch_log_likelihood(batch)
             loss = self._loss(log_probs, batch.actions.lengths)
             losses.append(loss)
         loss_val = sum(losses) / len(losses)

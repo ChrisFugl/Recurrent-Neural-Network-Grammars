@@ -60,13 +60,43 @@ class ActionConverter:
         """
         return self._terminal_count
 
-    def integer2action(self, index):
+    def get_singleton_offset(self):
         """
+        :rtype: int
+        """
+        return ACTION_EMBEDDING_OFFSET
+
+    def get_terminal_offset(self):
+        """
+        :rtype: int
+        """
+        return ACTION_EMBEDDING_OFFSET + self._singleton_count
+
+    def get_non_terminal_offset(self):
+        """
+        :rtype: int
+        """
+        return ACTION_EMBEDDING_OFFSET + self._singleton_count + self._terminal_count
+
+    def action2integer(self, action):
+        """
+        :type action: app.data.actions.action.Action
+        :rtype: int
+        """
+        if hasattr(action, 'argument'):
+            argument = action.argument
+        else:
+            argument = None
+        return self._action_args2integer(action.type(), argument)
+
+    def integer2action(self, device, index):
+        """
+        :type device: torch.device
         :type integer: int
         :rtype: app.data.actions.action.Action
         """
         string = self.integer2string(index)
-        action = self.string2action(string)
+        action = self.string2action(device, string)
         return action
 
     def integer2string(self, index):
@@ -76,16 +106,18 @@ class ActionConverter:
         """
         if index == PAD_INDEX:
             return PAD_SYMBOL
-        elif index == START_ACTION_INDEX:
+        if index == START_ACTION_INDEX:
             return START_ACTION_SYMBOL
-        elif index < ACTION_EMBEDDING_OFFSET + self._singleton_count:
-            return self._index2singleton[index]
-        elif index < ACTION_EMBEDDING_OFFSET + self._singleton_count + self._terminal_count:
-            terminal = self._index2terminal[index - self._singleton_count]
+        singleton_offset = self.get_singleton_offset()
+        if index < singleton_offset + self._singleton_count:
+            return self._index2singleton[index - singleton_offset]
+        terminal_offset = self.get_terminal_offset()
+        if index < terminal_offset + self._terminal_count:
+            terminal = self._index2terminal[index - terminal_offset]
             return f'GEN({terminal})'
-        else:
-            non_terminal = self._index2non_terminal[index - self._singleton_count - self._terminal_count]
-            return f'NT({non_terminal})'
+        non_terminal_offset = self.get_non_terminal_offset()
+        non_terminal = self._index2non_terminal[index - non_terminal_offset]
+        return f'NT({non_terminal})'
 
     def string2action(self, device, action_string):
         """
@@ -126,20 +158,7 @@ class ActionConverter:
         if action_string == START_ACTION_SYMBOL:
             return START_ACTION_INDEX
         type, argument = parse_action(action_string)
-        if self._generative:
-            if type == ACTION_REDUCE_TYPE:
-                return self._singleton2index['REDUCE']
-            elif type == ACTION_GENERATE_TYPE:
-                return self._singleton_count + self._terminal2index[argument]
-            else:
-                return self._singleton_count + self._terminal_count + self._non_terminal2index[argument]
-        else:
-            if type == ACTION_REDUCE_TYPE:
-                return self._singleton2index['REDUCE']
-            elif type == ACTION_SHIFT_TYPE:
-                return self._singleton2index['SHIFT']
-            else:
-                return self._singleton_count + self._non_terminal2index[argument]
+        return self._action_args2integer(type, argument)
 
     def _get_singleton_actions(self, generative):
         if generative:
@@ -174,3 +193,25 @@ class ActionConverter:
                         action2index[non_terminal] = counter
                         counter += 1
         return action2index, index2action
+
+    def _action_args2integer(self, type, argument):
+        if self._generative:
+            if type == ACTION_REDUCE_TYPE:
+                singleton_offset = self.get_singleton_offset()
+                return singleton_offset + self._singleton2index['REDUCE']
+            elif type == ACTION_GENERATE_TYPE:
+                terminal_offset = self.get_terminal_offset()
+                return terminal_offset + self._terminal2index[argument]
+            else:
+                non_terminal_offset = self.get_non_terminal_offset()
+                return non_terminal_offset + self._non_terminal2index[argument]
+        else:
+            if type == ACTION_REDUCE_TYPE:
+                singleton_offset = self.get_singleton_offset()
+                return singleton_offset + self._singleton2index['REDUCE']
+            elif type == ACTION_SHIFT_TYPE:
+                singleton_offset = self.get_singleton_offset()
+                return singleton_offset + self._singleton2index['SHIFT']
+            else:
+                non_terminal_offset = self.get_non_terminal_offset()
+                return non_terminal_offset + self._non_terminal2index[argument]

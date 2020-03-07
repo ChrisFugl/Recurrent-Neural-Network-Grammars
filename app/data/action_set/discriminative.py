@@ -28,7 +28,7 @@ class Discriminative(ActionSet):
             buffer_is_empty = token_counter == tokens_length
             top_action_type = top_action.type()
             is_non_terminal = top_action_type == ACTION_NON_TERMINAL_TYPE
-            if buffer_is_empty or open_non_terminals_count >= 2 or (not is_non_terminal or (is_non_terminal and not top_action.open)):
+            if (not is_non_terminal or (is_non_terminal and not top_action.open)) and (buffer_is_empty or open_non_terminals_count >= 2):
                 valid_actions.append(ACTION_REDUCE_INDEX)
                 action2index[ACTION_REDUCE_INDEX] = counter
                 counter += 1
