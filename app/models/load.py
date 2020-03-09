@@ -17,14 +17,14 @@ def load_saved_model(device, load_dir):
     generative = is_generative(training_config.type)
     action_set = get_action_set(training_config.type)
     loader = get_loader(training_config.loader, name=f'loader_{training_config.name}')
-    _, actions, _, unknownified_tokens = loader.load()
+    _, actions, _, unknownified_tokens = loader.load_train()
     token_converter = TokenConverter(unknownified_tokens)
     action_converter = ActionConverter(token_converter, generative, actions)
     model = get_model(device, generative, token_converter, action_converter, action_set, training_config.model)
-    _load_model_params(model, load_dir)
+    load_model_params(model, load_dir)
     return model, action_converter
 
-def _load_model_params(model, load_dir):
+def load_model_params(model, load_dir):
     """
     :type model: app.models.model.Model
     :type load_dir: str

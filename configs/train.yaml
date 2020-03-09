@@ -6,7 +6,7 @@ defaults:
   - loss: negative_log_likelihood
   - optimizer: adam
   - lr_scheduler: constant
-  - stopping_criterion: early_stopping
+  - stopping_criterion: manual
   - checkpoint: never
   - evaluator: batch
 name: rnng

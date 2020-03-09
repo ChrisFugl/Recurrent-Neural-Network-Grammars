@@ -2,3 +2,4 @@ sampler:
   type: ancestral
   load_dir: null
   posterior_scaling: 0.8
+  samples: 100

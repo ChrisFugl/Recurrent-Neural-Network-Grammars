@@ -1,5 +1,4 @@
 from app.composers import get_composer
-from app.constants import ACTION_EMBEDDING_OFFSET
 from app.distributions import get_distribution
 from app.embeddings import get_embedding
 from app.memories import get_memory
@@ -32,7 +31,7 @@ def get_model(device, generative, token_converter, action_converter, action_set,
         stack = get_stack(config.stack, rnn_args=stack_rnn_args)
         representation = get_representation(config.embedding.size, config.representation)
         composer = get_composer(device, config)
-        token_distribution = None if not generative else get_distribution(device, config)
+        token_distribution = None if not generative else get_distribution(device, action_converter, config)
         return RNNG(
             device,
             generative,
@@ -51,6 +50,7 @@ def get_model(device, generative, token_converter, action_converter, action_set,
             action_set,
             config.threads,
             config.reverse_tokens,
+            action_converter,
         ).to(device)
     else:
         raise Exception(f'Unknown model: {config.type}')

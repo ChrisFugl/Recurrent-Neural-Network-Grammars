@@ -1,10 +1,7 @@
 defaults:
   - iterator: evaluate
-  - loader: wsj.gen.oracle
   - data: val
   - sampler: ancestral
-  - inferer: importance
-load_dir: null
 gpu: null
 seed: null
 name: rnng

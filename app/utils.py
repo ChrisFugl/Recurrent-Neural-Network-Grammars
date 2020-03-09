@@ -32,14 +32,17 @@ def is_generative(type):
     """
     return type == 'generative'
 
+def get_config(load_dir, name):
+    absolute_load_dir = hydra.utils.to_absolute_path(load_dir)
+    config_path = os.path.join(absolute_load_dir, f'{name}.yaml')
+    with open(config_path, 'r') as config_file:
+        config_dict = yaml.load(config_file, Loader=yaml.Loader)
+    config = OmegaConf.create(config_dict)
+    return config
+
 def get_training_config(load_dir):
     """
     :type load_dir: str
     :rtype: OmegaConf
     """
-    absolute_load_dir = hydra.utils.to_absolute_path(load_dir)
-    config_path = os.path.join(absolute_load_dir, '.hydra/config.yaml')
-    with open(config_path, 'r') as config_file:
-        config_dict = yaml.load(config_file, Loader=yaml.Loader)
-    config = OmegaConf.create(config_dict)
-    return config
+    return get_config(load_dir, '.hydra/config')

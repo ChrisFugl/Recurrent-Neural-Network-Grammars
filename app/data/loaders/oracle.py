@@ -18,12 +18,14 @@ class OracleLoader(Loader):
     * test.oracle
     """
 
-    def __init__(self, data_dir):
+    def __init__(self, data_dir, name=None):
         """
         :type data_dir: str
+        :type name: str
         """
         absolute_data_dir = hydra.utils.to_absolute_path(data_dir)
-        self._logger = logging.getLogger('loader')
+        logger_name = 'loader' if name is None else name
+        self._logger = logging.getLogger(logger_name)
         self._logger.info(f'Loading data from {absolute_data_dir}')
         self._train_path = os.path.join(absolute_data_dir, 'train.oracle')
         self._val_path = os.path.join(absolute_data_dir, 'val.oracle')

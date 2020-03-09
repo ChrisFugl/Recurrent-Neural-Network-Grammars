@@ -15,12 +15,13 @@ class Distribution(nn.Module):
         """
         raise NotImplementedError('must be implemented by subclass')
 
-    def sample(self, representation, n):
+    def log_probs(self, representation, posterior_scaling=1.0):
         """
-        Sample n values from distribution.
+        Log probabilities of all elements in distribution.
 
         :type representation: torch.Tensor
-        :type n: int
-        :rtype: torch.Tensor
+        :type posterior_scaling: float
+        :rtype: torch.Tensor, list of int
+        :returns: log probabilities, log probability index to action index
         """
         raise NotImplementedError('must be implemented by subclass')

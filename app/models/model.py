@@ -8,19 +8,22 @@ class Model(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, batch):
-        """
-        :type batch: app.data.batch.Batch
-        :rtype: torch.Tensor
-        """
-        return self.log_likelihood(batch)
-
-    def log_likelihood(self, batch, posterior_scaling=1.0):
+    def batch_log_likelihood(self, batch):
         """
         Compute log likelihood of each sentence/tree in a batch.
 
         :type batch: app.data.batch.Batch
-        :type posterior_scaling: float
+        :rtype: torch.Tensor
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
+    def tree_log_probs(self, tokens_tensor, actions_tensor, actions):
+        """
+        Compute log probs of each action in a tree.
+
+        :type tokens_tensor: torch.Tensor
+        :type actions_tensor: torch.Tensor
+        :type actions: list of app.data.actions.action.Action
         :rtype: torch.Tensor
         """
         raise NotImplementedError('must be implemented by subclass')
@@ -34,11 +37,11 @@ class Model(nn.Module):
         """
         raise NotImplementedError('must be implemented by subclass')
 
-    def next_state(self, previous_state, action):
+    def next_state(self, state, action):
         """
         Advance state of the model to the next state.
 
-        :param previous_state: model specific previous state
+        :param state: model specific previous state
         :type action: app.data.actions.action.Action
         """
         raise NotImplementedError('must be implemented by subclass')
@@ -48,7 +51,7 @@ class Model(nn.Module):
         Compute log probability of every action given the current state.
 
         :param state: state of a parse
-        :rtype: torch.Tensor
+        :rtype: torch.Tensor, list of int
         """
         raise NotImplementedError('must be implemented by subclass')
 
