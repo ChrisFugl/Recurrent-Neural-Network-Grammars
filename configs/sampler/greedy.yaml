@@ -1,0 +1,4 @@
+sampler:
+  type: greedy
+  load_dir: null
+  posterior_scaling: 1.0

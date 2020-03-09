@@ -40,12 +40,12 @@ class EvaluateTask(Task):
         self._logger.info(f'Time taken: {time_stop - time_start:0.2f} s')
 
     def _evaluate(self):
-        gold_trees, gold_tokens, gold_tags, predicted_trees, gold_log_probs, action_log_probs, token_log_probs = self._sampler.evaluate()
-        gold_path = self._save_trees_to_brackets('gold', 'trees.gld', gold_trees, gold_tokens, gold_tags)
-        predicted_path = self._save_trees_to_brackets('predicted', 'trees.tst', predicted_trees, gold_tokens, gold_tags)
-        self._log_stats('Gold trees', self._get_stats(gold_log_probs, gold_trees))
-        self._log_stats('Predicted trees', self._get_stats(action_log_probs, gold_trees))
-        self._log_stats('Tokens', self._get_stats(token_log_probs, gold_tokens))
+        samples = self._sampler.evaluate()
+        gold_path = self._save_trees_to_brackets('gold', samples)
+        predicted_path = self._save_trees_to_brackets('predicted', samples)
+        self._log_stats('Gold trees', self._get_stats('gold', samples))
+        self._log_stats('Predicted trees', self._get_stats('predicted', samples))
+        self._log_stats('Tokens', self._get_stats('tokens', samples))
         self._bracket_scores(gold_path, predicted_path)
 
     def _get_path(self, filename):
@@ -53,13 +53,25 @@ class EvaluateTask(Task):
         path = os.path.join(working_dir, filename)
         return path
 
-    def _save_trees_to_brackets(self, name, filename, trees, trees_tokens, trees_tags):
+    def _save_trees_to_brackets(self, type, samples):
+        """
+        :type samples: list of app.samplers.sample.Sample
+        """
+        # name, filename, trees, trees_tokens, trees_tags
+        tokens = [sample.gold.tokens for sample in samples]
+        tags = [sample.gold.tags for sample in samples]
+        if type == 'gold':
+            filename = 'trees.gld'
+            trees = [sample.gold.actions for sample in samples]
+        else:
+            filename = 'trees.tst'
+            trees = [sample.prediction.actions for sample in samples]
         path = self._get_path(filename)
-        brackets = self._trees2brackets(trees, trees_tokens, trees_tags)
+        brackets = self._trees2brackets(trees, tokens, tags)
         content = '\n'.join(brackets)
         with open(path, 'w') as file:
             file.write(content)
-        self._logger.info(f'Saved {name} trees at {path}')
+        self._logger.info(f'Saved {type} trees at {path}')
         return path
 
     def _trees2brackets(self, trees, trees_tokens, trees_tags):
@@ -84,8 +96,20 @@ class EvaluateTask(Task):
             brackets.append(tree_brackets_string)
         return brackets
 
-    def _get_stats(self, log_probs, items):
-        if log_probs is None:
+    def _get_stats(self, type, samples):
+        """
+        :type samples: list of app.samplers.sample.Sample
+        """
+        if type == 'gold':
+            items = [sample.gold.actions for sample in samples]
+            log_probs = [sample.gold.log_prob for sample in samples]
+        elif type == 'predicted':
+            items = [sample.prediction.actions for sample in samples]
+            log_probs = [sample.prediction.log_prob for sample in samples]
+        else:
+            items = [sample.gold.tokens for sample in samples]
+            log_probs = [sample.gold.tokens_log_prob for sample in samples]
+        if None in log_probs:
             return None
         count = sum(map(len, items))
         log_likelihood = sum(log_probs)

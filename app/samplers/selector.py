@@ -21,6 +21,11 @@ def get_sampler(device, data, iterator_config, config):
         assert config.load_dir is not None, 'Ancestral sampling requires a discriminative model.'
         model, iterator, action_converter, token_converter = _load_from_dir(device, data, iterator_config, config.load_dir)
         return AncestralSampler(device, model, iterator, action_converter, token_converter, config.posterior_scaling, config.samples)
+    elif config.type == 'greedy':
+        from app.samplers.greedy import GreedySampler
+        assert config.load_dir is not None, 'Ancestral sampling requires a discriminative model.'
+        model, iterator, action_converter, token_converter = _load_from_dir(device, data, iterator_config, config.load_dir)
+        return GreedySampler(device, model, iterator, action_converter, token_converter, config.posterior_scaling)
     else:
         raise Exception(f'Unknown sampler: {config.type}')
 
