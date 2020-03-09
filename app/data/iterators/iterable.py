@@ -5,12 +5,13 @@ from torch.nn.utils.rnn import pad_sequence
 
 class Iterable:
 
-    def __init__(self, tokens_integers, tokens_strings, actions_integers, actions, device, batch_size):
+    def __init__(self, tokens_integers, tokens_strings, actions_integers, actions, tags, device, batch_size):
         """
         :type tokens_integers: list of list of int
         :type tokens_strings: list of list of str
         :type actions_integers: list of list of int
         :type actions: list of list of app.actions.action.Action
+        :type tags: list of list of str
         :type device: torch.device
         :type batch_size: int
         """
@@ -18,6 +19,7 @@ class Iterable:
         self._tokens_strings = tokens_strings
         self._actions_integers = actions_integers
         self._actions = actions
+        self._tags = tags
         self._batch_size = batch_size
         self._device = device
         self._counter = 0
@@ -34,10 +36,11 @@ class Iterable:
             tokens_strings = list(self._tokens_strings[start:end])
             actions_integers = list(map(self._to_tensor, self._actions_integers[start:end]))
             actions = list(self._actions[start:end])
+            tags = list(self._tags[start:end])
             self._counter += end - start
             tokens_integers_padded, tokens_lengths = self._pad(tokens_integers)
             actions_integers_padded, actions_lengths = self._pad(actions_integers)
-            batch = Batch(actions_integers_padded, actions_lengths, actions, tokens_integers_padded, tokens_lengths, tokens_strings)
+            batch = Batch(actions_integers_padded, actions_lengths, actions, tokens_integers_padded, tokens_lengths, tokens_strings, tags)
             return batch
         else:
             raise StopIteration()

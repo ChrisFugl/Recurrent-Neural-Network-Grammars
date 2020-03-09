@@ -1,6 +1,6 @@
 class Batch:
 
-    def __init__(self, actions_tensor, actions_lengths, actions, tokens_tensor, tokens_lengths, tokens):
+    def __init__(self, actions_tensor, actions_lengths, actions, tokens_tensor, tokens_lengths, tokens, tags):
         """
         :type actions_tensor: torch.Tensor
         :type actions_lengths: list of int
@@ -8,9 +8,11 @@ class Batch:
         :type tokens_tensor: torch.Tensor
         :type tokens_lengths: list of int
         :type tokens: list of list of str
+        :type tags: list of list of str
         """
         self.actions = BatchActions(actions_tensor, actions_lengths, actions)
         self.tokens = BatchTokens(tokens_tensor, tokens_lengths, tokens)
+        self.tags = tags
         self.max_actions_length = actions_tensor.size(0)
         self.max_tokens_length = tokens_tensor.size(0)
         self.size = actions_tensor.size(1)
@@ -26,10 +28,12 @@ class Batch:
         tokens_tensor = self.tokens.tensor[:, index:index+1]
         tokens_length = self.tokens.lengths[index]
         tokens = self.tokens.tokens[index]
+        tags = self.tags[index]
         return BatchElement(
             index,
             actions_tensor, actions_length, actions, self.max_actions_length,
-            tokens_tensor, tokens_length, tokens, self.max_tokens_length
+            tokens_tensor, tokens_length, tokens, self.max_tokens_length,
+            tags
         )
 
 class BatchActions:
@@ -61,7 +65,8 @@ class BatchElement:
     def __init__(self,
         index,
         actions_tensor, actions_length, actions, max_actions_length,
-        tokens_tensor, tokens_length, tokens, max_tokens_length
+        tokens_tensor, tokens_length, tokens, max_tokens_length,
+        tags
     ):
         """
         :type index: int
@@ -73,10 +78,12 @@ class BatchElement:
         :type tokens_length: int
         :type tokens: list of str
         :type max_tokens_length: int
+        :type tags: list of str
         """
         self.index = index
         self.actions = BatchElementActions(actions_tensor, actions_length, actions, max_actions_length)
         self.tokens = BatchElementTokens(tokens_tensor, tokens_length, tokens, max_tokens_length)
+        self.tags = tags
 
 class BatchElementActions:
 

@@ -46,7 +46,8 @@ def get_terminal_node(line, terminal_start_index):
     search_start_index = terminal_start_index + 1
     terminal_end_index = line.find(')', search_start_index)
     terminal_node = line[search_start_index:terminal_end_index].strip().split(' ')
-    assert len(terminal_node) == 2, 'Terminal nodes must contain two elements: Part of speech tag and word.'
+    # assert len(terminal_node) == 2, 'Terminal nodes must contain two elements: Part of speech tag and word.'
+    assert len(terminal_node) == 2, f'Terminal nodes must contain two elements: Part of speech tag and word.\n{line}\n{terminal_node}'
     assert len(terminal_node[0]) != 0, 'Terminal node tag cannot be empty.'
     assert len(terminal_node[1]) != 0, 'Terminal node word cannot be empty.'
     tag = terminal_node[0].strip()

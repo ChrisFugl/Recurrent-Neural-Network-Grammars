@@ -17,7 +17,7 @@ def load_saved_model(device, load_dir):
     generative = is_generative(training_config.type)
     action_set = get_action_set(training_config.type)
     loader = get_loader(training_config.loader, name=f'loader_{training_config.name}')
-    _, actions, _, unknownified_tokens = loader.load_train()
+    _, actions, _, unknownified_tokens, _ = loader.load_train()
     token_converter = TokenConverter(unknownified_tokens)
     action_converter = ActionConverter(token_converter, generative, actions)
     model = get_model(device, generative, token_converter, action_converter, action_set, training_config.model)

@@ -11,6 +11,8 @@ ACTION_GENERATE_TYPE = 2
 ACTION_NON_TERMINAL_TYPE = 3
 
 BROWN_CLUSTERING_TOOL_PATH = 'tools/percyliang_browncluster/wcluster'
+EVALB_TOOL_PATH = 'tools/evalb/evalb'
+EVALB_PARAMS_PATH = 'tools/evalb/COLLINS.prm'
 
 START_ACTION_INDEX = 1
 START_ACTION_SYMBOL = '<SOA>'

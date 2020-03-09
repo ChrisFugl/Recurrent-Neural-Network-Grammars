@@ -28,14 +28,14 @@ def _load_from_dir(device, data, iterator_config, load_dir):
     training_config = get_training_config(load_dir)
     generative = is_generative(training_config.type)
     loader = get_loader(training_config.loader, name=training_config.name)
-    _, actions_train, _, unknownified_tokens_train = loader.load_train()
-    _, actions_eval, _, unknownified_tokens_eval = _load_evaluation_data(loader, data)
+    _, actions_train, _, unknownified_tokens_train, _ = loader.load_train()
+    _, actions_eval, _, unknownified_tokens_eval, tags_eval = _load_evaluation_data(loader, data)
     token_converter = TokenConverter(unknownified_tokens_train)
     action_converter = ActionConverter(token_converter, generative, actions_train)
     action_set = get_action_set(training_config.type)
     model = get_model(device, generative, token_converter, action_converter, action_set, training_config.model)
     load_model_params(model, load_dir)
-    iterator = get_iterator(device, action_converter, token_converter, unknownified_tokens_eval, actions_eval, iterator_config)
+    iterator = get_iterator(device, action_converter, token_converter, unknownified_tokens_eval, actions_eval, tags_eval, iterator_config)
     return model, iterator, action_converter, token_converter
 
 def _load_evaluation_data(loader, data):

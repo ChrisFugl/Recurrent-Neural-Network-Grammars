@@ -20,9 +20,9 @@ class OracleStatsTask(Task):
         self._loader = loader
 
     def run(self):
-        trees_train, actions_train, terms_train, unknownified_terms_train = self._loader.load_train()
-        trees_val, actions_val, terms_val, unknownified_terms_val = self._loader.load_val()
-        trees_test, actions_test, terms_test, unknownified_terms_test = self._loader.load_test()
+        trees_train, actions_train, terms_train, unknownified_terms_train, _ = self._loader.load_train()
+        trees_val, actions_val, terms_val, unknownified_terms_val, _ = self._loader.load_val()
+        trees_test, actions_test, terms_test, unknownified_terms_test, _ = self._loader.load_test()
 
         trees = [trees_train, trees_val, trees_test]
         actions = [actions_train, actions_val, actions_test]

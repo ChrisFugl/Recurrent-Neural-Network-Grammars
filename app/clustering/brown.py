@@ -25,7 +25,7 @@ class BrownClustering(Clustering):
 
     def cluster(self):
         # get terms from input oracle file
-        _, _, _, terms_tokenized = self._loader.load_train()
+        _, _, _, terms_tokenized, _ = self._loader.load_train()
         terms = list(map(lambda tokens: ' '.join(tokens), terms_tokenized))
         terms_content = '\n'.join(terms)
         with open(self._terms_path, 'w') as terms_file:

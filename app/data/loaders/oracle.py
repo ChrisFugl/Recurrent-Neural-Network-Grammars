@@ -1,6 +1,7 @@
 from app.data.loaders.loader import Loader
 from app.data.preprocessing.oracles import (
     get_actions_from_oracle,
+    get_tags_from_oracle,
     get_terms_from_oracle,
     get_trees_from_oracle,
     get_unknownified_terms_from_oracle,
@@ -51,8 +52,8 @@ class OracleLoader(Loader):
 
     def load_test(self):
         """
-        :rtype: list of str, list of list of str, list of list of str, list of list of str
-        :returns: trees, actions, tokens, unknownified tokens
+        :rtype: list of str, list of list of str, list of list of str, list of list of str, list of list of str
+        :returns: trees, actions, tokens, unknownified tokens, tags
         """
         data = self._load(self._test_path)
         self._logger.info('Finished loading test data')
@@ -64,4 +65,5 @@ class OracleLoader(Loader):
         actions = get_actions_from_oracle(oracle)
         terms = get_terms_from_oracle(oracle)
         unknownified_terms = get_unknownified_terms_from_oracle(oracle)
-        return trees, actions, terms, unknownified_terms
+        tags = get_tags_from_oracle(oracle)
+        return trees, actions, terms, unknownified_terms, tags

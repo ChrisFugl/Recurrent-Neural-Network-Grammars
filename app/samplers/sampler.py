@@ -4,8 +4,8 @@ class Sampler:
 
     def evaluate(self):
         """
-        :returns: gold trees, predicted trees, log probability of each predicted tree
-        :rtype: list of list of app.data.actions.action.Action, list of list of app.data.actions.action.Action, list of float
+        :returns: gold trees, gold_tokens, predicted trees, log probability of each gold tree, log probability of each predicted tree, log probability of tokens
+        :rtype: list of list of app.data.actions.action.Action, list of list of str, list of list of app.data.actions.action.Action, list of float, list of float, list of float
         """
         raise NotImplementedError('must be implemented by subclass')
 

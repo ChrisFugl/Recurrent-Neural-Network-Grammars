@@ -41,7 +41,7 @@ def _get_token_type(generative):
 def _line2tokens(line):
     """
     :type line: str
-    :rtype: list of str
+    :rtype: list of str, list of str
     """
     tags = []
     tokens = []
@@ -150,6 +150,19 @@ def get_unknownified_terms_from_oracle(oracle):
     :rtype: list of list of str
     """
     return _get_from_oracle(oracle, 3)
+
+def get_tags_from_oracle(oracle):
+    """
+    :type oracle: list of str
+    :rtype: list of list of str
+    """
+    lines_count = len(oracle)
+    assert lines_count % 4 == 0, 'Oracle files must have a multiple of four lines.'
+    tags = []
+    for line_index in range(0, lines_count, 4):
+        line_tags, _ = _line2tokens(oracle[line_index])
+        tags.append(line_tags)
+    return tags
 
 def _get_from_oracle(oracle, start_index):
     lines_count = len(oracle)
