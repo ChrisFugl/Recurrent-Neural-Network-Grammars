@@ -1,0 +1,6 @@
+sampler:
+  type: importance
+  load_dir_dis: null
+  load_dir_gen: null
+  posterior_scaling: 0.8
+  samples: 100

@@ -78,6 +78,7 @@ class EvaluateTask(Task):
         brackets = []
         for tree, tokens, tags in zip(trees, trees_tokens, trees_tags):
             tree_brackets = []
+            tag_index = 0
             token_index = 0
             for action in tree:
                 type = action.type()
@@ -86,10 +87,12 @@ class EvaluateTask(Task):
                 elif type == ACTION_REDUCE_TYPE:
                     tree_brackets.append(')')
                 elif type == ACTION_SHIFT_TYPE:
-                    tree_brackets.append(f' ({tags[token_index]} {tokens[token_index]})')
+                    tree_brackets.append(f' ({tags[tag_index]} {tokens[token_index]})')
+                    tag_index += 1
                     token_index += 1
                 elif type == ACTION_GENERATE_TYPE:
-                    tree_brackets.append(f' ({tags[token_index]} {action.argument})')
+                    tree_brackets.append(f' ({tags[tag_index]} {action.argument})')
+                    tag_index += 1
                 else:
                     raise Exception(f'Unknown action: {type}')
             tree_brackets_string = ''.join(tree_brackets).strip()

@@ -63,6 +63,8 @@ class AncestralSampler(Sampler):
         :type tokens: list of str
         :rtype: list of app.data.actions.action.Action
         """
+        # TODO: consider multiple samples
+        self._model.eval()
         tokens_tensor = self._tokens2tensor(self._token_converter, tokens)
         return self._sample_from_tokens_tensor(tokens_tensor)
 
@@ -80,4 +82,4 @@ class AncestralSampler(Sampler):
         return actions
 
     def __str__(self):
-        return f'Ancestral(posterior_scaling={self._posterior_scaling})'
+        return f'Ancestral(posterior_scaling={self._posterior_scaling}, samples={self._samples})'

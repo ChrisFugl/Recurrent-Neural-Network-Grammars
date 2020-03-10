@@ -1,7 +1,7 @@
 defaults:
   - iterator: evaluate
   - data: val
-  - sampler: ancestral
+  - sampler: importance
 gpu: null
 seed: null
 name: rnng

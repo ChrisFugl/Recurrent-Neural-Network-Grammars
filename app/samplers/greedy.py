@@ -54,6 +54,7 @@ class GreedySampler(Sampler):
         :type tokens: list of str
         :rtype: list of app.data.actions.action.Action
         """
+        self._model.eval()
         tokens_tensor = self._tokens2tensor(self._token_converter, tokens)
         return self._sample_from_tokens_tensor(tokens_tensor)
 
@@ -70,4 +71,4 @@ class GreedySampler(Sampler):
         return actions
 
     def __str__(self):
-        return f'Ancestral(posterior_scaling={self._posterior_scaling})'
+        return f'Greedy(posterior_scaling={self._posterior_scaling})'
