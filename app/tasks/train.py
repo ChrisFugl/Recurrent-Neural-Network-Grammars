@@ -1,3 +1,5 @@
+from app.losses.negative_log_likelihood import NegativeLogLikelihoodLoss
+from app.losses.utils import negative_log_likelihood
 from app.tasks.task import Task
 import hydra
 import logging
@@ -76,27 +78,27 @@ class TrainTask(Task):
         self._logger.info(f'Model:\n{self._model}')
         batch_count = self._start_batch_count
         epoch = self._start_epoch
-        training_losses = []
+        training_metrics = [], [], []
         best_loss_val = None
         self._model.train()
         if self._evaluator.should_evaluate(epoch, batch_count, pretraining=True):
-            best_loss_val = self._evaluate(epoch, batch_count, training_losses, best_loss_val)
+            best_loss_val = self._evaluate(epoch, batch_count, training_metrics, best_loss_val)
         # assumes a single learning rate for all parameters
         learning_rate = self._optimizer.param_groups[0]['lr']
         self._log_epoch(epoch, batch_count, learning_rate)
         while True:
-            epoch, batch_count, done, training_losses, best_loss_val = self._train_epoch(
-                time_start, epoch, batch_count, training_losses, best_loss_val
+            epoch, batch_count, done, training_metrics, best_loss_val = self._train_epoch(
+                time_start, epoch, batch_count, training_metrics, best_loss_val
             )
             if done:
                 break
             if self._evaluator.should_evaluate(epoch, batch_count, end_of_epoch=True):
-                best_loss_val = self._evaluate(epoch, batch_count, training_losses, best_loss_val)
-                training_losses = []
+                best_loss_val = self._evaluate(epoch, batch_count, training_metrics, best_loss_val)
+                training_metrics = [], [], []
             self._stopping_criterion.add_epoch(epoch)
             if self._stopping_criterion.is_done():
                 break
-        self._evaluate(epoch, batch_count, training_losses, best_loss_val)
+        self._evaluate(epoch, batch_count, training_metrics, best_loss_val)
         time_stop = time.time()
         time_seconds = self._get_seconds(time_start, time_stop)
         time_hours = time_seconds / 3600
@@ -104,21 +106,25 @@ class TrainTask(Task):
         self._logger.info(f'Training time: {time_seconds:0.2f} s/{time_hours:0.2f} h/{time_days:0.2f} d')
         self._logger.info('Finished training')
 
-    def _train_epoch(self, time_start, epoch, batch_count, training_losses, best_loss_val):
+    def _train_epoch(self, time_start, epoch, batch_count, training_metrics, best_loss_val):
         time_epoch_start = time.time()
         start_of_epoch = True
+        training_losses, training_action_perplexities, training_token_perplexities = training_metrics
         for batch in self._iterator_train:
             batch_count += 1
-            loss_train = self._train_batch(batch, batch_count)
+            loss_train, action_perplexity, token_perplexity = self._train_batch(batch, batch_count)
             training_losses.append(loss_train)
+            training_action_perplexities.append(action_perplexity)
+            training_token_perplexities.append(token_perplexity)
             if self._evaluator.should_evaluate(epoch, batch_count):
-                best_loss_val = self._evaluate(epoch, batch_count, training_losses, best_loss_val)
-                training_losses = []
+                best_loss_val = self._evaluate(epoch, batch_count, training_metrics, best_loss_val)
+                training_losses, training_action_perplexities, training_token_perplexities = [], [], []
+                training_metrics = training_losses, training_action_perplexities, training_token_perplexities
             if self._stopping_criterion.is_done():
-                return epoch, batch_count, True, training_losses, best_loss_val
+                return epoch, batch_count, True, training_metrics, best_loss_val
             if self._checkpoint.should_save_checkpoint(epoch, batch_count, start_of_epoch):
                 self._save_checkpoint(time_start, epoch, batch_count)
-            start_of_epoch = False, training_losses
+            start_of_epoch = False
         self._learning_rate_scheduler.step()
         # assumes a single learning rate for all parameters
         learning_rate = self._learning_rate_scheduler.get_last_lr()[0]
@@ -126,44 +132,75 @@ class TrainTask(Task):
         time_epoch_stop = time.time()
         time_total = self._total_time_offset + self._get_seconds(time_start, time_epoch_stop)
         self._log_epoch(epoch, batch_count, learning_rate)
-        self._writer_train.add_scalar('time_s/epoch', self._get_seconds(time_epoch_start, time_epoch_stop), batch_count)
-        self._writer_train.add_scalar('time_s/total', time_total, batch_count)
-        return epoch, batch_count, False, training_losses, best_loss_val
+        self._writer_train.add_scalar('time/epoch_s', self._get_seconds(time_epoch_start, time_epoch_stop), batch_count)
+        self._writer_train.add_scalar('time/total_s', time_total, batch_count)
+        return epoch, batch_count, False, training_metrics, best_loss_val
 
     def _train_batch(self, batch, batch_count):
         time_batch_start = time.time()
         batch_log_probs = self._model.batch_log_likelihood(batch)
-        loss_train = self._loss(batch_log_probs, batch.actions.lengths)
-        self._optimize(loss_train)
+        loss = self._loss(batch_log_probs, batch.actions.lengths)
+        self._optimize(loss)
         time_batch_stop = time.time()
-        self._writer_train.add_scalar('time_s/batch', self._get_seconds(time_batch_start, time_batch_stop), batch_count)
-        return loss_train
+        time_batch = self._get_seconds(time_batch_start, time_batch_stop)
+        action_perplexity, token_perplexity, actions_count, tokens_count = self._get_perplexities(batch, batch_log_probs, loss)
+        actions_per_second = actions_count / time_batch
+        tokens_per_second = tokens_count / time_batch
+        sentences_per_second = batch.size / time_batch
+        self._writer_train.add_scalar('time/actions_per_s', actions_per_second, batch_count)
+        self._writer_train.add_scalar('time/tokens_per_s', tokens_per_second, batch_count)
+        self._writer_train.add_scalar('time/sentences_per_s', sentences_per_second, batch_count)
+        self._writer_train.add_scalar('time/batch_s', time_batch, batch_count)
+        return loss, action_perplexity, token_perplexity
 
     def _optimize(self, loss):
         self._optimizer.zero_grad()
         loss.backward()
         self._optimizer.step()
 
-    def _evaluate(self, epoch, batch_count, training_losses, best_loss_val):
+    def _evaluate(self, epoch, batch_count, training_metrics, best_loss_val):
         time_val_start = time.time()
         self._model.eval()
-        losses = []
+        losses, action_perplexities, token_perplexities = [], [], []
+        total_actions = 0
+        total_tokens = 0
+        total_sentences = self._iterator_val.size()
         for batch in self._iterator_val:
             log_probs = self._model.batch_log_likelihood(batch)
             loss = self._loss(log_probs, batch.actions.lengths)
+            action_perplexity, token_perplexity, actions_count, tokens_count = self._get_perplexities(batch, log_probs, loss)
             losses.append(loss)
-        loss_val = sum(losses) / len(losses)
+            action_perplexities.append(action_perplexity)
+            token_perplexities.append(token_perplexity)
+            total_actions += actions_count
+            total_tokens += tokens_count
         self._model.train()
         time_val_stop = time.time()
+        time_val = self._get_seconds(time_val_start, time_val_stop)
+        loss_val = sum(losses) / len(losses)
+        action_perplexity_val = sum(action_perplexities) / len(action_perplexities)
+        token_perplexity_val = sum(token_perplexities) / len(token_perplexities)
         self._writer_val.add_scalar('training/loss', loss_val, batch_count)
-        self._writer_val.add_scalar('time_s/val', self._get_seconds(time_val_start, time_val_stop), batch_count)
+        self._writer_val.add_scalar('training/per_action_perplexity', action_perplexity_val, batch_count)
+        self._writer_val.add_scalar('training/per_token_perplexity', token_perplexity_val, batch_count)
         self._stopping_criterion.add_val_loss(loss_val)
-        if len(training_losses) != 0:
-            loss_train = sum(training_losses) / len(training_losses)
+        if len(training_metrics[0]) != 0:
+            loss_train = sum(training_metrics[0]) / len(training_metrics[0])
+            action_perplexity_train = sum(training_metrics[1]) / len(training_metrics[1])
+            token_perplexity_train = sum(training_metrics[2]) / len(training_metrics[2])
             self._writer_train.add_scalar('training/loss', loss_train, batch_count)
+            self._writer_train.add_scalar('training/per_action_perplexity', action_perplexity_train, batch_count)
+            self._writer_train.add_scalar('training/per_token_perplexity', token_perplexity_train, batch_count)
             self._logger.info(f'epoch={epoch}, batch={batch_count}, loss_train={loss_train:0.8f}, loss_val={loss_val:0.8f}')
         else:
             self._logger.info(f'epoch={epoch}, batch={batch_count}, loss_val={loss_val:0.8f}')
+        actions_per_second = total_actions / time_val
+        tokens_per_second = total_tokens / time_val
+        sentences_per_second = total_sentences / time_val
+        self._writer_val.add_scalar('time/val_s', time_val, batch_count)
+        self._writer_val.add_scalar('time/actions_per_s', actions_per_second, batch_count)
+        self._writer_val.add_scalar('time/tokens_per_s', tokens_per_second, batch_count)
+        self._writer_val.add_scalar('time/sentences_per_s', sentences_per_second, batch_count)
 
         # save model with best performing validation loss
         if best_loss_val is None or loss_val < best_loss_val:
@@ -202,7 +239,7 @@ class TrainTask(Task):
         }
         torch.save(checkpoint, checkpoint_path)
         time_checkpoint_stop = time.time()
-        self._writer_train.add_scalar('time_s/checkpoint', self._get_seconds(time_checkpoint_start, time_checkpoint_stop), batch_count)
+        self._writer_train.add_scalar('time/checkpoint_s', self._get_seconds(time_checkpoint_start, time_checkpoint_stop), batch_count)
 
     def _load_checkpoint(self, path):
         absolute_path = hydra.utils.to_absolute_path(path)
@@ -225,3 +262,14 @@ class TrainTask(Task):
         parameters = filter(lambda p: p.requires_grad, self._model.parameters())
         count = sum([np.prod(parameter.size()) for parameter in parameters])
         return count
+
+    def _get_perplexities(self, batch, log_probs, loss):
+        if isinstance(self._loss, NegativeLogLikelihoodLoss):
+            nll = loss
+        else:
+            nll = negative_log_likelihood(self._device, log_probs, batch.actions.lengths)
+        actions_count = sum(map(len, batch.actions.actions))
+        tokens_count = sum(map(len, batch.tokens.tokens))
+        action_perplexity = torch.exp(nll / actions_count)
+        token_perplexity = torch.exp(nll / tokens_count)
+        return action_perplexity, token_perplexity, actions_count, tokens_count
