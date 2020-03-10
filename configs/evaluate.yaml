@@ -4,7 +4,7 @@ defaults:
   - sampler: importance
 gpu: null
 seed: null
-name: rnng
+name: tmp
 hydra:
   run:
     dir: ./outputs/evaluate/${name}/${now:%Y-%m-%d_%H-%M-%S}

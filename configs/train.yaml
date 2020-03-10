@@ -9,7 +9,7 @@ defaults:
   - stopping_criterion: manual
   - checkpoint: never
   - evaluator: batch
-name: rnng
+name: tmp
 load_checkpoint: null
 gpu: null
 seed: null
