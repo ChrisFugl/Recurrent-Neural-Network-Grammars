@@ -10,7 +10,7 @@ class Loss(nn.Module):
         """
         :param log_probs: batch of log probabilities of each action (size S x B)
         :type log_probs: torch.Tensor
-        :type actions_lengths: list of int
+        :type actions_lengths: torch.Tensor
         :rtype: torch.Tensor
         """
         raise NotImplementedError('must be implemented by subclass')

@@ -1,5 +1,5 @@
 from app.losses.loss import Loss
-import torch
+from app.losses.utils import negative_log_likelihood
 
 class NegativeLogLikelihoodLoss(Loss):
 
@@ -17,17 +17,4 @@ class NegativeLogLikelihoodLoss(Loss):
         :type lengths: torch.Tensor
         :rtype: torch.Tensor
         """
-        mask = self._get_mask(log_probs, lengths)
-        masked = log_probs * mask
-        sum = masked.sum(dim=0)
-        normalized = sum / lengths.float()
-        mean = normalized.mean()
-        return - mean
-
-    def _get_mask(self, log_probs, lengths):
-        max_length, batch_size = log_probs.shape
-        batch_size = len(lengths)
-        mask = torch.ones((max_length, batch_size), device=self._device)
-        for i, length in enumerate(lengths):
-            mask[length:, i] = 0
-        return mask
+        return negative_log_likelihood(self._device, log_probs, lengths)
