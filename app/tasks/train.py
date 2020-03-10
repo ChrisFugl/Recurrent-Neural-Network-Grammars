@@ -1,4 +1,4 @@
-from app.losses.negative_log_likelihood import NegativeLogLikelihoodLoss
+from app.losses.negative_tree_log_likelihood import NegativeTreeLogLikelihoodLoss
 from app.losses.utils import negative_log_likelihood
 from app.tasks.task import Task
 import hydra
@@ -264,7 +264,7 @@ class TrainTask(Task):
         return count
 
     def _get_perplexities(self, batch, log_probs, loss):
-        if isinstance(self._loss, NegativeLogLikelihoodLoss):
+        if isinstance(self._loss, NegativeTreeLogLikelihoodLoss):
             nll = loss
         else:
             nll = negative_log_likelihood(self._device, log_probs, batch.actions.lengths)

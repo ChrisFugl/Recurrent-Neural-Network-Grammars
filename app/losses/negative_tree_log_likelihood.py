@@ -1,7 +1,7 @@
 from app.losses.loss import Loss
 from app.losses.utils import negative_log_likelihood
 
-class NegativeLogLikelihoodLoss(Loss):
+class NegativeTreeLogLikelihoodLoss(Loss):
 
     def __init__(self, device):
         """

@@ -3,7 +3,7 @@ defaults:
   - model: ${defaults.0.type}.rnng
   - iterator: unordered
   - loader: wsj.${defaults.0.type}.oracle
-  - loss: negative_log_likelihood
+  - loss: negative_action_log_likelihood
   - optimizer: adam
   - lr_scheduler: constant
   - stopping_criterion: manual
