@@ -1,11 +1,8 @@
 train_size: 1000
 val_size: 200
 test_size: 200
-max_depth: 3
-max_determiners: 5
-max_nouns: 20
-max_particles: 5
-max_verbs: 20
+max_depth: 4
+max_words: 333
 save_dir: data/artificial/
 hydra:
   run:

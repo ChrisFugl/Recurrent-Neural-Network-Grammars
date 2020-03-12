@@ -8,10 +8,7 @@ def _main(config):
         config.val_size,
         config.test_size,
         config.max_depth,
-        config.max_determiners,
-        config.max_nouns,
-        config.max_particles,
-        config.max_verbs,
+        config.max_words,
         config.save_dir
     )
     task.run()

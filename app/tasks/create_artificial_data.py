@@ -14,16 +14,13 @@ class CreateArtificialDataTask(Task):
     vp --> v, pa, vp
     """
 
-    def __init__(self, train_size, val_size, test_size, max_depth, max_determiners, max_nouns, max_particles, max_verbs, save_dir):
+    def __init__(self, train_size, val_size, test_size, max_depth, max_words, save_dir):
         """
         :type train_size: int
         :type val_size: int
         :type test_size: int
         :type max_depth: int
-        :type max_determiners: int
-        :type max_nouns: int
-        :type max_particles: int
-        :type max_verbs: int
+        :type max_words; int
         :type save_dir: str
         """
         super().__init__()
@@ -32,10 +29,11 @@ class CreateArtificialDataTask(Task):
         self._test_size = test_size
         self._max_depth = max_depth
         self._save_dir = hydra.utils.to_absolute_path(save_dir)
-        self._determiners = [f'd{i}' for i in range(max_determiners)]
-        self._nouns = [f'n{i}' for i in range(max_nouns)]
-        self._particles = [f'p{i}' for i in range(max_particles)]
-        self._verbs = [f'v{i}' for i in range(max_verbs)]
+        self._max_words = max_words
+        self._determiners = [f'd{i}' for i in range(max_words)]
+        self._nouns = [f'n{i}' for i in range(max_words)]
+        self._particles = [f'p{i}' for i in range(max_words)]
+        self._verbs = [f'v{i}' for i in range(max_words)]
 
     def run(self):
         n_trees = self._train_size + self._val_size + self._test_size
@@ -60,55 +58,59 @@ class CreateArtificialDataTask(Task):
     def _create_tree(self):
         next_depth = 1
         # s --> np , vp
-        noun_phrase = self._create_noun_phrase()
-        verb_phrase = self._create_verb_phrase(next_depth)
+        noun_phrase, word_index = self._create_noun_phrase()
+        verb_phrase = self._create_verb_phrase(next_depth, word_index)
         return f'(S {noun_phrase} {verb_phrase})'
 
-    def _create_noun_phrase(self):
+    def _create_noun_phrase(self, word_index=None):
         # np --> det, n
-        determiner = self._create_determiner()
-        noun = self._create_noun()
-        return f'(NP {determiner} {noun})'
+        determiner, word_index = self._create_determiner(word_index)
+        noun = self._create_noun(word_index)
+        return f'(NP {determiner} {noun})', word_index
 
-    def _create_verb_phrase(self, depth):
+    def _create_verb_phrase(self, depth, word_index):
         next_depth = depth + 1
         if next_depth < self._max_depth:
             verb_phrase_type = random.randint(1, 3)
             if verb_phrase_type == 1:
                 # vp --> v
-                verb = self._create_verb()
+                verb = self._create_verb(word_index)
                 return f'(VP {verb})'
             elif verb_phrase_type == 2:
                 # vp --> v, np
-                verb = self._create_verb()
-                noun_phrase = self._create_noun_phrase()
+                verb = self._create_verb(word_index)
+                noun_phrase, word_index = self._create_noun_phrase(word_index=word_index)
                 return f'(VP {verb} {noun_phrase})'
             else:
                 # vp --> v, pa, vp
-                verb = self._create_verb()
-                particle = self._create_particle()
-                verb_phrase = self._create_verb_phrase(next_depth)
+                verb = self._create_verb(word_index)
+                particle = self._create_particle(word_index)
+                verb_phrase = self._create_verb_phrase(next_depth, word_index)
                 return f'(VP {verb} {particle} {verb_phrase})'
         else:
             # vp --> v
-            verb = self._create_verb()
+            verb = self._create_verb(word_index)
             return verb
 
-    def _create_determiner(self):
-        determiner = random.choice(self._determiners)
-        return f'(DT {determiner})'
+    def _create_determiner(self, word_index):
+        if word_index is None:
+            index = random.randint(0, self._max_words - 1)
+        else:
+            index = (word_index + 1) % self._max_words
+        determiner = self._determiners[index]
+        return f'(DT {determiner})', index
 
-    def _create_noun(self):
-        return self._create_leaf('NN', self._nouns)
+    def _create_noun(self, index):
+        return self._create_leaf('NN', self._nouns, index)
 
-    def _create_particle(self):
-        return self._create_leaf('PA', self._particles)
+    def _create_particle(self, index):
+        return self._create_leaf('PA', self._particles, index)
 
-    def _create_verb(self):
-        return self._create_leaf('VB', self._verbs)
+    def _create_verb(self, index):
+        return self._create_leaf('VB', self._verbs, index)
 
-    def _create_leaf(self, prefix, choices):
-        word = random.choice(choices)
+    def _create_leaf(self, prefix, choices, index):
+        word = choices[index]
         return f'({prefix} {word})'
 
     def _save_file(self, sentences, filename):
