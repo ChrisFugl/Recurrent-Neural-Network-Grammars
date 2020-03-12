@@ -1,9 +1,8 @@
 from app.composers import get_composer
 from app.distributions import get_distribution
 from app.embeddings import get_embedding
-from app.memories import get_memory
 from app.representations import get_representation
-from app.stacks import get_stack
+from app.rnn import get_rnn
 
 def get_model(device, generative, token_converter, action_converter, action_set, config):
     """
@@ -17,6 +16,7 @@ def get_model(device, generative, token_converter, action_converter, action_set,
     """
     if config.type == 'rnng':
         from app.models.rnng import RNNG
+        from app.models.rnng.stack import Stack
         token_count = token_converter.count()
         action_count = action_converter.count()
         non_terminal_count = action_converter.count_non_terminals()
@@ -25,10 +25,9 @@ def get_model(device, generative, token_converter, action_converter, action_set,
         non_terminal_compose_embedding = get_embedding(non_terminal_count, config.embedding)
         token_embedding = get_embedding(token_count, config.embedding)
         rnn_args = [device, config.embedding.size, config.rnn]
-        action_history = get_memory(config.memory, rnn_args=rnn_args)
-        token_buffer = get_memory(config.memory, rnn_args=rnn_args)
-        stack_rnn_args = [device, config.embedding.size, config.rnn]
-        stack = get_stack(config.stack, rnn_args=stack_rnn_args)
+        action_history = Stack(get_rnn(*rnn_args))
+        token_buffer = Stack(get_rnn(*rnn_args))
+        stack = Stack(get_rnn(*rnn_args))
         representation = get_representation(config.embedding.size, config.representation)
         composer = get_composer(device, config)
         token_distribution = None if not generative else get_distribution(device, action_converter, config)
@@ -49,8 +48,8 @@ def get_model(device, generative, token_converter, action_converter, action_set,
             non_terminal_count,
             action_set,
             config.threads,
-            config.reverse_tokens,
             action_converter,
+            token_converter,
         ).to(device)
     else:
         raise Exception(f'Unknown model: {config.type}')

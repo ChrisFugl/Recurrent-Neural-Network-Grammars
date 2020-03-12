@@ -1,1 +1,1 @@
-from .rnng import RNNG
+from .model import RNNG

@@ -21,12 +21,6 @@ class NonTerminalAction(Action):
         """
         return self._to_long_tensor(self.argument_index)
 
-    def close(self):
-        """
-        Call this method when the non-terminal is completed after a reduce operation.
-        """
-        self.open = False
-
     def index(self):
         """
         :rtype: int

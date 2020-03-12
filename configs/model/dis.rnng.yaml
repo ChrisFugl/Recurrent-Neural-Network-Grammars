@@ -12,8 +12,6 @@ model:
     norm_type: 2.0
     scale_grad_by_freq: false
     sparse: false
-  memory:
-    type: 'rnn'
   representation:
     type: vanilla
     size: 128
@@ -25,7 +23,4 @@ model:
     bias: true
     dropout: 0.2
     bidirectional: false
-  stack:
-    type: 'rnn'
   threads: 1
-  reverse_tokens: true

@@ -15,6 +15,6 @@ def get_rnn(device, input_size, config):
             config.bias,
             config.dropout,
             config.bidirectional
-        )
+        ).to(device)
     else:
         raise Exception(f'Unknown RNN: {config.type}')

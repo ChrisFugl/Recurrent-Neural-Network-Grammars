@@ -18,21 +18,23 @@ class StackOnlyRepresentation(Representation):
         self._activation = nn.ReLU()
         self._dropout = nn.Dropout(p=dropout)
 
-    def forward(self, action_history, stack, token_buffer, action_timestep, token_timestep, batch_index):
+    def forward(self, action_history, stack, token_buffer):
         """
-        :type action_history: app.memories.memory.Memory
-        :type stack: app.stacks.stack.Stack
-        :type token_buffer: app.memories.memory.Memory
-        :type action_timestep: int
-        :type token_timestep: int
-        :type batch_index: int
+        :type action_history: torch.Tensor
+        :type stack: torch.Tensor
+        :type token_buffer: torch.Tensor
         :rtype: torch.Tensor
         """
-        stack_embedding, _ = stack.top()
-        stack_embedding = self._dropout(stack_embedding)
-        output = self._feedforward(stack_embedding)
+        output = self._pick_last(stack)
+        output = self._dropout(output)
+        output = self._feedforward(output)
         output = self._activation(output)
         return output
+
+    def _pick_last(self, embeddings):
+        length, batch_size, hidden_size = embeddings.shape
+        last = embeddings[length - 1, :, :].view(1, batch_size, hidden_size)
+        return last
 
     def __str__(self):
         return f'StackOnly(size={self._representation_size})'

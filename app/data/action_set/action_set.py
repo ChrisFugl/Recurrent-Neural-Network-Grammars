@@ -1,10 +1,10 @@
 class ActionSet:
 
-    def valid_actions(self, tokens_length, token_counter, stack, open_non_terminals_count):
+    def valid_actions(self, tokens_length, token_counter, last_action, open_non_terminals_count):
         """
         :type tokens_length: int
         :type token_counter: int
-        :type stack: app.stacks.stack.Stack
+        :type last_action: app.actions.action.Action
         :type open_non_terminals_count: int
         :rtype: list of int, dict
         """

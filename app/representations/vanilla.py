@@ -21,29 +21,28 @@ class VanillaRepresentation(Representation):
         self._activation = nn.ReLU()
         self._dropout = nn.Dropout(p=dropout)
 
-    def forward(self, action_history, stack, token_buffer, action_timestep, token_timestep, batch_index):
+    def forward(self, action_history, stack, token_buffer):
         """
-        :type action_history: app.memories.memory.Memory
-        :type stack: app.stacks.stack.Stack
-        :type token_buffer: app.memories.memory.Memory
-        :type action_timestep: int
-        :type token_timestep: int
-        :type batch_index: int
+        :type action_history: torch.Tensor
+        :type stack: torch.Tensor
+        :type token_buffer: torch.Tensor
         :rtype: torch.Tensor
         """
-        action_embedding = action_history.get(action_timestep, batch_index)
-        stack_embedding, _ = stack.top()
-        token_embedding = token_buffer.get(token_timestep, batch_index)
         embeddings = [
-            self._dropout(token_embedding),
-            self._dropout(stack_embedding),
-            self._dropout(action_embedding),
+            self._dropout(self._pick_last(action_history)),
+            self._dropout(self._pick_last(stack)),
+            self._dropout(self._pick_last(token_buffer)),
         ]
         # concatenate along last dimension, as inputs have shape S, B, H (sequence length, batch size, hidden size)
         feedforward_input = torch.cat(embeddings, dim=2)
         output = self._feedforward(feedforward_input)
         output = self._activation(output)
         return output
+
+    def _pick_last(self, embeddings):
+        length, batch_size, hidden_size = embeddings.shape
+        last = embeddings[length - 1, :, :].view(1, batch_size, hidden_size)
+        return last
 
     def __str__(self):
         return f'Vanilla(size={self._representation_size})'
