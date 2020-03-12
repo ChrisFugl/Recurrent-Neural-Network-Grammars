@@ -4,7 +4,6 @@ from app.data.actions.non_terminal import NonTerminalAction
 from app.data.actions.reduce import ReduceAction
 from app.samplers.sample import Sample
 from app.samplers.sampler import Sampler
-from math import log
 from torch.distributions import Categorical
 
 class ImportanceSampler(Sampler):
@@ -71,8 +70,8 @@ class ImportanceSampler(Sampler):
         gold_log_probs = self._model_gen.tree_log_probs(tokens_tensor_gen, gold_tree_tensor, gold_tree)
         gold_log_prob = gold_log_probs.sum()
         best_log_prob = best_log_prob.cpu().item()
-        tokens_log_prob = log(sum(weights) / len(weights))
-        return Sample(gold_tree, element_gen.tokens.tokens, element_gen.tags, gold_log_prob, best_tree, best_log_prob, tokens_log_prob)
+        tokens_prob = sum(weights) / len(weights)
+        return Sample(gold_tree, element_gen.tokens.tokens, element_gen.tags, gold_log_prob, best_tree, best_log_prob, tokens_prob)
 
     def get_batch_size(self, batch):
         """

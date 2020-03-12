@@ -3,9 +3,11 @@ from app.constants import (
     EVALB_TOOL_PATH, EVALB_PARAMS_PATH
 )
 from app.tasks.task import Task
+from functools import reduce
 import hydra
 import logging
-from math import exp
+from math import exp, log
+from operator import mul
 import os
 import re
 import subprocess
@@ -103,20 +105,27 @@ class EvaluateTask(Task):
         """
         :type samples: list of app.samplers.sample.Sample
         """
-        if type == 'gold':
-            items = [sample.gold.actions for sample in samples]
-            log_probs = [sample.gold.log_prob for sample in samples]
-        elif type == 'predicted':
-            items = [sample.prediction.actions for sample in samples]
-            log_probs = [sample.prediction.log_prob for sample in samples]
+        if type == 'gold' or type == 'predicted':
+            if type == 'gold':
+                items = [sample.gold.actions for sample in samples]
+                log_probs = [sample.gold.log_prob for sample in samples]
+            else:
+                items = [sample.prediction.actions for sample in samples]
+                log_probs = [sample.prediction.log_prob for sample in samples]
+            log_likelihood = sum(log_probs)
+            likelihood = exp(log_likelihood)
         else:
             items = [sample.gold.tokens for sample in samples]
-            log_probs = [sample.gold.tokens_log_prob for sample in samples]
-        if None in log_probs:
-            return None
+            probs = [sample.gold.tokens_prob for sample in samples]
+            if None in probs:
+                return None
+            try:
+                likelihood = reduce(mul, probs, 1.0)
+                log_likelihood = log(likelihood)
+            except ValueError:
+                self._logger.info('Failed to compute token metrics.')
+                return None
         count = sum(map(len, items))
-        log_likelihood = sum(log_probs)
-        likelihood = exp(log_likelihood)
         perplexity = exp(- log_likelihood / count)
         return log_likelihood, likelihood, perplexity
 
