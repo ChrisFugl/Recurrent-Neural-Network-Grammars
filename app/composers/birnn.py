@@ -8,7 +8,6 @@ class BiRNNComposer(Composer):
         """
         :type birnn: app.rnn.rnn.RNN
         :type birnn_output_size: int
-        :
         """
         super().__init__()
         self._birnn = birnn

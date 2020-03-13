@@ -1,9 +1,9 @@
-from app.constants import ACTION_EMBEDDING_OFFSET, TOKEN_EMBEDDING_OFFETSET
-from app.data.action_set import get_action_set
+from app.constants import ACTION_EMBEDDING_OFFSET, TAG_EMBEDDING_OFFSET, TOKEN_EMBEDDING_OFFSET
 from app.checkpoints import get_checkpoint
 from app.data.iterators import get_iterator
 from app.data.loaders import get_loader
 from app.data.converters.action import ActionConverter
+from app.data.converters.tag import TagConverter
 from app.data.converters.token import TokenConverter
 from app.evaluators import get_evaluator
 from app.learning_rate_schedulers import get_learning_rate_scheduler
@@ -24,11 +24,12 @@ def _main(config):
     generative = is_generative(config.type)
     device = get_device(config.gpu)
     token_converter = TokenConverter(unknownified_tokens_train)
+    tag_converter = TagConverter(tags_train)
     action_converter = ActionConverter(token_converter, generative, actions_train)
-    action_set = get_action_set(config.type)
-    iterator_train = get_iterator(device, action_converter, token_converter, unknownified_tokens_train, actions_train, tags_train, config.iterator)
-    iterator_val = get_iterator(device, action_converter, token_converter, unknownified_tokens_val, actions_val, tags_val, config.iterator)
-    model = get_model(device, generative, token_converter, action_converter, action_set, config.model)
+    converters = (action_converter, token_converter, tag_converter)
+    iterator_train = get_iterator(device, *converters, unknownified_tokens_train, actions_train, tags_train, config.iterator)
+    iterator_val = get_iterator(device, *converters, unknownified_tokens_val, actions_val, tags_val, config.iterator)
+    model = get_model(device, generative, *converters, config.model)
     loss = get_loss(device, config.loss)
     optimizer = get_optimizer(config.optimizer, model.parameters())
     learning_rate_scheduler = get_learning_rate_scheduler(optimizer, config.lr_scheduler)
@@ -47,7 +48,8 @@ def _main(config):
         checkpoint,
         evaluator,
         config.load_checkpoint,
-        token_converter.count() - TOKEN_EMBEDDING_OFFETSET,
+        token_converter.count() - TOKEN_EMBEDDING_OFFSET,
+        tag_converter.count() - TAG_EMBEDDING_OFFSET,
         action_converter.count_non_terminals(),
         action_converter.count() - ACTION_EMBEDDING_OFFSET,
     )

@@ -9,11 +9,12 @@ class OrderedIterator(Iterator):
     Batches are ordered such that actions in a batch strive to have the same length.
     """
 
-    def __init__(self, device, action_converter, token_converter, batch_size, shuffle, tokens_strings, actions_strings, tags):
+    def __init__(self, device, action_converter, token_converter, tag_converter, batch_size, shuffle, tokens_strings, actions_strings, tags):
         """
         :type device: torch.device
         :type action_converter: app.data.converters.action.ActionConverter
         :type token_converter: app.data.converters.token.TokenConverter
+        :type tag_converter: app.data.converters.tag.TagConverter
         :type batch_size: int
         :type shuffle: bool
         :type tokens_strings: list of list of str
@@ -27,10 +28,10 @@ class OrderedIterator(Iterator):
 
         actions = self._convert(partial(action_converter.string2action, device), actions_strings)
         actions_integers = self._convert(action_converter.string2integer, actions_strings)
-        tokens_strings = tokens_strings
         tokens_integers = self._convert(token_converter.token2integer, tokens_strings)
+        tags_integers = self._convert(tag_converter.tag2integer, tags)
 
-        ordered = self._order_by_actions_count(actions_integers, actions, tokens_integers, tokens_strings, tags)
+        ordered = self._order_by_actions_count(actions_integers, actions, tokens_integers, tokens_strings, tags, tags_integers)
         self._actions_counts = ordered[0]
         if shuffle:
             self._actions_counts_set = set(self._actions_counts)
@@ -38,21 +39,26 @@ class OrderedIterator(Iterator):
         self._actions = ordered[2]
         self._tokens_integers = ordered[3]
         self._tokens_strings = ordered[4]
-        self._tags = ordered[5]
+        self._tags_strings = ordered[5]
+        self._tags_integers = ordered[6]
 
     def __iter__(self):
         actions_integers, actions = self._actions_integers, self._actions
         tokens_integers, tokens_strings = self._tokens_integers, self._tokens_strings
-        tags = self._tags
+        tags_strings, tags_integers = self._tags_strings, self._tags_integers
         if self._shuffle:
-            self._shuffle_by_action_count(self._actions_integers, self._actions, self._tokens_integers, self._tokens_strings, self._tags)
-            batches = self._create_batches(actions_integers, actions, tokens_integers, tokens_strings, tags)
+            self._shuffle_by_action_count(
+                self._actions_integers, self._actions,
+                self._tokens_integers, self._tokens_strings,
+                self._tags_integers, self._tags_strings
+            )
+            batches = self._create_batches(actions_integers, actions, tokens_integers, tokens_strings, tags_strings, tags_integers)
             shuffled_batches = self._shuffle_lists(*batches)
             flattened = self._flatten_all_batches(*shuffled_batches)
             actions_integers, actions = flattened[0], flattened[1]
             tokens_integers, tokens_strings = flattened[2], flattened[3]
-            tags = flattened[4]
-        return Iterable(tokens_integers, tokens_strings, actions_integers, actions, tags, self._device, self._batch_size)
+            tags_integers, tags_strings = flattened[4], flattened[5]
+        return Iterable(tokens_integers, tokens_strings, actions_integers, actions, tags_integers, tags_strings, self._device, self._batch_size)
 
     def size(self):
         """

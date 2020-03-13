@@ -20,30 +20,30 @@ class OracleStatsTask(Task):
         self._loader = loader
 
     def run(self):
-        trees_train, actions_train, terms_train, unknownified_terms_train, _ = self._loader.load_train()
-        trees_val, actions_val, terms_val, unknownified_terms_val, _ = self._loader.load_val()
-        trees_test, actions_test, terms_test, unknownified_terms_test, _ = self._loader.load_test()
-
+        trees_train, actions_train, terms_train, unknownified_terms_train, tags_train = self._loader.load_train()
+        trees_val, actions_val, terms_val, unknownified_terms_val, tags_val = self._loader.load_val()
+        trees_test, actions_test, terms_test, unknownified_terms_test, tags_test = self._loader.load_test()
         trees = [trees_train, trees_val, trees_test]
         actions = [actions_train, actions_val, actions_test]
         terms = [terms_train, terms_val, terms_test]
         unknown_terms = [unknownified_terms_train, unknownified_terms_val, unknownified_terms_test]
-
+        tags = [tags_train, tags_val, tags_test]
         headers = ['Train', 'Val', 'Test']
         rows = [
             self._count_sequences(trees),
-            self._count_tokens(unknown_terms),
-            self._count_tokens_without_punctuation(unknown_terms),
-            self._count_unique_tokens('Unique tokens', terms),
-            self._count_unique_tokens_without_punctuation('Unique tokens without punctuation', terms),
-            self._count_unique_tokens('Unique unknownified tokens', unknown_terms),
-            self._count_unique_tokens_without_punctuation('Unique unknownified tokens without punctuation', unknown_terms),
+            self._count_strings('Tokens', unknown_terms),
+            self._count_strings_without_punctuation('Tokens without punctuation', unknown_terms),
+            self._count_unique_strings('Unique tokens', terms),
+            self._count_unique_strings_without_punctuation('Unique tokens without punctuation', terms),
+            self._count_unique_strings('Unique unknownified tokens', unknown_terms),
+            self._count_unique_strings_without_punctuation('Unique unknownified tokens without punctuation', unknown_terms),
             self._count_unknown_types(unknown_terms),
+            self._count_strings('Part-of-speech tags', tags),
+            self._count_unique_strings('Unique part-of-speech tags', tags),
             self._count_non_terminals(actions),
             self._count_unique_non_terminals(actions),
             self._count_unknown_non_terminals_types(actions),
         ]
-
         colalign = ['left', 'right', 'right', 'right']
         print(tabulate(rows, headers, tablefmt='fancy_grid', colalign=colalign))
 
@@ -51,19 +51,19 @@ class OracleStatsTask(Task):
         counts = map(lambda sequences: f'{len(sequences):,}', data)
         return ['Sequences', *counts]
 
-    def _count_tokens(self, data):
+    def _count_strings(self, name, data):
         counts = map(lambda tokens: f'{sum(map(len, tokens)):,}', data)
-        return ['Tokens', *counts]
+        return [name, *counts]
 
-    def _count_tokens_without_punctuation(self, data):
+    def _count_strings_without_punctuation(self, name, data):
         counts = [0, 0, 0]
         for index, tokens in enumerate(data):
             tokens_flattened = reduce(iconcat, tokens, [])
             tokens_without_punctuation = list(filter(self._is_not_punctuation, tokens_flattened))
             counts[index] = f'{len(tokens_without_punctuation):,}'
-        return ['Tokens without punctuation', *counts]
+        return [name, *counts]
 
-    def _count_unique_tokens(self, name, data):
+    def _count_unique_strings(self, name, data):
         counts = [0, 0, 0]
         for index, tokens in enumerate(data):
             tokens_flattened = reduce(iconcat, tokens, [])
@@ -71,7 +71,7 @@ class OracleStatsTask(Task):
             counts[index] = f'{len(tokens_set):,}'
         return [name, *counts]
 
-    def _count_unique_tokens_without_punctuation(self, name, data):
+    def _count_unique_strings_without_punctuation(self, name, data):
         counts = [0, 0, 0]
         for index, tokens in enumerate(data):
             tokens_flattened = reduce(iconcat, tokens, [])

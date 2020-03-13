@@ -44,13 +44,6 @@ class Sampler:
     def get_iterator(self):
         raise NotImplementedError('must be implemented by subclass')
 
-    def sample(self, tokens):
-        """
-        :type tokens: list of str
-        :rtype: list of app.data.actions.action.Action
-        """
-        raise NotImplementedError('must be implemented by subclass')
-
     def _is_finished_sampling(self, actions, tokens_length):
         """
         :type actions: list of app.data.actions.action.Action
@@ -73,10 +66,3 @@ class Sampler:
         action_integers = [action_converter.action2integer(action) for action in actions]
         actions_tensor = torch.tensor(action_integers, device=self._device, dtype=torch.long)
         return actions_tensor.reshape((len(actions), 1))
-
-    def _tokens2tensor(self, token_converter, tokens):
-        known_tokens = self.token_converter.tokens()
-        unknownified_tokens = [fine_grained_unknownifier(known_tokens, (None, token)) for token in tokens]
-        token_integers = [self._token_converter.token2integer(token) for token in unknownified_tokens]
-        tokens_tensor = torch.tensor(token_integers, device=self._device, dtype=torch.long)
-        return tokens_tensor.reshape((len(tokens), 1))

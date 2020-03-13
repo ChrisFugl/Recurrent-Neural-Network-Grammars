@@ -2,19 +2,15 @@ model:
   type: rnng
   composer:
     type: birnn
+    dropout: 0.0
     num_layers: 1
-  distribution:
-    type: class_based_softmax
-    cluster: data/pet/wsj/generative/brown_c140.cluster
   embedding:
-    size: 128
     max_norm: null
     norm_type: 2.0
     scale_grad_by_freq: false
     sparse: false
   representation:
     type: vanilla
-    size: 128
     dropout: 0.2
   rnn:
     type: lstm
@@ -23,4 +19,9 @@ model:
     bias: true
     dropout: 0.2
     bidirectional: false
+  size:
+    action: 16
+    pos: 12
+    token: 32
+    rnn: 128
   threads: 1

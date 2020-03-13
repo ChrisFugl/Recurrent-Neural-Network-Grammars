@@ -16,7 +16,7 @@ class TrainTask(Task):
         iterator_train, iterator_val,
         model, loss, optimizer, learning_rate_scheduler,
         stopping_criterion, checkpoint, evaluator,
-        load_checkpoint, token_count, non_terminal_count, action_count
+        load_checkpoint, token_count, tag_count, non_terminal_count, action_count
     ):
         """
         :type device: torch.device
@@ -31,6 +31,7 @@ class TrainTask(Task):
         :type evaluator: app.evaluators.evaluator.Evaluator
         :type load_checkpoint: str
         :type token_count: int
+        :type tag_count: int
         :type non_terminal_count: int
         :type action_count: int
         """
@@ -47,6 +48,7 @@ class TrainTask(Task):
         self._evaluator = evaluator
 
         self._token_count = token_count
+        self._tag_count = tag_count
         self._non_terminal_count = non_terminal_count
         self._action_count = action_count
 
@@ -72,6 +74,7 @@ class TrainTask(Task):
         self._logger.info(f'Saving output to {os.getcwd()}')
         self._logger.info(f'Using device: {self._device}')
         self._logger.info(f'Tokens: {self._token_count:,}')
+        self._logger.info(f'Part-of-speech tags: {self._tag_count:,}')
         self._logger.info(f'Non-terminals: {self._non_terminal_count:,}')
         self._logger.info(f'Actions: {self._action_count:,}')
         self._logger.info(f'Parameters: {self._count_parameters():,}')

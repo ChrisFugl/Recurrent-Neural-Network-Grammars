@@ -1,5 +1,5 @@
-from app.data.action_set import get_action_set
 from app.data.converters.action import ActionConverter
+from app.data.converters.tag import TagConverter
 from app.data.converters.token import TokenConverter
 from app.data.loaders import get_loader
 from app.models import get_model
@@ -15,12 +15,12 @@ def load_saved_model(device, load_dir):
     """
     training_config = get_training_config(load_dir)
     generative = is_generative(training_config.type)
-    action_set = get_action_set(training_config.type)
     loader = get_loader(training_config.loader, name=f'loader_{training_config.name}')
-    _, actions, _, unknownified_tokens, _ = loader.load_train()
+    _, actions, _, unknownified_tokens, tags = loader.load_train()
     token_converter = TokenConverter(unknownified_tokens)
+    tag_converter = TagConverter(tags)
     action_converter = ActionConverter(token_converter, generative, actions)
-    model = get_model(device, generative, token_converter, action_converter, action_set, training_config.model)
+    model = get_model(device, generative, action_converter, token_converter, tag_converter, training_config.model)
     load_model_params(model, load_dir)
     return model, action_converter
 

@@ -3,11 +3,9 @@ from app.constants import (
     EVALB_TOOL_PATH, EVALB_PARAMS_PATH
 )
 from app.tasks.task import Task
-from functools import reduce
 import hydra
 import logging
 from math import exp, log
-from operator import mul
 import os
 import re
 import subprocess
