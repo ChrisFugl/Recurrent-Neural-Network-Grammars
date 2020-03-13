@@ -1,10 +1,10 @@
-from app.constants import ACTION_GENERATE_INDEX, START_TOKEN_INDEX
+from app.constants import ACTION_GENERATE_INDEX
 from app.data.action_set.generative import Generative as GenerativeActionSet
 from app.models.rnng.rnng import RNNG
 
 class GenerativeRNNG(RNNG):
 
-    def __init__(self, device, embeddings, structures, converters, representation, composer, rnn_input_size, rnn_size, threads, token_distribution):
+    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, threads, token_distribution):
         """
         :type device: torch.device
         :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
@@ -12,12 +12,11 @@ class GenerativeRNNG(RNNG):
         :type converters: app.data.converters.action.ActionConverter, app.data.converters.token.TokenConverter, app.data.converters.tag.TagConverter
         :type representation: app.representations.representation.Representation
         :type composer: app.composers.composer.Composer
-        :type rnn_input_size: int
-        :type rnn_size: int
+        :type sizes: int, int, int, int
         :type threads: int
         :type token_distribution: app.distributions.distribution.Distribution
         """
-        super().__init__(device, embeddings, structures, converters, representation, composer, rnn_input_size, rnn_size, threads)
+        super().__init__(device, embeddings, structures, converters, representation, composer, sizes, threads)
         self._action_set = GenerativeActionSet()
         self._generative = True
         self._token_distribution = token_distribution
@@ -44,9 +43,7 @@ class GenerativeRNNG(RNNG):
         :type length: int
         :rtype: app.models.rnng.stack.StackNode
         """
-        start_token_tensor = self._index2tensor(START_TOKEN_INDEX)
-        start_token_embedding = self._token_embedding(start_token_tensor)
-        token_top = self._token_buffer.push(start_token_embedding)
+        token_top = self._token_buffer.push(self._start_token_embedding)
         return token_top
 
     def __str__(self):

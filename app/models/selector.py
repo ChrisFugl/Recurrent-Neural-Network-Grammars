@@ -33,7 +33,8 @@ def get_model(device, generative, action_converter, token_converter, tag_convert
         converters = (action_converter, token_converter, tag_converter)
         representation = get_representation(config.size.rnn, config.rnn.hidden_size, config.representation)
         composer = get_composer(device, config)
-        base_args = (device, embeddings, structures, converters, representation, composer, config.size.rnn, config.rnn.hidden_size, config.threads)
+        sizes = (config.size.action, token_size, config.size.rnn, config.rnn.hidden_size)
+        base_args = (device, embeddings, structures, converters, representation, composer, sizes, config.threads)
         if generative:
             from app.models.rnng.generative import GenerativeRNNG
             token_distribution = get_distribution(device, action_converter, config)

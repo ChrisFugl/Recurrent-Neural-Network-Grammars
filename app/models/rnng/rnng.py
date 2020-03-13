@@ -2,7 +2,6 @@ from app.data.actions.non_terminal import NonTerminalAction
 from app.constants import (
     ACTION_REDUCE_INDEX, ACTION_NON_TERMINAL_INDEX, ACTION_SHIFT_INDEX, ACTION_GENERATE_INDEX,
     ACTION_REDUCE_TYPE, ACTION_NON_TERMINAL_TYPE, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE,
-    START_ACTION_INDEX
 )
 from app.models.model import Model
 from app.models.rnng.action_args import ActionOutputs, ActionLogProbs
@@ -16,7 +15,7 @@ ACTIONS_COUNT = 3
 
 class RNNG(Model):
 
-    def __init__(self, device, embeddings, structures, converters, representation, composer, rnn_input_size, rnn_size, threads):
+    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, threads):
         """
         :type device: torch.device
         :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
@@ -24,11 +23,11 @@ class RNNG(Model):
         :type converters: app.data.converters.action.ActionConverter, app.data.converters.token.TokenConverter, app.data.converters.tag.TagConverter
         :type representation: app.representations.representation.Representation
         :type composer: app.composers.composer.Composer
-        :type rnn_input_size: int
-        :type rnn_size: int
+        :type sizes: int, int, int, int
         :type threads: int
         """
         super().__init__()
+        action_size, token_size, rnn_input_size, rnn_size = sizes
         self._device = device
         self._threads = threads
         self._action_converter, self._token_converter, self._tag_converter = converters
@@ -42,6 +41,10 @@ class RNNG(Model):
         self._logits2log_prob = nn.LogSoftmax(dim=2)
         self._representation2nt_logits = nn.Linear(in_features=rnn_size, out_features=self._non_terminal_count, bias=True)
 
+        start_action_embedding = torch.FloatTensor(1, 1, action_size).uniform_(-1, 1)
+        self._start_action_embedding = nn.Parameter(start_action_embedding, requires_grad=True)
+        start_token_embedding = torch.FloatTensor(1, 1, token_size).uniform_(-1, 1)
+        self._start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)
         start_stack_embedding = torch.FloatTensor(1, 1, rnn_input_size).uniform_(-1, 1)
         self._start_stack_embedding = nn.Parameter(start_stack_embedding, requires_grad=True)
 
@@ -285,9 +288,7 @@ class RNNG(Model):
         raise NotImplementedError('must be implemented by subclass')
 
     def _initialize_structures(self, tokens, tags, length):
-        start_action_tensor = self._index2tensor(START_ACTION_INDEX)
-        start_action_embedding = self._action_embedding(start_action_tensor)
-        action_top = self._action_history.push(start_action_embedding)
+        action_top = self._action_history.push(self._start_action_embedding)
         stack_top = self._stack.push(self._start_stack_embedding)
         token_top = self._initialize_token_buffer(tokens, tags, length)
         return action_top, stack_top, token_top

@@ -1,6 +1,6 @@
 from app.constants import (
     ACTION_REDUCE_TYPE, ACTION_GENERATE_TYPE, ACTION_NON_TERMINAL_TYPE, ACTION_SHIFT_TYPE,
-    ACTION_EMBEDDING_OFFSET, PAD_INDEX, PAD_SYMBOL, START_ACTION_INDEX, START_ACTION_SYMBOL
+    ACTION_EMBEDDING_OFFSET, PAD_INDEX, PAD_SYMBOL
 )
 from app.data.actions.generate import GenerateAction
 from app.data.actions.non_terminal import NonTerminalAction
@@ -108,8 +108,6 @@ class ActionConverter:
         """
         if index == PAD_INDEX:
             return PAD_SYMBOL
-        if index == START_ACTION_INDEX:
-            return START_ACTION_SYMBOL
         singleton_offset = self.get_singleton_offset()
         if index < singleton_offset + self._singleton_count:
             return self._index2singleton[index - singleton_offset]
@@ -129,8 +127,6 @@ class ActionConverter:
         """
         if action_string == PAD_SYMBOL:
             raise Exception('Cannot convert padding symbol to action.')
-        if action_string == START_ACTION_SYMBOL:
-            raise Exception('Cannot convert start symbol to action.')
         type, argument = parse_action(action_string)
         if self._generative:
             if type == ACTION_REDUCE_TYPE:
@@ -157,8 +153,6 @@ class ActionConverter:
         """
         if action_string == PAD_SYMBOL:
             return PAD_INDEX
-        if action_string == START_ACTION_SYMBOL:
-            return START_ACTION_INDEX
         type, argument = parse_action(action_string)
         return self._action_args2integer(type, argument)
 

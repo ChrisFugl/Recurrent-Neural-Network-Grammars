@@ -1,4 +1,4 @@
-from app.constants import PAD_INDEX, PAD_SYMBOL, START_TAG_INDEX, START_TAG_SYMBOL, TAG_EMBEDDING_OFFSET
+from app.constants import PAD_INDEX, PAD_SYMBOL, TAG_EMBEDDING_OFFSET
 
 class TagConverter:
 
@@ -9,8 +9,8 @@ class TagConverter:
         self._tag2integer, self._integer2tag = self._get_tag_converters(tags)
 
     def _get_tag_converters(self, tags):
-        tag2integer = {PAD_SYMBOL: PAD_INDEX, START_TAG_SYMBOL: START_TAG_INDEX}
-        integer2tag = [PAD_SYMBOL, START_TAG_SYMBOL]
+        tag2integer = {PAD_SYMBOL: PAD_INDEX}
+        integer2tag = [PAD_SYMBOL]
         counter = TAG_EMBEDDING_OFFSET
         for sentence_tags in tags:
             for tag in sentence_tags:

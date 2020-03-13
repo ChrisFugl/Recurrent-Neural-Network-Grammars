@@ -1,4 +1,4 @@
-from app.constants import PAD_INDEX, PAD_SYMBOL, START_TOKEN_INDEX, START_TOKEN_SYMBOL, TOKEN_EMBEDDING_OFFSET
+from app.constants import PAD_INDEX, PAD_SYMBOL, TOKEN_EMBEDDING_OFFSET
 
 class TokenConverter:
     """
@@ -14,8 +14,8 @@ class TokenConverter:
         self._token2integer, self._integer2token = self._get_token_converters(sentences)
 
     def _get_token_converters(self, sentences):
-        token2integer = {PAD_SYMBOL: PAD_INDEX, START_TOKEN_SYMBOL: START_TOKEN_INDEX}
-        integer2token = [PAD_SYMBOL, START_TOKEN_SYMBOL]
+        token2integer = {PAD_SYMBOL: PAD_INDEX}
+        integer2token = [PAD_SYMBOL]
         counter = TOKEN_EMBEDDING_OFFSET
         for sentence in sentences:
             for token in sentence:
