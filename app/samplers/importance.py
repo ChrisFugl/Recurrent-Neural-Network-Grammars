@@ -110,11 +110,11 @@ class ImportanceSampler(Sampler):
                 action_gen = ReduceAction(self._device)
             elif type == ACTION_NON_TERMINAL_TYPE:
                 argument = action_dis.argument
-                argument_index = self._action_converter_gen.string2integer(f'NT({argument})') - non_terminal_offset
+                argument_index = self._action_converter_gen.non_terminal2integer(argument) - non_terminal_offset
                 action_gen = NonTerminalAction(self._device, argument, argument_index)
             else:
                 argument = tokens[token_index]
-                argument_index = self._action_converter_gen.string2integer(f'GEN({argument})') - terminal_offset
+                argument_index = self._action_converter_gen.token2integer(argument) - terminal_offset
                 action_gen = GenerateAction(self._device, argument, argument_index)
                 token_index += 1
             actions_gen.append(action_gen)

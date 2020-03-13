@@ -71,8 +71,7 @@ class ClassBasedSoftmax(Distribution):
                 log_probs[log_prob_index] = cluster_log_prob + token_log_prob
                 log_prob_index += 1
                 token = self._cluster_converter.cluster2token((cluster_index, token_index))
-                action_string = f'GEN({token})'
-                action_index = self._action_converter.string2integer(action_string)
+                action_index = self._action_converter.token2integer(token)
                 index2action.append(action_index)
         return log_probs, index2action
 

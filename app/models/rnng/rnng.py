@@ -209,8 +209,7 @@ class RNNG(Model):
                 token_distribution_log_prob = self._token_distribution.log_prob(representation, token, posterior_scaling=posterior_scaling).view(1)
                 token_log_prob = base_generate_log_prob + token_distribution_log_prob
                 log_probs_list.append(token_log_prob)
-                token_action_string = f'GEN({token})'
-                token_action_index = self._action_converter.string2integer(token_action_string)
+                token_action_index = self._action_converter.token2integer(token)
                 index2action_index.append(token_action_index)
         # non-terminal log probabilities
         if ACTION_NON_TERMINAL_INDEX in valid_base_actions:

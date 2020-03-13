@@ -30,8 +30,10 @@ class ActionConverter:
         self._singleton_count = len(self._index2singleton)
         self._terminal2index, self._index2terminal = self._get_terminal_actions(self._generative, token_converter)
         self._terminal_count = len(self._index2terminal)
+        self._terminal_offset = ACTION_EMBEDDING_OFFSET + self._singleton_count
         self._non_terminal2index, self._index2non_terminal = self._get_non_terminal_actions(self._generative, trees)
         self._non_terminal_count = len(self._index2non_terminal)
+        self._non_terminal_offset = ACTION_EMBEDDING_OFFSET + self._singleton_count + self._terminal_count
         self._actions_count = ACTION_EMBEDDING_OFFSET + self._singleton_count + self._terminal_count + self._non_terminal_count
 
     def count(self):
@@ -70,13 +72,13 @@ class ActionConverter:
         """
         :rtype: int
         """
-        return ACTION_EMBEDDING_OFFSET + self._singleton_count
+        return self._terminal_offset
 
     def get_non_terminal_offset(self):
         """
         :rtype: int
         """
-        return ACTION_EMBEDDING_OFFSET + self._singleton_count + self._terminal_count
+        return self._non_terminal_offset
 
     def action2integer(self, action):
         """
@@ -159,6 +161,26 @@ class ActionConverter:
             return START_ACTION_INDEX
         type, argument = parse_action(action_string)
         return self._action_args2integer(type, argument)
+
+    def token2integer(self, token):
+        """
+        Assumes that model is generative and token is the argument of a generate action.
+
+        :type token: str
+        :rtype: int
+        """
+        terminal_offset = self.get_terminal_offset()
+        return terminal_offset + self._terminal2index[token]
+
+    def non_terminal2integer(self, non_terminal):
+        """
+        Assumes that argument is the argument of a non-terminal action.
+
+        :type non_terminal: str
+        :rtype: int
+        """
+        non_terminal_offset = self.get_non_terminal_offset()
+        return non_terminal_offset + self._non_terminal2index[non_terminal]
 
     def _get_singleton_actions(self, generative):
         if generative:
