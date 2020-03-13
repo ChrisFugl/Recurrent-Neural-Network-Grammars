@@ -41,16 +41,19 @@ class Model(nn.Module):
         """
         Advance state of the model to the next state.
 
-        :param state: model specific previous state
+        :param state: model specific state
         :type action: app.data.actions.action.Action
         """
         raise NotImplementedError('must be implemented by subclass')
 
-    def next_action_log_probs(self, state, posterior_scaling=1.0):
+    def next_action_log_probs(self, state, posterior_scaling=1.0, token=None, include_gen=True, include_nt=True):
         """
         Compute log probability of every action given the current state.
 
-        :param state: state of a parse
+        :param state: model specific state
+        :type token: str
+        :type include_gen: bool
+        :type include_nt: bool
         :rtype: torch.Tensor, list of int
         """
         raise NotImplementedError('must be implemented by subclass')

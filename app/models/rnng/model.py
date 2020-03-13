@@ -219,11 +219,14 @@ class RNNG(Model):
         action_top = self._action_history.push(action_embedding, data=action, top=state.action_top)
         return state.next(stack_top, action_top, token_top, open_non_terminals_count, token_counter)
 
-    def next_action_log_probs(self, state, posterior_scaling=1.0):
+    def next_action_log_probs(self, state, posterior_scaling=1.0, token=None, include_gen=True, include_nt=True):
         """
         Compute log probability of every action given the current state.
 
         :type state: app.models.rnng.state.RNNGState
+        :type token: str
+        :type include_gen: bool
+        :type include_nt: bool
         :rtype: torch.Tensor, list of int
         """
         tokens_length = state.tokens_length
@@ -251,20 +254,34 @@ class RNNG(Model):
         # token log probabilities for generative model
         if self._generative and ACTION_GENERATE_INDEX in valid_base_actions:
             index2action_index.remove(singleton_offset + ACTION_GENERATE_INDEX)
-            token_log_probs, token_index2action_index = self._token_distribution.log_probs(representation, posterior_scaling=posterior_scaling)
-            log_probs_list.append(token_log_probs)
-            index2action_index.extend(token_index2action_index)
+            base_generate_log_prob = valid_base_log_probs[action2index[ACTION_GENERATE_INDEX]]
+            if token is None and include_gen:
+                conditional_token_log_probs, token_index2action_index = self._token_distribution.log_probs(
+                    representation,
+                    posterior_scaling=posterior_scaling
+                )
+                token_log_probs = base_generate_log_prob + conditional_token_log_probs
+                log_probs_list.append(token_log_probs)
+                index2action_index.extend(token_index2action_index)
+            if token is not None:
+                token_distribution_log_prob = self._token_distribution.log_prob(representation, token, posterior_scaling=posterior_scaling).view(1)
+                token_log_prob = base_generate_log_prob + token_distribution_log_prob
+                log_probs_list.append(token_log_prob)
+                token_action_string = f'GEN({token})'
+                token_action_index = self._action_converter.string2integer(token_action_string)
+                index2action_index.append(token_action_index)
         # non-terminal log probabilities
         if ACTION_NON_TERMINAL_INDEX in valid_base_actions:
             index2action_index.remove(singleton_offset + ACTION_NON_TERMINAL_INDEX)
-            non_terminal_logits = self._representation2non_terminal_logits(representation)
-            base_non_terminal_log_prob = valid_base_log_probs[action2index[ACTION_NON_TERMINAL_INDEX]]
-            conditional_non_terminal_log_probs = self._logits2log_prob(posterior_scaling * non_terminal_logits).view((-1,))
-            non_terminal_log_probs = base_non_terminal_log_prob + conditional_non_terminal_log_probs
-            log_probs_list.append(non_terminal_log_probs)
-            non_terminal_offset = self._action_converter.get_non_terminal_offset()
-            non_terminal2action_index = [non_terminal_offset + index for index in range(self._non_terminal_count)]
-            index2action_index.extend(non_terminal2action_index)
+            if include_nt:
+                non_terminal_logits = self._representation2non_terminal_logits(representation)
+                base_non_terminal_log_prob = valid_base_log_probs[action2index[ACTION_NON_TERMINAL_INDEX]]
+                conditional_non_terminal_log_probs = self._logits2log_prob(posterior_scaling * non_terminal_logits).view((-1,))
+                non_terminal_log_probs = base_non_terminal_log_prob + conditional_non_terminal_log_probs
+                log_probs_list.append(non_terminal_log_probs)
+                non_terminal_offset = self._action_converter.get_non_terminal_offset()
+                non_terminal2action_index = [non_terminal_offset + index for index in range(self._non_terminal_count)]
+                index2action_index.extend(non_terminal2action_index)
         log_probs = torch.cat(log_probs_list, dim=0)
         return log_probs, index2action_index
 

@@ -14,6 +14,7 @@ class ClusterConverter:
         :type cluster_file_path: str
         """
         self._token2cluster, self._cluster2token = self._get_cluster_converters(cluster_file_path)
+        self._token_count = sum(map(len, self._cluster2token))
 
     def _get_cluster_converters(self, cluster_file_path):
         data = self._read_cluster(cluster_file_path)
@@ -46,7 +47,15 @@ class ClusterConverter:
         """
         return len(self._cluster2token)
 
-    def count_tokens(self, cluster_index):
+    def count_tokens(self):
+        """
+        Count number of tokens in total.
+
+        :rtype: int
+        """
+        return self._token_count
+
+    def count_tokens_in_cluster(self, cluster_index):
         """
         Count number of tokens in specific cluster.
 

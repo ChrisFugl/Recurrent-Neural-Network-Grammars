@@ -20,22 +20,23 @@ class ClassBasedSoftmax(Distribution):
         self._representation2clusters = nn.Linear(in_features=representation_size, out_features=clusters_count, bias=True)
         cluster2logits = []
         for cluster_index in range(clusters_count):
-            tokens_count = cluster_converter.count_tokens(cluster_index)
+            tokens_count = cluster_converter.count_tokens_in_cluster(cluster_index)
             cluster = nn.Linear(in_features=representation_size, out_features=tokens_count, bias=True).to(device)
             cluster2logits.append(cluster)
         self._cluster2logits = nn.ModuleList(cluster2logits)
 
-    def log_prob(self, representation, token):
+    def log_prob(self, representation, token, posterior_scaling=1.0):
         """
         Compute log probability of given value.
 
         :type representation: torch.Tensor
+        :type posterior_scaling: float
         :type token: str
         :rtype: torch.Tensor
         """
         cluster_index, token_index = self._cluster_converter.token2cluster(token)
         cluster_logits = self._representation2clusters(representation)
-        cluster_log_probs = self._logits2log_prob(cluster_logits)
+        cluster_log_probs = self._logits2log_prob(posterior_scaling * cluster_logits)
         cluster_log_prob = cluster_log_probs[:, :, cluster_index]
         cluster2logits = self._cluster2logits[cluster_index]
         token_logits = cluster2logits(representation)
@@ -53,10 +54,10 @@ class ClassBasedSoftmax(Distribution):
         :returns: log probabilities, log probability index to action index
         """
         index2action = []
-        cluster_logits = self._representation2logits(representation)
+        cluster_logits = self._representation2clusters(representation)
         cluster_log_probs = self._logits2log_prob(posterior_scaling * cluster_logits).squeeze()
         clusters_count = self._cluster_converter.count()
-        tokens_count = self._action_converter.count_terminals()
+        tokens_count = self._cluster_converter.count_tokens()
         log_probs = torch.empty((tokens_count,), device=self._device, dtype=torch.float)
         log_prob_index = 0
         for cluster_index in range(clusters_count):
@@ -64,7 +65,7 @@ class ClassBasedSoftmax(Distribution):
             cluster2logits = self._cluster2logits[cluster_index]
             token_logits = cluster2logits(representation)
             token_log_probs = self._logits2log_prob(posterior_scaling * token_logits).squeeze()
-            cluster_tokens_count = self._cluster_converter.count_tokens(cluster_index)
+            cluster_tokens_count = self._cluster_converter.count_tokens_in_cluster(cluster_index)
             for token_index in range(cluster_tokens_count):
                 token_log_prob = token_log_probs[token_index]
                 log_probs[log_prob_index] = cluster_log_prob + token_log_prob
@@ -73,7 +74,7 @@ class ClassBasedSoftmax(Distribution):
                 action_string = f'GEN({token})'
                 action_index = self._action_converter.string2integer(action_string)
                 index2action.append(action_index)
-        return log_probs
+        return log_probs, index2action
 
     def __str__(self):
         return f'ClassBasedSoftmax(n_clusters={self._cluster_converter.count()})'

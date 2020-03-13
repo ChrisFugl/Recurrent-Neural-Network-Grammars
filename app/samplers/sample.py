@@ -10,24 +10,23 @@ class Sample:
         :type predicted_log_prob: float
         :type tokens_prob: float
         """
-        self.gold = Gold(gold_actions, gold_tokens, gold_tags, gold_log_prob, tokens_prob)
+        self.gold = Gold(gold_actions, gold_tokens, gold_tags, gold_log_prob)
         self.prediction = Prediction(predicted_actions, predicted_log_prob)
+        self.tokens_prob = tokens_prob
 
 class Gold:
 
-    def __init__(self, actions, tokens, tags, log_prob, tokens_prob):
+    def __init__(self, actions, tokens, tags, log_prob):
         """
         :type actions: list of app.data.actions.action.Action
         :type tokens: list of str
         :type tags: list of str
         :type log_prob: float
-        :type tokens_prob: float
         """
         self.actions = actions
         self.tokens = tokens
         self.tags = tags
         self.log_prob = log_prob
-        self.tokens_prob = tokens_prob
 
 class Prediction:
 

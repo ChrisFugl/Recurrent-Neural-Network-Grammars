@@ -112,29 +112,32 @@ class EvaluateTask(Task):
             else:
                 items = [sample.prediction.actions for sample in samples]
                 log_probs = [sample.prediction.log_prob for sample in samples]
-            log_likelihood = sum(log_probs)
-            likelihood = exp(log_likelihood)
+            probs = [exp(log_prob) for log_prob in log_probs]
+            perplexities = [exp(- log_prob / len(items[index])) for index, log_prob in enumerate(log_probs)]
         else:
-            items = [sample.gold.tokens for sample in samples]
-            probs = [sample.gold.tokens_prob for sample in samples]
-            if None in probs:
-                return None
-            try:
-                likelihood = reduce(mul, probs, 1.0)
-                log_likelihood = log(likelihood)
-            except ValueError:
-                self._logger.info('Failed to compute token metrics.')
-                return None
-        count = sum(map(len, items))
-        perplexity = exp(- log_likelihood / count)
+            probs, log_probs, perplexities = [], [], []
+            for sample in samples:
+                if sample.tokens_prob is not None:
+                    try:
+                        log_prob = log(sample.tokens_prob)
+                        probs.append(sample.tokens_prob)
+                        log_probs.append(log_prob)
+                        perplexities.append(exp(- log_prob / len(sample.gold.tokens)))
+                    except ValueError:
+                        pass
+        if len(probs) == 0:
+            return None
+        log_likelihood = sum(log_probs) / len(log_probs)
+        likelihood = sum(probs) / len(probs)
+        perplexity = sum(perplexities) / len(perplexities)
         return log_likelihood, likelihood, perplexity
 
     def _log_stats(self, name, stats):
         if stats is not None:
             log_likelihood, likelihood, perplexity = stats
-            self._logger.info(f'{name} log likelihood = {log_likelihood:0.8f}')
-            self._logger.info(f'{name} likelihood     = {likelihood:0.8f}')
-            self._logger.info(f'{name} perplexity     = {perplexity:0.8f}')
+            self._logger.info(f'{name} mean log likelihood = {log_likelihood:0.8f}')
+            self._logger.info(f'{name} mean likelihood     = {likelihood:0.8f}')
+            self._logger.info(f'{name} mean perplexity     = {perplexity:0.8f}')
 
     def _bracket_scores(self, gold_path, predicted_path):
         process = subprocess.run([self._tool_path, '-p', self._params_path, gold_path, predicted_path], capture_output=True)
