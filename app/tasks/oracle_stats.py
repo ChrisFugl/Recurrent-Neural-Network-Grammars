@@ -43,9 +43,17 @@ class OracleStatsTask(Task):
             self._count_non_terminals(actions),
             self._count_unique_non_terminals(actions),
             self._count_unknown_non_terminals_types(actions),
+            self._max_children_nodes(actions),
+            self._max_open_non_terminals(actions),
+            self._min_length('Min actions', actions),
+            self._mean_length('Mean actions', actions),
+            self._max_length('Max actions', actions),
+            self._min_length('Min tokens', unknown_terms),
+            self._mean_length('Mean tokens', unknown_terms),
+            self._max_length('Max tokens', unknown_terms),
         ]
         colalign = ['left', 'right', 'right', 'right']
-        print(tabulate(rows, headers, tablefmt='fancy_grid', colalign=colalign))
+        print(tabulate(rows, headers, tablefmt='github', colalign=colalign))
 
     def _count_sequences(self, data):
         counts = map(lambda sequences: f'{len(sequences):,}', data)
@@ -113,6 +121,53 @@ class OracleStatsTask(Task):
             counts[index] = f'{len(unknown_non_terminals):,}'
         return ['Unknown non-terminal types', *counts]
 
+    def _max_children_nodes(self, data):
+        counts = [0, 0, 0]
+        for index, sequences in enumerate(data):
+            max_children_nodes = 0
+            for actions in sequences:
+                tree = self._actions2tree(actions)
+                max_from_tree = self._max_children_nodes_from_tree(tree)
+                max_children_nodes = max(max_children_nodes, max_from_tree)
+            counts[index] = max_children_nodes
+        return ['Max children nodes', *counts]
+
+    def _max_children_nodes_from_tree(self, tree):
+        if tree is None or tree.children is None:
+            return 0
+        children = map(self._max_children_nodes_from_tree, tree.children)
+        return max(len(tree.children), *children)
+
+    def _max_open_non_terminals(self, data):
+        counts = [0, 0, 0]
+        for index, sequences in enumerate(data):
+            max_open_nt = 0
+            for actions in sequences:
+                open_nt = 0
+                for action in actions:
+                    if self._is_non_terminal(action):
+                        open_nt += 1
+                        max_open_nt = max(max_open_nt, open_nt)
+                    elif self._is_reduce(action):
+                        open_nt -= 1
+            counts[index] = max_open_nt
+        return ['Max open non-terminals', *counts]
+
+    def _max_length(self, name, data):
+        lengths = map(lambda sequences: map(len, sequences), data)
+        max_lengths = map(lambda sequences: max(sequences), lengths)
+        return [name, *max_lengths]
+
+    def _min_length(self, name, data):
+        lengths = map(lambda sequences: map(len, sequences), data)
+        min_lengths = map(lambda sequences: min(sequences), lengths)
+        return [name, *min_lengths]
+
+    def _mean_length(self, name, data):
+        lengths = map(lambda sequences: list(map(len, sequences)), data)
+        mean_lengths = map(lambda sequences: f'{sum(sequences) / len(sequences):0.2f}', lengths)
+        return [name, *mean_lengths]
+
     def _is_not_punctuation(self, token):
         return token not in ['.', '?', '!', ',', ';', ':', '--', '-', '(', ')', '[', ']', '{', '}', "'", '"', '...']
 
@@ -124,3 +179,35 @@ class OracleStatsTask(Task):
 
     def _is_unknown_non_terminal(self, action):
         return action.startswith('NT(<UNK')
+
+    def _is_reduce(self, action):
+        return action == 'REDUCE'
+
+    def _actions2tree(self, actions):
+        # first action creates the root of the tree
+        root = TreeNode(value=actions[0])
+        parent = root
+        for action in actions[1:]:
+            if self._is_reduce(action):
+                parent = parent.parent
+            elif self._is_non_terminal(action):
+                node = TreeNode(action, parent=parent)
+                parent.add_child(node)
+                parent = node
+            else:
+                node = TreeNode(action, parent=parent)
+                parent.add_child(node)
+        return root
+
+class TreeNode:
+
+    def __init__(self, value, parent=None, children=None):
+        self.value = value
+        self.parent = parent
+        self.children = children
+
+    def add_child(self, child):
+        if self.children is None:
+            self.children = [child]
+        else:
+            self.children.append(child)
