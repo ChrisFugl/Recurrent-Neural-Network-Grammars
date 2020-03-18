@@ -41,22 +41,46 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         start_word_embedding = self._token_tag2word(start_token_embedding, start_tag_embedding)
         push_all_op = self._push_op(batch_size)
         token_buffer = self._token_buffer.initialize(batch_size)
-        token_buffer = self._token_buffer(token_buffer, start_word_embedding, push_all_op)
+        token_buffer = self._token_buffer.hold_or_push(token_buffer, start_word_embedding, push_all_op)
         # add tokens in reverse order
-        word_embeddings = self._get_word_embedding(tokens_tensor, tags_tensor)
+        word_embeddings = self._token_tag2embedding(tokens_tensor, tags_tensor)
         length = word_embeddings.size(0)
         for index in range(length - 1, -1, -1):
             word_embedding = word_embeddings[index:index+1, :, :]
-            token_buffer = self._token_buffer(token_buffer, word_embedding, push_all_op)
+            token_buffer = self._token_buffer.hold_or_push(token_buffer, word_embedding, push_all_op)
         return token_buffer
 
-    def _get_word_embedding(self, tokens, tags):
+    def _get_word_embedding(self, preprocessed, token_action_indices):
+        """
+        :type preprocessed: app.models.parallel_rnng.preprocessed_batch.Preprocessed
+        :type token_action_indices: torch.Tensor
+        :rtype: torch.Tensor, torch.Tensor
+        """
+        token_indices = preprocessed.token_index[token_action_indices]
+        tag_indices = preprocessed.tag_index[token_action_indices]
+        word_embeddings = self._token_tag2embedding(token_indices, tag_indices, dim=1)
+        return word_embeddings
+
+    def _update_token_buffer(self, batch_size, token_action_indices, token_buffer, word_embeddings):
+        """
+        :type batch_size: int
+        :type token_action_indices: torch.Tensor
+        :type token_buffer: app.models.parallel_rnng.stack_lstm.Stack
+        :type word_embeddings: torch.Tensor
+        :rtype: app.models.parallel_rnng.stack_lstm.Stack
+        """
+        op = self._hold_op(batch_size)
+        op[token_action_indices] = -1
+        token_buffer, _ = self._token_buffer.hold_or_pop(token_buffer, op)
+        return token_buffer
+
+    def _token_tag2embedding(self, tokens, tags, dim=2):
         tokens_embedding = self._token_embedding(tokens)
         tags_embedding = self._pos_embedding(tags)
-        return self._token_tag2word(tokens_embedding, tags_embedding)
+        return self._token_tag2word(tokens_embedding, tags_embedding, dim=dim)
 
-    def _token_tag2word(self, tokens, tags):
-        words = torch.cat((tokens, tags), dim=2)
+    def _token_tag2word(self, tokens, tags, dim=2):
+        words = torch.cat((tokens, tags), dim=dim)
         words = self._activation(self._word2buffer(words))
         return words
 

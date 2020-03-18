@@ -41,12 +41,23 @@ class StackLSTM(MemoryLSTM):
         indices = torch.tensor([0] * batch_size, device=self._device, dtype=torch.long)
         return Stack(hidden_state, cell_state, indices)
 
-    def forward(self, stack, input, op):
+    def hold_or_pop(self, stack, op):
+        """
+        :type stack: app.models.parallel_rnng.stack_lstm.Stack
+        :param op: tensor, (batch size), hold = 0, pop = -1
+        :type op: torch.Tensor
+        :rtype: app.models.parallel_rnng.stack_lstm.Stack, torch.Tensor
+        """
+        output = self.top(stack)
+        next_indices = stack.indices + op
+        return Stack(stack.hidden_state, stack.cell_state, next_indices), output
+
+    def hold_or_push(self, stack, input, op):
         """
         :type stack: app.models.parallel_rnng.stack_lstm.Stack
         :param input: tensor, (sequence length, batch size, input size)
         :type input: torch.Tensor
-        :param op: tensor, (batch size), push = 1, hold = 0, pop = -1
+        :param op: tensor, (batch size), push = 1, hold = 0
         :type op: torch.Tensor
         :rtype: app.models.parallel_rnng.stack_lstm.Stack
         """
@@ -69,8 +80,8 @@ class StackLSTM(MemoryLSTM):
         :rtype: torch.Tensor
         """
         batch_size = stack.hidden_state.size(2)
-        last_layer_state = stack.hidden_state[:, self._num_layers - 1:self._num_layers, :, :]
-        top = stack.indices.view(1, 1, batch_size, 1).expand(1, 1, batch_size, self._hidden_size)
+        last_layer_state = stack.hidden_state[:, self._num_layers - 1, :, :]
+        top = stack.indices.view(1, batch_size, 1).expand(1, batch_size, self._hidden_size)
         output = torch.gather(last_layer_state, 0, top).squeeze()
         return output
 

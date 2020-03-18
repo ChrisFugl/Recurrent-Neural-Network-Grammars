@@ -1,5 +1,6 @@
-from app.constants import ACTION_EMBEDDING_OFFSET, PAD_INDEX
+from app.constants import ACTION_EMBEDDING_OFFSET, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_REDUCE_TYPE, ACTION_NON_TERMINAL_TYPE
 from app.models.model import Model
+from app.models.parallel_rnng.preprocess_batch import preprocess_batch
 import torch
 from torch import nn
 
@@ -23,6 +24,7 @@ class ParallelRNNG(Model):
         self._action_converter, self._token_converter, self._tag_converter = converters
         action_size, token_size, rnn_input_size, rnn_size = sizes
         self._action_count = self._action_converter.count() - ACTION_EMBEDDING_OFFSET
+        self._rnn_input_size = rnn_input_size
 
         self._action_embedding, self._token_embedding, self._nt_embedding, self._nt_compose_embedding = embeddings
         self._action_history, self._token_buffer, self._stack = structures
@@ -49,17 +51,21 @@ class ParallelRNNG(Model):
         # is feasible since the loss masks out padded actions.
         groundtruth_actions = torch.clamp(batch.actions.tensor, min=ACTION_EMBEDDING_OFFSET) - ACTION_EMBEDDING_OFFSET
         history, stack, token_buffer = self._initialize_structures(batch.tokens.tensor, batch.tags.tensor)
+        # time_pre_start = time.time()
+        preprocessed_batch = preprocess_batch(self._device, batch)
+        # time_pre_stop = time.time()
+        # print(f'preprocess batch time = {time_pre_stop-time_pre_start:0.4f}')
         output_log_probs = torch.zeros((batch.max_actions_length, batch.size), device=self._device, dtype=torch.float)
         for action_index in range(batch.max_actions_length):
             # time_start = time.time()
             representation = self._get_representation(history, stack, token_buffer)
             # TODO: should valid actions be considered?
             output_log_probs[action_index] = self._get_log_probs(batch.size, groundtruth_actions[action_index], representation)
-            # TODO: how to execute actions?
+            stack, token_buffer = self._do_actions(batch, preprocessed_batch, stack, token_buffer, action_index)
             action_embedding = self._action_embedding(batch.actions.tensor)
-            history = self._action_history(history, action_embedding)
+            history = self._action_history.push(history, action_embedding)
             # time_stop = time.time()
-            # print(f'time = {time_stop-time_start:0.4f}')
+            # print(f'action time = {time_stop-time_start:0.4f}')
         return output_log_probs
 
     def tree_log_probs(self, tokens_tensor, tags_tensor, actions_tensor, actions, actions_max_length=None):
@@ -138,13 +144,13 @@ class ParallelRNNG(Model):
     def _initialize_action_history(self, batch_size):
         start_action_embedding = self._batch_one_element_tensor(self._start_action_embedding, batch_size)
         history = self._action_history.initialize(batch_size)
-        history = self._action_history(history, start_action_embedding)
+        history = self._action_history.push(history, start_action_embedding)
         return history
 
     def _initialize_stack(self, batch_size, push_all_op):
         start_stack_embedding = self._batch_one_element_tensor(self._start_stack_embedding, batch_size)
         stack = self._stack.initialize(batch_size)
-        stack = self._stack(stack, start_stack_embedding, push_all_op)
+        stack = self._stack.hold_or_push(stack, start_stack_embedding, push_all_op)
         return stack
 
     def _initialize_token_buffer(self, tokens_tensor, tags_tensor):
@@ -152,6 +158,24 @@ class ParallelRNNG(Model):
         :type tokens_tensor: torch.Tensor
         :type tags_tensor: torch.Tensor
         :type length: int
+        :rtype: app.models.parallel_rnng.stack_lstm.Stack
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
+    def _get_word_embedding(self, preprocessed, token_action_indices):
+        """
+        :type preprocessed: app.models.parallel_rnng.preprocessed_batch.Preprocessed
+        :type token_action_indices: torch.Tensor
+        :rtype: torch.Tensor
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
+    def _update_token_buffer(self, batch_size, token_action_indices, token_buffer, word_embeddings):
+        """
+        :type batch_size: int
+        :type token_action_indices: torch.Tensor
+        :type token_buffer: app.models.parallel_rnng.stack_lstm.Stack
+        :type word_embeddings: torch.Tensor
         :rtype: app.models.parallel_rnng.stack_lstm.Stack
         """
         raise NotImplementedError('must be implemented by subclass')
@@ -173,9 +197,9 @@ class ParallelRNNG(Model):
 
     def _get_representation(self, history, stack, token_buffer):
         """
-        :type history: app.models.parallel_rnng.stack.Stack
-        :type stack: app.models.parallel_rnng.stack.Stack
-        :type token_buffer: app.models.parallel_rnng.stack.Stack
+        :type history: app.models.parallel_rnng.history_lstm.History
+        :type stack: app.models.parallel_rnng.stack_lstm.Stack
+        :type token_buffer: app.models.parallel_rnng.stack_lstm.Stack
         """
         history_embedding, history_lengths = self._action_history.contents(history)
         stack_embedding, stack_lengths = self._stack.contents(stack)
@@ -198,3 +222,63 @@ class ParallelRNNG(Model):
         indicies = actions.view(batch_size, 1)
         action_log_probs = torch.gather(log_probs, 1, indicies).squeeze()
         return action_log_probs
+
+    def _do_actions(self, batch, preprocessed_batch, stack, token_buffer, action_index):
+        """
+        :type batch: app.data.batch.Batch
+        :type preprocessed_batch: list of app.models.parallel_rnng.preprocessed_batch.Preprocessed
+        :type stack: app.models.parallel_rnng.stack_lstm.Stack
+        :type token_buffer: app.models.parallel_rnng.stack_lstm.Stack
+        :type action_index: int
+        """
+        preprocessed = preprocessed_batch[action_index]
+        token_action_indices = self._get_indices_for_action(preprocessed.actions_indices, self._is_token_action)
+        reduce_action_indices = self._get_indices_for_action(preprocessed.actions_indices, self._is_reduce_action)
+        non_terminal_action_indices = self._get_indices_for_action(preprocessed.actions_indices, self._is_non_terminal_action)
+        non_pad_indices = token_action_indices + reduce_action_indices + non_terminal_action_indices
+        stack_input = torch.zeros((1, batch.size, self._rnn_input_size), device=self._device, dtype=torch.float)
+        # NT
+        if len(non_terminal_action_indices) != 0:
+            nt_indices = preprocessed.non_terminal_index[non_terminal_action_indices]
+            nt_embeddings = self._nt_embedding(nt_indices)
+            stack_input[:, non_terminal_action_indices] = nt_embeddings
+        # SHIFT or GEN
+        if len(token_action_indices) != 0:
+            word_embeddings = self._get_word_embedding(preprocessed, token_action_indices)
+            stack_input[:, token_action_indices] = word_embeddings
+            token_buffer = self._update_token_buffer(batch.size, token_action_indices, token_buffer, word_embeddings)
+        # REDUCE
+        if len(reduce_action_indices) != 0:
+            children = []
+            non_zero_indices = preprocessed.number_of_children != 0
+            max_reduce_children = torch.max(preprocessed.number_of_children)
+            for child_index in range(max_reduce_children):
+                reduce_children_op = self._hold_op(batch.size)
+                reduce_children_op[child_index < preprocessed.number_of_children] = -1
+                stack, output = self._stack.hold_or_pop(stack, reduce_children_op)
+                children.append(output[non_zero_indices])
+            children.reverse()
+            children = torch.stack(children, dim=0)
+            compose_nt_index = preprocessed.compose_non_terminal_index[non_zero_indices]
+            reduce_nt_embeddings = self._nt_compose_embedding(compose_nt_index).unsqueeze(dim=0)
+            composed = self._composer(reduce_nt_embeddings, children, preprocessed.number_of_children[non_zero_indices])
+            stack_input[:, non_zero_indices] = composed[0]
+        stack_op = self._hold_op(batch.size)
+        stack_op[non_pad_indices] = 1
+        stack = self._stack.hold_or_push(stack, stack_input, stack_op)
+        return stack, token_buffer
+
+    def _is_token_action(self, action):
+        type = action.type()
+        return type == ACTION_SHIFT_TYPE or type == ACTION_GENERATE_TYPE
+
+    def _is_reduce_action(self, action):
+        return action.type() == ACTION_REDUCE_TYPE
+
+    def _is_non_terminal_action(self, action):
+        return action.type() == ACTION_NON_TERMINAL_TYPE
+
+    def _get_indices_for_action(self, actions_indices, condition):
+        indices = [index for index, action in actions_indices if condition(action)]
+        indices.sort()
+        return indices

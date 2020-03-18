@@ -253,7 +253,8 @@ class RNNG(Model):
         compose_action = NonTerminalAction(self._device, action.argument, action.argument_index, open=False)
         stack_top = self._stack.pop(stack_top)
         nt_embeding, _ = self._get_nt_embedding(self._nt_compose_embedding, compose_action)
-        composed = self._composer(nt_embeding, children_tensor)
+        children_lengths = torch.tensor([len(children)], device=self._device, dtype=torch.long)
+        composed = self._composer(nt_embeding, children_tensor, children_lengths)
         stack_top = self._stack.push(composed, data=compose_action, top=stack_top)
         action_log_prob = self._get_base_log_prop(log_probs, ACTION_REDUCE_INDEX)
         open_non_terminals_count = outputs.open_non_terminals_count - 1

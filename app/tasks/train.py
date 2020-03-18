@@ -143,9 +143,12 @@ class TrainTask(Task):
         time_batch_start = time.time()
         batch_log_probs = self._model.batch_log_likelihood(batch)
         loss = self._loss(batch_log_probs, batch.actions.lengths)
-        self._optimize(loss)
         time_batch_stop = time.time()
+        time_optimize_start = time.time()
+        self._optimize(loss)
+        time_optimize_stop = time.time()
         time_batch = self._get_seconds(time_batch_start, time_batch_stop)
+        time_optimize = self._get_seconds(time_optimize_start, time_optimize_stop)
         action_perplexity, token_perplexity, actions_count, tokens_count = self._get_perplexities(batch, batch_log_probs, loss)
         actions_per_second = actions_count / time_batch
         tokens_per_second = tokens_count / time_batch
@@ -154,6 +157,7 @@ class TrainTask(Task):
         self._writer_train.add_scalar('time/tokens_per_s', tokens_per_second, batch_count)
         self._writer_train.add_scalar('time/sentences_per_s', sentences_per_second, batch_count)
         self._writer_train.add_scalar('time/batch_s', time_batch, batch_count)
+        self._writer_train.add_scalar('time/optimize_s', time_optimize, batch_count)
         return loss, action_perplexity, token_perplexity
 
     def _optimize(self, loss):

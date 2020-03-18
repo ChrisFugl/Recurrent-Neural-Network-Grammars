@@ -1,9 +1,6 @@
 from app.models.parallel_rnng.memory_lstm import MemoryLSTM
 import torch
 
-# TODO: remove this
-torch.autograd.set_detect_anomaly(True)
-
 class HistoryLSTM(MemoryLSTM):
     """
     Similar to a StackLSTM, but only push is allowed.
@@ -45,7 +42,7 @@ class HistoryLSTM(MemoryLSTM):
         cell_state = torch.zeros(shape, device=self._device, dtype=torch.float)
         return History(hidden_state, cell_state, None)
 
-    def forward(self, history, input):
+    def push(self, history, input):
         """
         :type history: app.models.parallel_rnng.history_lstm.History
         :param input: tensor, (sequence length, batch size, input size)
@@ -62,8 +59,8 @@ class HistoryLSTM(MemoryLSTM):
         :rtype: torch.Tensor
         """
         batch_size = history.hidden_state.size(2)
-        last_layer_state = history.hidden_state[:, self._num_layers - 1:self._num_layers, :, :]
-        top = history.indices.view(1, 1, batch_size, 1).expand(1, 1, batch_size, self._hidden_size)
+        last_layer_state = history.hidden_state[:, self._num_layers - 1, :, :]
+        top = history.indices.view(1, batch_size, 1).expand(1, batch_size, self._hidden_size)
         output = torch.gather(last_layer_state, 0, top).squeeze()
         return output
 
