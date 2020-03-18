@@ -1,0 +1,28 @@
+model:
+  type: parallel_rnng
+  composer:
+    type: birnn
+    dropout: 0.0
+    num_layers: 1
+  embedding:
+    max_norm: null
+    norm_type: 2.0
+    scale_grad_by_freq: false
+    sparse: false
+  representation:
+    type: vanilla
+    dropout: 0.2
+  rnn:
+    type: lstm
+    hidden_size: 128
+    num_layers: 2
+    bias: true
+    dropout: 0.2
+    bidirectional: false
+  size:
+    action: 16
+    pos: 12
+    buffer: 243
+    stack: 92
+    token: 32
+    rnn: 128

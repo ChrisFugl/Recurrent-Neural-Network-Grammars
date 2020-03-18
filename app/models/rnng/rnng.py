@@ -55,8 +55,6 @@ class RNNG(Model):
             ACTION_GENERATE_TYPE: self._generate,
         }
 
-        # TODO: initialize
-
     def batch_log_likelihood(self, batch):
         """
         Compute log likelihood of each sentence/tree in a batch.
@@ -105,10 +103,7 @@ class RNNG(Model):
         for action_index in range(actions_length):
             action = actions[action_index]
             last_action = stack_top.data
-            stack_embedding = self._stack.contents(stack_top)
-            action_history_embedding = self._action_history.contents(action_top)
-            token_buffer_embedding = self._token_buffer.contents(token_top)
-            representation = self._representation(action_history_embedding, stack_embedding, token_buffer_embedding)
+            representation = self._get_representation(action_top, stack_top, token_top)
             valid_actions, action2index = self._action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
             assert action.index() in action2index, f'{action} is not a valid action. (action2index = {action2index})'
             base_logits = self._representation2logits(representation)
@@ -178,10 +173,7 @@ class RNNG(Model):
         token_counter = state.token_counter
         last_action = state.stack_top.data
         open_non_terminals_count = state.open_non_terminals_count
-        stack_embedding = self._stack.contents(state.stack_top)
-        action_history_embedding = self._action_history.contents(state.action_top)
-        token_buffer_embedding = self._token_buffer.contents(state.token_top)
-        representation = self._representation(action_history_embedding, stack_embedding, token_buffer_embedding)
+        representation = self._get_representation(state.action_top, state.stack_top, state.token_top)
         valid_base_actions, action2index = self._action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
         index2action_index = []
         singleton_offset = self._action_converter.get_singleton_offset()
@@ -315,3 +307,18 @@ class RNNG(Model):
             return None
         else:
             return log_probs.log_prob_base[:, :, log_probs.action2index[action_index]]
+
+    def _get_representation(self, action_top, stack_top, token_top):
+        """
+        :type action_top: app.models.rnng.stack.StackNode
+        :type stack_top: app.models.rnng.stack.StackNode
+        :type token_top: app.models.rnng.stack.StackNode
+        """
+        action_history_embedding = self._action_history.contents(action_top)
+        stack_embedding = self._stack.contents(stack_top)
+        token_buffer_embedding = self._token_buffer.contents(token_top)
+        return self._representation(
+            action_history_embedding, action_top.length_as_tensor(self._device),
+            stack_embedding, stack_top.length_as_tensor(self._device),
+            token_buffer_embedding, token_top.length_as_tensor(self._device),
+        )

@@ -6,7 +6,7 @@ from torch import nn
 
 class DiscriminativeRNNG(RNNG):
 
-    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, threads, token_size, pos_size, pos_embedding):
+    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, threads, pos_size, pos_embedding):
         """
         :type device: torch.device
         :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
@@ -16,7 +16,6 @@ class DiscriminativeRNNG(RNNG):
         :type composer: app.composers.composer.Composer
         :type sizes: int, int, int, int
         :type threads: int
-        :type token_size: int
         :type pos_size: int
         :type pos_embedding: torch.nn.Embedding
         """
@@ -25,6 +24,7 @@ class DiscriminativeRNNG(RNNG):
         self._generative = False
         self._pos_embedding = pos_embedding
         self._activation = nn.ReLU()
+        token_size = sizes[1]
         rnn_input_size = sizes[2]
         self._word2buffer = nn.Linear(in_features=token_size + pos_size, out_features=rnn_input_size, bias=True)
         start_tag_embedding = torch.FloatTensor(1, 1, pos_size).uniform_(-1, 1)

@@ -1,4 +1,5 @@
 from app.representations.representation import Representation
+import torch
 from torch import nn
 
 class StackOnlyRepresentation(Representation):
@@ -18,22 +19,27 @@ class StackOnlyRepresentation(Representation):
         self._activation = nn.ReLU()
         self._dropout = nn.Dropout(p=dropout)
 
-    def forward(self, action_history, stack, token_buffer):
+    def forward(self, action_history, action_history_lengths, stack, stack_lengths, token_buffer, token_buffer_lengths):
         """
         :type action_history: torch.Tensor
+        :type action_history_lengths: torch.Tensor
         :type stack: torch.Tensor
+        :type stack_lengths: torch.Tensor
         :type token_buffer: torch.Tensor
+        :type token_buffer_lengths: torch.Tensor
         :rtype: torch.Tensor
         """
-        output = self._pick_last(stack)
+        output = self._pick_last(stack, stack_lengths)
         output = self._dropout(output)
         output = self._feedforward(output)
         output = self._activation(output)
         return output
 
-    def _pick_last(self, embeddings):
-        length, batch_size, hidden_size = embeddings.shape
-        last = embeddings[length - 1, :, :].view(1, batch_size, hidden_size)
+    def _pick_last(self, embeddings, lengths):
+        _, batch_size, hidden_size = embeddings.shape
+        last_index = lengths - 1
+        top = last_index.view(1, batch_size, 1).expand(1, batch_size, hidden_size)
+        last = torch.gather(embeddings, 0, top).view(1, batch_size, hidden_size)
         return last
 
     def __str__(self):

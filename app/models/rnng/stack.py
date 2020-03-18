@@ -60,3 +60,14 @@ class StackNode:
         self.state = state
         self.parent = parent
         self.data = data
+        if parent is None:
+            self.length = 1
+        else:
+            self.length = parent.length + 1
+
+    def length_as_tensor(self, device):
+        """
+        :type device: torch.device
+        :rtype: torch.Tensor
+        """
+        return torch.tensor([self.length], device=device, dtype=torch.long)

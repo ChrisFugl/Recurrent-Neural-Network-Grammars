@@ -1,6 +1,6 @@
 defaults:
   - type: gen
-  - model: ${defaults.0.type}.rnng
+  - model: ${defaults.0.type}.parallel_rnng
   - iterator: unordered
   - loader: wsj.${defaults.0.type}.oracle
   - loss: negative_tree_log_likelihood
