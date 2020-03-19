@@ -21,6 +21,4 @@ model:
     bidirectional: false
   size:
     action: 16
-    buffer: 243
-    stack: 92
     rnn: 256

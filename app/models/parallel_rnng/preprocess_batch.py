@@ -6,12 +6,14 @@ def preprocess_batch(device, batch):
     """
     :type device: torch.device
     :type batch: app.data.batch.Batch
-    :rtype: list of app.models.parallel_rnng.preprocess_batch.Preprocessed
+    :rtype: list of app.models.parallel_rnng.preprocess_batch.Preprocessed, int
     """
     shift_indices = [0 for _ in range(batch.size)]
     parents = [None for _ in range(batch.size)]
     output = []
     actions_in_batch = enumerate(batch.actions.actions)
+    stack_size = [0 for _ in range(batch.size)]
+    max_stack_size = 0
     for action_index in range(batch.max_actions_length):
         actions_in_batch, actions = _get_actions_at_index(actions_in_batch, action_index)
         nt_index = [PAD_INDEX for _ in range(batch.size)]
@@ -29,19 +31,24 @@ def preprocess_batch(device, batch):
                 token_index[batch_index] = batch.tokens.tensor[tokens_length - shift_index - 1, batch_index]
                 tag_index[batch_index] = batch.tags.tensor[tokens_length - shift_index - 1, batch_index]
                 shift_indices[batch_index] = shift_index + 1
+                stack_size[batch_index] = stack_size[batch_index] + 1
                 parent.add_child(node)
             elif type == ACTION_GENERATE_TYPE:
                 token_index[batch_index] = action.argument_index
+                stack_size[batch_index] = stack_size[batch_index] + 1
                 parent.add_child(node)
             elif type == ACTION_NON_TERMINAL_TYPE:
                 if parent is not None:
                     parent.add_child(node)
                 nt_index[batch_index] = action.argument_index
+                stack_size[batch_index] = stack_size[batch_index] + 1
                 parents[batch_index] = node
             else:
                 compose_nt_index[batch_index] = parent.action.argument_index
                 number_of_children[batch_index] = len(parent.children)
+                stack_size[batch_index] = stack_size[batch_index] - len(parent.children)
                 parents[batch_index] = parent.parent
+            max_stack_size = max(max_stack_size, stack_size[batch_index])
         nt_index_tensor = torch.tensor(nt_index, device=device, dtype=torch.long)
         compose_nt_index_tensor = torch.tensor(compose_nt_index, device=device, dtype=torch.long)
         token_index_tensor = torch.tensor(token_index, device=device, dtype=torch.long)
@@ -56,7 +63,7 @@ def preprocess_batch(device, batch):
             tag_index_tensor,
         )
         output.append(preprocessed)
-    return output
+    return output, max_stack_size
 
 def _get_actions_at_index(actions_in_batch, action_index):
     actions_in_batch = list(filter(lambda element: action_index < len(element[1]), actions_in_batch))
@@ -64,19 +71,6 @@ def _get_actions_at_index(actions_in_batch, action_index):
     for i, acts in actions_in_batch:
         actions.append((i, acts[action_index]))
     return actions_in_batch, actions
-
-class Tree:
-
-    def __init__(self, action, parent=None, children=None):
-        self.action = action
-        self.parent = parent
-        self.children = children
-
-    def add_child(self, child):
-        if self.children is None:
-            self.children = [child]
-        else:
-            self.children.append(child)
 
 class Preprocessed:
 
@@ -95,3 +89,16 @@ class Preprocessed:
         self.token_index = token_index
         self.tag_index = tag_index
         self.number_of_children = number_of_children
+
+class Tree:
+
+    def __init__(self, action, parent=None, children=None):
+        self.action = action
+        self.parent = parent
+        self.children = children
+
+    def add_child(self, child):
+        if self.children is None:
+            self.children = [child]
+        else:
+            self.children.append(child)

@@ -22,7 +22,5 @@ model:
   size:
     action: 16
     pos: 12
-    buffer: 243
-    stack: 92
     token: 32
     rnn: 128

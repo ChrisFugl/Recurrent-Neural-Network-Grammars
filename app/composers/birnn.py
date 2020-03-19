@@ -23,7 +23,6 @@ class BiRNNComposer(Composer):
         :type lengths: torch.Tensor
         :rtype: torch.Tensor
         """
-        # TODO: account for lengths
         tensors = torch.cat((non_terminal_embedding, popped_stack_items), dim=0)
         packed = pack_padded_sequence(tensors, lengths, enforce_sorted=False)
         _, batch_size, _ = tensors.shape

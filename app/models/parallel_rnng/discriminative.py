@@ -28,26 +28,21 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         start_tag_embedding = torch.FloatTensor(1, 1, pos_size).uniform_(-1, 1)
         self._start_tag_embedding = nn.Parameter(start_tag_embedding, requires_grad=True)
 
-    def _initialize_token_buffer(self, tokens_tensor, tags_tensor):
+    def _initialize_token_buffer(self, tokens_tensor, tags_tensor, token_lengths):
         """
         :type tokens_tensor: torch.Tensor
         :type tags_tensor: torch.Tensor
-        :type length: int
-        :rtype: app.models.parallel_rnng.stack_lstm.Stack
+        :type token_lengths: torch.Tensor
+        :rtype: app.models.parallel_rnng.buffer_lstm.Buffer
         """
         batch_size = tokens_tensor.size(1)
         start_token_embedding = self._batch_one_element_tensor(self._start_token_embedding, batch_size)
         start_tag_embedding = self._batch_one_element_tensor(self._start_tag_embedding, batch_size)
         start_word_embedding = self._token_tag2word(start_token_embedding, start_tag_embedding)
-        push_all_op = self._push_op(batch_size)
-        token_buffer = self._token_buffer.initialize(batch_size)
-        token_buffer = self._token_buffer.hold_or_push(token_buffer, start_word_embedding, push_all_op)
         # add tokens in reverse order
-        word_embeddings = self._token_tag2embedding(tokens_tensor, tags_tensor)
-        length = word_embeddings.size(0)
-        for index in range(length - 1, -1, -1):
-            word_embedding = word_embeddings[index:index+1, :, :]
-            token_buffer = self._token_buffer.hold_or_push(token_buffer, word_embedding, push_all_op)
+        word_embeddings = self._token_tag2embedding(tokens_tensor, tags_tensor).flip(dims=[0])
+        word_embeddings = torch.cat((start_word_embedding, word_embeddings), dim=0)
+        token_buffer = self._token_buffer.initialize(word_embeddings, token_lengths)
         return token_buffer
 
     def _get_word_embedding(self, preprocessed, token_action_indices):
@@ -65,7 +60,7 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         """
         :type batch_size: int
         :type token_action_indices: torch.Tensor
-        :type token_buffer: app.models.parallel_rnng.stack_lstm.Stack
+        :type token_buffer: app.models.parallel_rnng.buffer_lstm.Buffer
         :type word_embeddings: torch.Tensor
         :rtype: app.models.parallel_rnng.stack_lstm.Stack
         """

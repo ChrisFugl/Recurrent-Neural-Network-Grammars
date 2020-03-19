@@ -3,11 +3,15 @@ from app.losses.utils import negative_log_likelihood
 from app.tasks.task import Task
 import hydra
 import logging
+from math import exp
 import numpy as np
 import os
 import time
 import torch
 from torch.utils.tensorboard import SummaryWriter
+
+# TODO: remove this
+torch.autograd.set_detect_anomaly(True)
 
 class TrainTask(Task):
 
@@ -64,6 +68,8 @@ class TrainTask(Task):
         self._start_batch_count = 0
 
         self._logger = logging.getLogger('train')
+
+        self._uses_gpu = self._device.type == 'cuda'
 
         if load_checkpoint is not None:
             self._load_checkpoint(load_checkpoint)
@@ -140,16 +146,19 @@ class TrainTask(Task):
         return epoch, batch_count, False, training_metrics, best_loss_val
 
     def _train_batch(self, batch, batch_count):
+        if self._uses_gpu:
+            torch.cuda.reset_peak_memory_stats(self._device)
         time_batch_start = time.time()
         batch_log_probs = self._model.batch_log_likelihood(batch)
         loss = self._loss(batch_log_probs, batch.actions.lengths)
         time_batch_stop = time.time()
         time_optimize_start = time.time()
         self._optimize(loss)
+        loss_scalar = loss.cpu().item()
         time_optimize_stop = time.time()
         time_batch = self._get_seconds(time_batch_start, time_batch_stop)
         time_optimize = self._get_seconds(time_optimize_start, time_optimize_stop)
-        action_perplexity, token_perplexity, actions_count, tokens_count = self._get_perplexities(batch, batch_log_probs, loss)
+        action_perplexity, token_perplexity, actions_count, tokens_count = self._get_perplexities(batch, batch_log_probs, loss_scalar)
         actions_per_second = actions_count / time_batch
         tokens_per_second = tokens_count / time_batch
         sentences_per_second = batch.size / time_batch
@@ -158,7 +167,18 @@ class TrainTask(Task):
         self._writer_train.add_scalar('time/sentences_per_s', sentences_per_second, batch_count)
         self._writer_train.add_scalar('time/batch_s', time_batch, batch_count)
         self._writer_train.add_scalar('time/optimize_s', time_optimize, batch_count)
-        return loss, action_perplexity, token_perplexity
+        self._writer_train.add_scalar('batch/action_count_min', batch.actions.lengths.min(), batch_count)
+        self._writer_train.add_scalar('batch/action_count_mean', sum(batch.actions.lengths) / len(batch.actions.lengths), batch_count)
+        self._writer_train.add_scalar('batch/action_count_max', batch.max_actions_length, batch_count)
+        self._writer_train.add_scalar('batch/token_count_min', batch.tokens.lengths.min(), batch_count)
+        self._writer_train.add_scalar('batch/token_count_mean', sum(batch.tokens.lengths) / len(batch.tokens.lengths), batch_count)
+        self._writer_train.add_scalar('batch/token_count_max', batch.max_tokens_length, batch_count)
+        if self._uses_gpu:
+            allocated_gb = self._byte2gb(torch.cuda.max_memory_allocated(self._device))
+            reserved_gb = self._byte2gb(torch.cuda.max_memory_reserved(self._device))
+            self._writer_train.add_scalar('memory/allocated_gb', allocated_gb, batch_count)
+            self._writer_train.add_scalar('memory/reserved_gb', reserved_gb, batch_count)
+        return loss_scalar, action_perplexity, token_perplexity
 
     def _optimize(self, loss):
         self._optimizer.zero_grad()
@@ -166,6 +186,8 @@ class TrainTask(Task):
         self._optimizer.step()
 
     def _evaluate(self, epoch, batch_count, training_metrics, best_loss_val):
+        if self._uses_gpu:
+            torch.cuda.reset_peak_memory_stats(self._device)
         time_val_start = time.time()
         self._model.eval()
         losses, action_perplexities, token_perplexities = [], [], []
@@ -175,14 +197,20 @@ class TrainTask(Task):
         for batch in self._iterator_val:
             log_probs = self._model.batch_log_likelihood(batch)
             loss = self._loss(log_probs, batch.actions.lengths)
-            action_perplexity, token_perplexity, actions_count, tokens_count = self._get_perplexities(batch, log_probs, loss)
-            losses.append(loss)
+            loss_scalar = loss.cpu().item()
+            action_perplexity, token_perplexity, actions_count, tokens_count = self._get_perplexities(batch, log_probs, loss_scalar)
+            losses.append(loss_scalar)
             action_perplexities.append(action_perplexity)
             token_perplexities.append(token_perplexity)
             total_actions += actions_count
             total_tokens += tokens_count
         self._model.train()
         time_val_stop = time.time()
+        if self._uses_gpu:
+            allocated_gb = self._byte2gb(torch.cuda.max_memory_allocated(self._device))
+            reserved_gb = self._byte2gb(torch.cuda.max_memory_reserved(self._device))
+            self._writer_val.add_scalar('memory/allocated_gb', allocated_gb, batch_count)
+            self._writer_val.add_scalar('memory/reserved_gb', reserved_gb, batch_count)
         time_val = self._get_seconds(time_val_start, time_val_stop)
         loss_val = sum(losses) / len(losses)
         action_perplexity_val = sum(action_perplexities) / len(action_perplexities)
@@ -274,9 +302,12 @@ class TrainTask(Task):
         if isinstance(self._loss, NegativeTreeLogLikelihoodLoss):
             nll = loss
         else:
-            nll = negative_log_likelihood(self._device, log_probs, batch.actions.lengths)
+            nll = negative_log_likelihood(self._device, log_probs, batch.actions.lengths).cpu().item()
         actions_count = sum(map(len, batch.actions.actions))
         tokens_count = sum(map(len, batch.tokens.tokens))
-        action_perplexity = torch.exp(nll / actions_count)
-        token_perplexity = torch.exp(nll / tokens_count)
+        action_perplexity = exp(nll / actions_count)
+        token_perplexity = exp(nll / tokens_count)
         return action_perplexity, token_perplexity, actions_count, tokens_count
+
+    def _byte2gb(self, byte_amount):
+        return byte_amount / (1024 ** 3)

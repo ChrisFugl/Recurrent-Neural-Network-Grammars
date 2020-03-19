@@ -14,8 +14,8 @@ class VanillaRepresentation(Representation):
         :type dropout: float
         """
         super().__init__()
-        # token, stack, action
         self._representation_size = representation_size
+        # token, stack, action
         input_size = 3 * embedding_size
         self._feedforward = nn.Linear(in_features=input_size, out_features=representation_size, bias=True)
         self._activation = nn.ReLU()

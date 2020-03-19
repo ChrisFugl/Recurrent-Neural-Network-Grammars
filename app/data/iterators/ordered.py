@@ -31,7 +31,7 @@ class OrderedIterator(Iterator):
         tokens_integers = self._convert(token_converter.token2integer, tokens_strings)
         tags_integers = self._convert(tag_converter.tag2integer, tags)
 
-        ordered = self._order_by_actions_count(actions_integers, actions, tokens_integers, tokens_strings, tags, tags_integers)
+        ordered = self._order_by_actions_count(actions_integers, actions, tokens_integers, tokens_strings, tags_integers, tags)
         self._actions_counts = ordered[0]
         if shuffle:
             self._actions_counts_set = set(self._actions_counts)
@@ -39,8 +39,8 @@ class OrderedIterator(Iterator):
         self._actions = ordered[2]
         self._tokens_integers = ordered[3]
         self._tokens_strings = ordered[4]
-        self._tags_strings = ordered[5]
-        self._tags_integers = ordered[6]
+        self._tags_integers = ordered[5]
+        self._tags_strings = ordered[6]
 
     def __iter__(self):
         actions_integers, actions = self._actions_integers, self._actions
@@ -52,7 +52,7 @@ class OrderedIterator(Iterator):
                 self._tokens_integers, self._tokens_strings,
                 self._tags_integers, self._tags_strings
             )
-            batches = self._create_batches(actions_integers, actions, tokens_integers, tokens_strings, tags_strings, tags_integers)
+            batches = self._create_batches(actions_integers, actions, tokens_integers, tokens_strings, tags_integers, tags_strings)
             shuffled_batches = self._shuffle_lists(*batches)
             flattened = self._flatten_all_batches(*shuffled_batches)
             actions_integers, actions = flattened[0], flattened[1]
@@ -66,9 +66,9 @@ class OrderedIterator(Iterator):
         """
         return len(self._actions)
 
-    def _order_by_actions_count(self, action_ints, actions, token_ints, token_strs, tags):
+    def _order_by_actions_count(self, action_ints, actions, token_ints, token_strs, tags_integers, tags):
         actions_counts = list(map(len, actions))
-        zipped_lists = zip(actions_counts, action_ints, actions, token_ints, token_strs, tags)
+        zipped_lists = zip(actions_counts, action_ints, actions, token_ints, token_strs, tags_integers, tags)
         ordered_lists = sorted(zipped_lists, key=itemgetter(0))
         ordered_tuples = zip(*ordered_lists)
         return tuple(map(list, ordered_tuples))
@@ -76,25 +76,27 @@ class OrderedIterator(Iterator):
     def _last_index(self, list, item):
         return max(index for index, value in enumerate(list) if value == item)
 
-    def _shuffle_by_action_count(self, actions_integers, actions, tokens_integers, tokens_strings, tags):
+    def _shuffle_by_action_count(self, actions_integers, actions, tokens_integers, tokens_strings, tags_integers, tags):
         for action_count in self._actions_counts_set:
             start = self._actions_counts.index(action_count)
             end = self._last_index(self._actions_counts, action_count) + 1
-            actions_ints_slice, actions_slice, tokens_ints_slice, tokens_strs_slice, tags_slice = self._shuffle_lists(
+            actions_ints_slice, actions_slice, tokens_ints_slice, tokens_strs_slice, tags_ints_slice, tags_slice = self._shuffle_lists(
                 actions_integers[start:end],
                 actions[start:end],
                 tokens_integers[start:end],
                 tokens_strings[start:end],
+                tags_integers[start:end],
                 tags[start:end],
             )
             actions_integers[start:end] = actions_ints_slice
             actions[start:end] = actions_slice
             tokens_integers[start:end] = tokens_ints_slice
             tokens_strings[start:end] = tokens_strs_slice
+            tags_integers[start:end] = tags_ints_slice
             tags[start:end] = tags_slice
 
-    def _create_batches(self, actions_integers, actions, tokens_integers, tokens_strings, tags):
-        batches_ai, batches_a, batches_ti, batches_ts, batches_ta = [], [], [], [], []
+    def _create_batches(self, actions_integers, actions, tokens_integers, tokens_strings, tags_integers, tags):
+        batches_ai, batches_a, batches_ti, batches_ts, batches_tai, batches_tas = [], [], [], [], [], []
         observations_count = len(actions_integers)
         batch_count = ceil(observations_count / self._batch_size)
         for batch_index in range(batch_count):
@@ -104,16 +106,18 @@ class OrderedIterator(Iterator):
             batches_a.append(actions[start:end])
             batches_ti.append(tokens_integers[start:end])
             batches_ts.append(tokens_strings[start:end])
-            batches_ta.append(tags[start:end])
-        return batches_ai, batches_a, batches_ti, batches_ts, batches_ta
+            batches_tai.append(tags_integers[start:end])
+            batches_tas.append(tags[start:end])
+        return batches_ai, batches_a, batches_ti, batches_ts, batches_tai, batches_tas
 
-    def _flatten_all_batches(self, batches_ai, batches_a, batches_ti, batches_ts, batches_ta):
+    def _flatten_all_batches(self, batches_ai, batches_a, batches_ti, batches_ts, batches_tai, batches_tas):
         return (
             self._flatten_batches(batches_ai),
             self._flatten_batches(batches_a),
             self._flatten_batches(batches_ti),
             self._flatten_batches(batches_ts),
-            self._flatten_batches(batches_ta)
+            self._flatten_batches(batches_tai),
+            self._flatten_batches(batches_tas),
         )
 
     def _flatten_batches(self, batches):

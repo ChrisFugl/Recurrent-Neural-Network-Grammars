@@ -19,18 +19,19 @@ class GenerativeParallelRNNG(ParallelRNNG):
         start_token_embedding = torch.FloatTensor(1, 1, token_size).uniform_(-1, 1)
         self._start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)
 
-    def _initialize_token_buffer(self, tokens_tensor, tags_tensor):
+    def _initialize_token_buffer(self, tokens_tensor, tags_tensor, token_lengths):
         """
         :type tokens_tensor: torch.Tensor
         :type tags_tensor: torch.Tensor
-        :type length: int
-        :rtype: app.models.parallel_rnng.stack_lstm.Stack
+        :type token_lengths: torch.Tensor
+        :rtype: app.models.parallel_rnng.buffer_lstm.Buffer
         """
         batch_size = tokens_tensor.size(1)
-        push_all_op = self._push_op(batch_size)
         start_token_embedding = self._batch_one_element_tensor(self._start_token_embedding, batch_size)
-        token_buffer = self._token_buffer.initialize(batch_size)
-        token_buffer = self._token_buffer.hold_or_push(token_buffer, start_token_embedding, push_all_op)
+        token_embeddings = self._token_embedding(tokens_tensor)
+        token_embeddings = torch.cat((start_token_embedding, token_embeddings), dim=0)
+        indices = torch.tensor([0] * batch_size, device=self._device, dtype=torch.long)
+        token_buffer = self._token_buffer.initialize(token_embeddings, indices)
         return token_buffer
 
     def _get_word_embedding(self, preprocessed, token_action_indices):
@@ -47,13 +48,13 @@ class GenerativeParallelRNNG(ParallelRNNG):
         """
         :type batch_size: int
         :type token_action_indices: torch.Tensor
-        :type token_buffer: app.models.parallel_rnng.stack_lstm.Stack
+        :type token_buffer: app.models.parallel_rnng.buffer_lstm.Buffer
         :type word_embeddings: torch.Tensor
         :rtype: app.models.parallel_rnng.stack_lstm.Stack
         """
         op = self._hold_op(batch_size)
         op[token_action_indices] = 1
-        token_buffer = self._token_buffer.hold_or_push(token_buffer, word_embeddings, op)
+        token_buffer = self._token_buffer(token_buffer, op)
         return token_buffer
 
     def __str__(self):

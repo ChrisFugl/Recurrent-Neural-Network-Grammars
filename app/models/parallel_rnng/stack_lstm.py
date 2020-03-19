@@ -3,19 +3,6 @@ import torch
 
 class StackLSTM(MemoryLSTM):
 
-    def __init__(self, device, stack_size, input_size, hidden_size, num_layers, bias, dropout):
-        """
-        :type device: torch.device
-        :type stack_size: int
-        :type input_size: int
-        :type hidden_size: int
-        :type num_layers: int
-        :type bias: bool
-        :type dropout: float
-        """
-        super().__init__(device, input_size, hidden_size, num_layers, bias, dropout)
-        self._stack_size = stack_size
-
     def contents(self, stack):
         """
         Retrieve content for all batches. Each batch will include states up to the largest index.
@@ -30,12 +17,13 @@ class StackLSTM(MemoryLSTM):
         contents = last_layer_state[1:max_index + 1, :, :]
         return contents, stack.indices
 
-    def initialize(self, batch_size):
+    def initialize(self, stack_size, batch_size):
         """
+        :type stack_size: int
         :type batch_size: int
         :rtype: app.models.parallel_rnng.stack_lstm.Stack
         """
-        shape = (self._stack_size + 1, self._num_layers, batch_size, self._hidden_size)
+        shape = (stack_size + 1, self._num_layers, batch_size, self._hidden_size)
         hidden_state = torch.zeros(shape, device=self._device, dtype=torch.float)
         cell_state = torch.zeros(shape, device=self._device, dtype=torch.float)
         indices = torch.tensor([0] * batch_size, device=self._device, dtype=torch.long)
@@ -86,7 +74,7 @@ class StackLSTM(MemoryLSTM):
         return output
 
     def __str__(self):
-        return f'StackLSTM(stack_size={self._stack_size}, input_size={self._input_size}, hidden_size={self._hidden_size}, num_layers={self._num_layers})'
+        return f'StackLSTM(input_size={self._input_size}, hidden_size={self._hidden_size}, num_layers={self._num_layers})'
 
 class Stack:
 
