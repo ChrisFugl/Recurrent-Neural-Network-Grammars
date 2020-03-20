@@ -16,10 +16,10 @@ class GenerativeParallelRNNG(ParallelRNNG):
         """
         super().__init__(device, embeddings, structures, converters, representation, composer, sizes)
         token_size = sizes[1]
-        start_token_embedding = torch.FloatTensor(1, 1, token_size).uniform_(-1, 1)
-        self._start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)
+        start_token_embedding = torch.FloatTensor(1, token_size).uniform_(-1, 1)
+        self.start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)
 
-    def _initialize_token_buffer(self, tokens_tensor, tags_tensor, token_lengths):
+    def initialize_token_buffer(self, tokens_tensor, tags_tensor, token_lengths):
         """
         :type tokens_tensor: torch.Tensor
         :type tags_tensor: torch.Tensor
@@ -27,24 +27,24 @@ class GenerativeParallelRNNG(ParallelRNNG):
         :rtype: app.models.parallel_rnng.buffer_lstm.Buffer
         """
         batch_size = tokens_tensor.size(1)
-        start_token_embedding = self._batch_one_element_tensor(self._start_token_embedding, batch_size)
-        token_embeddings = self._token_embedding(tokens_tensor)
+        start_token_embedding = self.batch_one_element_tensor(self.start_token_embedding, batch_size).unsqueeze(dim=0)
+        token_embeddings = self.token_embedding(tokens_tensor)
         token_embeddings = torch.cat((start_token_embedding, token_embeddings), dim=0)
-        indices = torch.tensor([0] * batch_size, device=self._device, dtype=torch.long)
-        token_buffer = self._token_buffer.initialize(token_embeddings, indices)
+        indices = torch.tensor([0] * batch_size, device=self.device, dtype=torch.long)
+        token_buffer = self.token_buffer.initialize(token_embeddings, indices)
         return token_buffer
 
-    def _get_word_embedding(self, preprocessed, token_action_indices):
+    def get_word_embedding(self, preprocessed, token_action_indices):
         """
         :type preprocessed: app.models.parallel_rnng.preprocessed_batch.Preprocessed
         :type token_action_indices: torch.Tensor
         :rtype: torch.Tensor, torch.Tensor
         """
         token_indices = preprocessed.token_index[token_action_indices]
-        word_embeddings = self._token_embedding(token_indices)
+        word_embeddings = self.token_embedding(token_indices)
         return word_embeddings
 
-    def _update_token_buffer(self, batch_size, token_action_indices, token_buffer, word_embeddings):
+    def update_token_buffer(self, batch_size, token_action_indices, token_buffer, word_embeddings):
         """
         :type batch_size: int
         :type token_action_indices: torch.Tensor
@@ -52,18 +52,18 @@ class GenerativeParallelRNNG(ParallelRNNG):
         :type word_embeddings: torch.Tensor
         :rtype: app.models.parallel_rnng.stack_lstm.Stack
         """
-        op = self._hold_op(batch_size)
+        op = self.hold_op(batch_size)
         op[token_action_indices] = 1
-        token_buffer = self._token_buffer(token_buffer, op)
+        token_buffer = self.token_buffer.hold_or_push(token_buffer, op)
         return token_buffer
 
     def __str__(self):
         return (
             'GenerativeParallelRNNG(\n'
-            + f'  action_history={self._action_history}\n'
-            + f'  token_buffer={self._token_buffer}\n'
-            + f'  stack={self._stack}\n'
-            + f'  representation={self._representation}\n'
-            + f'  composer={self._composer}\n'
+            + f'  action_history={self.action_history}\n'
+            + f'  token_buffer={self.token_buffer}\n'
+            + f'  stack={self.stack}\n'
+            + f'  representation={self.representation}\n'
+            + f'  composer={self.composer}\n'
             + ')'
         )

@@ -14,10 +14,10 @@ class StackOnlyRepresentation(Representation):
         :type dropout: float
         """
         super().__init__()
-        self._representation_size = representation_size
-        self._feedforward = nn.Linear(in_features=embedding_size, out_features=representation_size, bias=True)
-        self._activation = nn.ReLU()
-        self._dropout = nn.Dropout(p=dropout)
+        self.representation_size = representation_size
+        self.feedforward = nn.Linear(in_features=embedding_size, out_features=representation_size, bias=True)
+        self.activation = nn.ReLU()
+        self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, action_history, action_history_lengths, stack, stack_lengths, token_buffer, token_buffer_lengths):
         """
@@ -29,13 +29,13 @@ class StackOnlyRepresentation(Representation):
         :type token_buffer_lengths: torch.Tensor
         :rtype: torch.Tensor
         """
-        output = self._pick_last(stack, stack_lengths)
-        output = self._dropout(output)
-        output = self._feedforward(output)
-        output = self._activation(output)
+        output = self.pick_last(stack, stack_lengths)
+        output = self.dropout(output)
+        output = self.feedforward(output)
+        output = self.activation(output)
         return output
 
-    def _pick_last(self, embeddings, lengths):
+    def pick_last(self, embeddings, lengths):
         _, batch_size, hidden_size = embeddings.shape
         last_index = lengths - 1
         top = last_index.view(1, batch_size, 1).expand(1, batch_size, hidden_size)
@@ -43,4 +43,4 @@ class StackOnlyRepresentation(Representation):
         return last
 
     def __str__(self):
-        return f'StackOnly(size={self._representation_size})'
+        return f'StackOnly(size={self.representation_size})'

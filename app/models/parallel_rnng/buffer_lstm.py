@@ -1,7 +1,7 @@
-from app.models.parallel_rnng.memory_lstm import MemoryLSTM
 import torch
+from torch import nn
 
-class BufferLSTM(MemoryLSTM):
+class BufferLSTM(nn.Module):
     """
     Similar to a StackLSTM, but only push and pop
     does not change the contents. Instead it only moves
@@ -9,6 +9,28 @@ class BufferLSTM(MemoryLSTM):
     allocate sufficient memory when it does not repeatedly
     have to copy a large buffer.
     """
+
+    def __init__(self, device, input_size, hidden_size, num_layers, bias, dropout):
+        """
+        :type device: torch.device
+        :type input_size: int
+        :type hidden_size: int
+        :type num_layers: int
+        :type bias: bool
+        :type dropout: float
+        """
+        super().__init__()
+        self.device = device
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.lstm = nn.LSTM(
+            input_size,
+            hidden_size,
+            num_layers,
+            bias=bias,
+            dropout=dropout,
+        )
 
     def contents(self, buffer):
         """
@@ -28,7 +50,7 @@ class BufferLSTM(MemoryLSTM):
         :type indices: torch.Tensor
         :rtype: app.models.parallel_rnng.buffer_lstm.Buffer
         """
-        buffer, _ = self._lstm(inputs)
+        buffer, _ = self.lstm(inputs)
         return Buffer(buffer, indices)
 
     def forward(self, buffer, op):
@@ -65,12 +87,12 @@ class BufferLSTM(MemoryLSTM):
         :rtype: torch.Tensor
         """
         batch_size = buffer.output.size(1)
-        top = buffer.indices.view(1, batch_size, 1).expand(1, batch_size, self._hidden_size)
+        top = buffer.indices.view(1, batch_size, 1).expand(1, batch_size, self.hidden_size)
         output = torch.gather(buffer.output, 0, top).squeeze()
         return output
 
     def __str__(self):
-        return f'BufferLSTM(input_size={self._input_size}, hidden_size={self._hidden_size}, num_layers={self._num_layers})'
+        return f'BufferLSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers})'
 
 class Buffer:
 

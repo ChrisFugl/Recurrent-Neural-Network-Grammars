@@ -15,7 +15,7 @@ def preprocess_batch(device, batch):
     stack_size = [0 for _ in range(batch.size)]
     max_stack_size = 0
     for action_index in range(batch.max_actions_length):
-        actions_in_batch, actions = _get_actions_at_index(actions_in_batch, action_index)
+        actions_in_batch, actions = get_actions_at_index(actions_in_batch, action_index)
         nt_index = [PAD_INDEX for _ in range(batch.size)]
         compose_nt_index = [PAD_INDEX for _ in range(batch.size)]
         token_index = [PAD_INDEX for _ in range(batch.size)]
@@ -65,7 +65,7 @@ def preprocess_batch(device, batch):
         output.append(preprocessed)
     return output, max_stack_size
 
-def _get_actions_at_index(actions_in_batch, action_index):
+def get_actions_at_index(actions_in_batch, action_index):
     actions_in_batch = list(filter(lambda element: action_index < len(element[1]), actions_in_batch))
     actions = []
     for i, acts in actions_in_batch:

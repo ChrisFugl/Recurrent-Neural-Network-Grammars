@@ -10,9 +10,6 @@ import time
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-# TODO: remove this
-torch.autograd.set_detect_anomaly(True)
-
 class TrainTask(Task):
 
     def __init__(self,
@@ -146,8 +143,7 @@ class TrainTask(Task):
         return epoch, batch_count, False, training_metrics, best_loss_val
 
     def _train_batch(self, batch, batch_count):
-        if self._uses_gpu:
-            torch.cuda.reset_peak_memory_stats(self._device)
+        self._start_measure_memory()
         time_batch_start = time.time()
         batch_log_probs = self._model.batch_log_likelihood(batch)
         loss = self._loss(batch_log_probs, batch.actions.lengths)
@@ -167,12 +163,12 @@ class TrainTask(Task):
         self._writer_train.add_scalar('time/sentences_per_s', sentences_per_second, batch_count)
         self._writer_train.add_scalar('time/batch_s', time_batch, batch_count)
         self._writer_train.add_scalar('time/optimize_s', time_optimize, batch_count)
-        self._writer_train.add_scalar('batch/action_count_min', batch.actions.lengths.min(), batch_count)
-        self._writer_train.add_scalar('batch/action_count_mean', sum(batch.actions.lengths) / len(batch.actions.lengths), batch_count)
-        self._writer_train.add_scalar('batch/action_count_max', batch.max_actions_length, batch_count)
-        self._writer_train.add_scalar('batch/token_count_min', batch.tokens.lengths.min(), batch_count)
-        self._writer_train.add_scalar('batch/token_count_mean', sum(batch.tokens.lengths) / len(batch.tokens.lengths), batch_count)
-        self._writer_train.add_scalar('batch/token_count_max', batch.max_tokens_length, batch_count)
+        self._writer_train.add_scalar('batch_stats/action_count_min', batch.actions.lengths.min(), batch_count)
+        self._writer_train.add_scalar('batch_stats/action_count_mean', sum(batch.actions.lengths) / len(batch.actions.lengths), batch_count)
+        self._writer_train.add_scalar('batch_stats/action_count_max', batch.max_actions_length, batch_count)
+        self._writer_train.add_scalar('batch_stats/token_count_min', batch.tokens.lengths.min(), batch_count)
+        self._writer_train.add_scalar('batch_stats/token_count_mean', sum(batch.tokens.lengths) / len(batch.tokens.lengths), batch_count)
+        self._writer_train.add_scalar('batch_stats/token_count_max', batch.max_tokens_length, batch_count)
         if self._uses_gpu:
             allocated_gb = self._byte2gb(torch.cuda.max_memory_allocated(self._device))
             reserved_gb = self._byte2gb(torch.cuda.max_memory_reserved(self._device))
@@ -186,8 +182,7 @@ class TrainTask(Task):
         self._optimizer.step()
 
     def _evaluate(self, epoch, batch_count, training_metrics, best_loss_val):
-        if self._uses_gpu:
-            torch.cuda.reset_peak_memory_stats(self._device)
+        self._start_measure_memory()
         time_val_start = time.time()
         self._model.eval()
         losses, action_perplexities, token_perplexities = [], [], []
@@ -311,3 +306,14 @@ class TrainTask(Task):
 
     def _byte2gb(self, byte_amount):
         return byte_amount / (1024 ** 3)
+
+    def _start_measure_memory(self):
+        if self._uses_gpu:
+            torch.cuda.reset_peak_memory_stats(self._device)
+
+    def _log_memory(self, writer, batch_count):
+        if self._uses_gpu:
+            allocated_gb = self._byte2gb(torch.cuda.max_memory_allocated(self._device))
+            reserved_gb = self._byte2gb(torch.cuda.max_memory_reserved(self._device))
+            writer.add_scalar('memory/allocated_gb', allocated_gb, batch_count)
+            writer.add_scalar('memory/reserved_gb', reserved_gb, batch_count)

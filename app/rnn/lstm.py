@@ -15,12 +15,12 @@ class LSTM(RNN):
         :type bidirectional: bool
         """
         super().__init__()
-        self._device = device
-        self._input_size = input_size
-        self._hidden_size = hidden_size
-        self._num_layers = num_layers
-        self._bidirectional = bidirectional
-        self._lstm = nn.LSTM(
+        self.device = device
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.bidirectional = bidirectional
+        self.lstm = nn.LSTM(
             input_size,
             hidden_size,
             num_layers,
@@ -35,7 +35,7 @@ class LSTM(RNN):
         :type hidden_state: torch.Tensor, torch.Tensor
         :rtype: torch.Tensor, (torch.Tensor, torch.Tensor)
         """
-        return self._lstm(input, hidden_state)
+        return self.lstm(input, hidden_state)
 
     def initial_state(self, batch_size):
         """
@@ -44,11 +44,11 @@ class LSTM(RNN):
         :type batch_size: int
         :rtype: torch.Tensor, torch.Tensor
         """
-        num_directions = 2 if self._bidirectional else 1
-        shape = (self._num_layers * num_directions, batch_size, self._hidden_size)
-        cell = torch.zeros(shape, device=self._device, requires_grad=True)
-        hidden = torch.zeros(shape, device=self._device, requires_grad=True)
+        num_directions = 2 if self.bidirectional else 1
+        shape = (self.num_layers * num_directions, batch_size, self.hidden_size)
+        cell = torch.zeros(shape, device=self.device, requires_grad=True)
+        hidden = torch.zeros(shape, device=self.device, requires_grad=True)
         return cell, hidden
 
     def __str__(self):
-        return f'LSTM(input_size={self._input_size}, hidden_size={self._hidden_size}, num_layers={self._num_layers})'
+        return f'LSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers})'
