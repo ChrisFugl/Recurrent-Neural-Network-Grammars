@@ -47,6 +47,7 @@ def _main(config):
         stopping_criterion,
         checkpoint,
         evaluator,
+        config.log_train_every,
         config.load_checkpoint,
         token_converter.count() - TOKEN_EMBEDDING_OFFSET,
         tag_converter.count() - TAG_EMBEDDING_OFFSET,

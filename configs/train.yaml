@@ -10,6 +10,7 @@ defaults:
   - checkpoint: never
   - evaluator: batch
 name: tmp
+log_train_every: 1
 load_checkpoint: null
 gpu: null
 seed: null
