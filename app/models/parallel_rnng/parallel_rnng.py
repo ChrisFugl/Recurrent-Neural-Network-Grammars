@@ -1,4 +1,4 @@
-from app.constants import ACTION_EMBEDDING_OFFSET, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_REDUCE_TYPE, ACTION_NON_TERMINAL_TYPE
+from app.constants import ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_REDUCE_TYPE, ACTION_NON_TERMINAL_TYPE
 from app.models.model import Model
 from app.models.parallel_rnng.preprocess_batch import preprocess_batch
 import torch
@@ -20,7 +20,7 @@ class ParallelRNNG(Model):
         self.device = device
         self.action_converter, self.token_converter, self.tag_converter = converters
         action_size, token_size, rnn_input_size, rnn_size = sizes
-        self.action_count = self.action_converter.count() - ACTION_EMBEDDING_OFFSET
+        self.action_count = self.action_converter.count()
         self.rnn_input_size = rnn_input_size
 
         self.action_embedding, self.token_embedding, self.nt_embedding, self.nt_compose_embedding = embeddings
@@ -42,11 +42,6 @@ class ParallelRNNG(Model):
         :type batch: app.data.batch.Batch
         :rtype: torch.Tensor
         """
-        # Groundtruth actions should correspond to the set of available actions that
-        # the model can predict. Padding should therefore be excluded from the set of
-        # groundtruth actions and be replaced by some dummy action. This replacement
-        # is feasible since the loss masks out padded actions.
-        groundtruth_actions = torch.clamp(batch.actions.tensor, min=ACTION_EMBEDDING_OFFSET) - ACTION_EMBEDDING_OFFSET
         preprocessed, stack_size = preprocess_batch(self.device, batch)
         self.initialize_structures(
             batch.actions.tensor,
@@ -56,12 +51,12 @@ class ParallelRNNG(Model):
             # plus one to account for start stack embedding
             stack_size + 1,
         )
-        output_log_probs = torch.zeros((batch.max_actions_length, batch.size), device=self.device, dtype=torch.float)
+        output_shape = (batch.max_actions_length, batch.size, self.action_count)
+        output_log_probs = torch.zeros(output_shape, device=self.device, dtype=torch.float)
         for action_index in range(batch.max_actions_length):
             representation = self.get_representation()
             # TODO: should valid actions be considered?
-            # TODO: are log probs computed correctly?
-            output_log_probs[action_index] = self.get_log_probs(batch.size, groundtruth_actions[action_index], representation)
+            output_log_probs[action_index, :, :] = self.get_log_probs(representation)
             self.do_actions(batch, preprocessed[action_index])
             self.action_history.hold_or_push(self.push_op(batch.size))
         return output_log_probs
@@ -198,18 +193,14 @@ class ParallelRNNG(Model):
             token_buffer_embedding, token_buffer_lengths
         )
 
-    def get_log_probs(self, batch_size, actions, representation):
+    def get_log_probs(self, representation):
         """
-        :type batch_size: int
-        :type actions: torch.Tensor
         :type representation: torch.Tensor
         :rtype: torch.Tensor
         """
         logits = self.representation2logits(representation)
-        log_probs = self.logits2log_prob(logits).view(batch_size, self.action_count)
-        indicies = actions.view(batch_size, 1)
-        action_log_probs = torch.gather(log_probs, 1, indicies).view(batch_size)
-        return action_log_probs
+        log_probs = self.logits2log_prob(logits)
+        return log_probs
 
     def do_actions(self, batch, preprocessed):
         """

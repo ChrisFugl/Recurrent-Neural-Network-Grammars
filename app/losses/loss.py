@@ -4,13 +4,14 @@ class Loss(nn.Module):
     """
     Abstract class that all losses must subclass.
     """
-    pass
 
-    def forward(self, log_probs, actions_lengths):
+    def forward(self, predictions, groundtruths, lengths):
         """
-        :param log_probs: batch of log probabilities of each action (size S x B)
-        :type log_probs: torch.Tensor
-        :type actions_lengths: torch.Tensor
+        :param predictions: batch of log probabilities of each action (size S x B x A)
+        :param groundtruths: batch of groundtruth actions (size S x B)
+        :type predictions: torch.Tensor
+        :type groundtruths: torch.Tensor
+        :type lengths: torch.Tensor
         :rtype: torch.Tensor
         """
         raise NotImplementedError('must be implemented by subclass')

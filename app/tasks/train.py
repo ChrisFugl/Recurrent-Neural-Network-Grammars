@@ -140,7 +140,7 @@ class TrainTask(Task):
         self.start_measure_memory()
         time_batch_start = time.time()
         batch_log_probs = self.model.batch_log_likelihood(batch)
-        loss = self.loss(batch_log_probs, batch.actions.lengths)
+        loss = self.loss(batch_log_probs, batch.actions.tensor, batch.actions.lengths)
         time_batch_stop = time.time()
         time_optimize_start = time.time()
         self.optimize(loss)
@@ -180,7 +180,7 @@ class TrainTask(Task):
         total_sentences = self.iterator_val.size()
         for batch in self.iterator_val:
             log_probs = self.model.batch_log_likelihood(batch)
-            loss = self.loss(log_probs, batch.actions.lengths)
+            loss = self.loss(log_probs, batch.actions.tensor, batch.actions.lengths)
             loss_scalar = loss.cpu().item()
             losses.append(loss_scalar)
             total_actions += self.count_actions(batch)

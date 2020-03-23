@@ -1,2 +1,0 @@
-loss:
-  type: negative_action_log_likelihood

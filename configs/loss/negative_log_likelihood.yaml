@@ -1,0 +1,2 @@
+loss:
+  type: negative_log_likelihood

@@ -1,2 +1,0 @@
-loss:
-  type: negative_tree_log_likelihood
