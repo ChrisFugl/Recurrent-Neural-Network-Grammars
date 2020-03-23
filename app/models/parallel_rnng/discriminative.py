@@ -42,8 +42,7 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         # add tokens in reverse order
         word_embeddings = self.token_tag2embedding(tokens_tensor, tags_tensor).flip(dims=[0])
         word_embeddings = torch.cat((start_word_embedding, word_embeddings), dim=0)
-        token_buffer = self.token_buffer.initialize(word_embeddings, token_lengths)
-        return token_buffer
+        self.token_buffer.initialize(word_embeddings, token_lengths)
 
     def get_word_embedding(self, preprocessed, token_action_indices):
         """
@@ -56,18 +55,15 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         word_embeddings = self.token_tag2embedding(token_indices, tag_indices, dim=1)
         return word_embeddings
 
-    def update_token_buffer(self, batch_size, token_action_indices, token_buffer, word_embeddings):
+    def update_token_buffer(self, batch_size, token_action_indices, word_embeddings):
         """
         :type batch_size: int
         :type token_action_indices: torch.Tensor
-        :type token_buffer: app.models.parallel_rnng.buffer_lstm.Buffer
         :type word_embeddings: torch.Tensor
-        :rtype: app.models.parallel_rnng.stack_lstm.Stack
         """
         op = self.hold_op(batch_size)
         op[token_action_indices] = -1
-        token_buffer, _ = self.token_buffer.hold_or_pop(token_buffer, op)
-        return token_buffer
+        self.token_buffer.hold_or_pop(op)
 
     def token_tag2embedding(self, tokens, tags, dim=2):
         tokens_embedding = self.token_embedding(tokens)

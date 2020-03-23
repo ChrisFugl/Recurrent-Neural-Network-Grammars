@@ -32,74 +32,56 @@ class BufferLSTM(nn.Module):
             dropout=dropout,
         )
 
-    def contents(self, buffer):
+    def contents(self):
         """
         Retrieve content for all batches. Each batch will include states up to the largest index.
 
-        :type buffer: app.models.parallel_rnng.buffer_lstm.Buffer
         :returns: buffer contents and batch lengths
         :rtype: torch.Tensor, torch.Tensor
         """
-        max_index = torch.max(buffer.indices)
-        contents = buffer.output[0:max_index + 1, :, :]
-        return contents, buffer.indices + 1
+        max_index = torch.max(self.pos)
+        contents = self.buffer[0:max_index + 1, :, :]
+        return contents, self.pos + 1
 
-    def initialize(self, inputs, indices):
+    def initialize(self, inputs, pos):
         """
         :type inputs: torch.Tensor
-        :type indices: torch.Tensor
-        :rtype: app.models.parallel_rnng.buffer_lstm.Buffer
+        :type pos: torch.Tensor
         """
         buffer, _ = self.lstm(inputs)
-        return Buffer(buffer, indices)
+        self.buffer = buffer
+        self.pos = pos
 
-    def forward(self, buffer, op):
+    def forward(self, op):
         """
-        :type buffer: app.models.parallel_rnng.buffer_lstm.Buffer
         :type op: torch.Tensor
-        :rtype: app.models.parallel_rnng.buffer_lstm.Buffer
         """
-        next_indices = buffer.indices + op
-        return Buffer(buffer.output, next_indices)
+        self.pos = self.pos + op
 
-    def hold_or_pop(self, buffer, op):
+    def hold_or_pop(self, op):
         """
-        :type buffer: app.models.parallel_rnng.buffer_lstm.Buffer
         :type op: torch.Tensor
-        :rtype: app.models.parallel_rnng.buffer_lstm.Buffer, torch.Tensor
-        """
-        top = self.top(buffer)
-        next_indices = buffer.indices + op
-        return Buffer(buffer.output, next_indices), top
-
-    def hold_or_push(self, buffer, op):
-        """
-        :type buffer: app.models.parallel_rnng.buffer_lstm.Buffer
-        :type op: torch.Tensor
-        :rtype: app.models.parallel_rnng.buffer_lstm.Buffer
-        """
-        next_indices = buffer.indices + op
-        return Buffer(buffer.output, next_indices)
-
-    def top(self, buffer):
-        """
-        :type buffer: app.models.parallel_rnng.buffer_lstm.Buffer
         :rtype: torch.Tensor
         """
-        batch_size = buffer.output.size(1)
-        top = buffer.indices.view(1, batch_size, 1).expand(1, batch_size, self.hidden_size)
-        output = torch.gather(buffer.output, 0, top).squeeze()
+        top = self.top()
+        self.pos = self.pos + op
+        return top
+
+    def hold_or_push(self, op):
+        """
+        :type op: torch.Tensor
+        :rtype: app.models.parallel_rnng.buffer_lstm.Buffer
+        """
+        self.pos = self.pos + op
+
+    def top(self):
+        """
+        :rtype: torch.Tensor
+        """
+        batch_size = self.buffer.size(1)
+        top = self.pos.view(1, batch_size, 1).expand(1, batch_size, self.hidden_size)
+        output = torch.gather(self.buffer, 0, top).squeeze()
         return output
 
     def __str__(self):
         return f'BufferLSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers})'
-
-class Buffer:
-
-    def __init__(self, output, indices):
-        """
-        :type output: torch.Tensor
-        :type indices: torch.Tensor
-        """
-        self.output = output
-        self.indices = indices

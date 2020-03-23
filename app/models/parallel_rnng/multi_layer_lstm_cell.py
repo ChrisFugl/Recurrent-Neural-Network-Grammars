@@ -30,17 +30,14 @@ class MultiLayerLSTMCell(nn.Module):
       """
       next_hidden = []
       next_cell = []
-      input_im1 = None
+      lstm_input = input
       for i in range(self.num_layers):
           prev_hidden_i = prev[0][:, :, i]
           prev_cell_i = prev[1][:, :, i]
-          if input_im1 is None:
-              next_hidden_i, next_cell_i = self.lstm[i](input, (prev_hidden_i, prev_cell_i))
-          else:
-              next_hidden_i, next_cell_i = self.lstm[i](input_im1, (prev_hidden_i, prev_cell_i))
+          next_hidden_i, next_cell_i = self.lstm[i](lstm_input, (prev_hidden_i, prev_cell_i))
           next_hidden += [next_hidden_i]
           next_cell += [next_cell_i]
-          input_im1 = self.dropout(next_hidden_i)
+          lstm_input = self.dropout(next_hidden_i)
       next_hidden = torch.stack(next_hidden).permute(1, 2, 0)
       next_cell = torch.stack(next_cell).permute(1, 2, 0)
       return next_hidden, next_cell
