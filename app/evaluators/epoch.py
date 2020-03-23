@@ -8,8 +8,8 @@ class EpochEvaluator(Evaluator):
         :type pretraining: bool
         """
         super().__init__()
-        self._epoch = epoch
-        self._pretraining = pretraining
+        self.epoch = epoch
+        self.pretraining = pretraining
 
     def should_evaluate(self, epoch, batch, pretraining=False, end_of_epoch=False):
         """
@@ -18,4 +18,6 @@ class EpochEvaluator(Evaluator):
         :type pretraining: bool
         :type end_of_epoch: bool
         """
-        return (self._pretraining and pretraining) or (end_of_epoch and epoch % self._epoch == 0)
+        if pretraining:
+            return self.pretraining
+        return end_of_epoch and epoch % self.epoch == 0
