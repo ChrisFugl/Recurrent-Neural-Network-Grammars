@@ -40,7 +40,6 @@ class HistoryLSTM(nn.Module):
         :type lengths: torch.Tensor
         """
         self.lengths = torch.zeros_like(lengths, device=self.device, dtype=torch.long)
-        self.pos = 0
         self.max_lengths = lengths
         batch_size = lengths.size(0)
         state_shape = (self.num_layers, batch_size, self.hidden_size)
@@ -54,7 +53,6 @@ class HistoryLSTM(nn.Module):
         :type input: torch.Tensor
         """
         output, next_state = self.lstm(input, self.state)
-        self.pos = self.pos + 1
         self.lengths = torch.min(self.lengths + 1, self.max_lengths)
         self.state = next_state
         self.history.append(output)

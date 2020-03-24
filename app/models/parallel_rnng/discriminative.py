@@ -9,7 +9,7 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         """
         :type device: torch.device
         :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
-        :type structures: app.models.parallel_rnng.stack_lstm.StackLSTM, app.models.parallel_rnng.stack_lstm.StackLSTM, app.models.parallel_rnng.stack_lstm.StackLSTM
+        :type structures: app.models.parallel_rnng.history_lstm.HistoryLSTM, app.models.parallel_rnng.input_buffer_lstm.InputBufferLSTM, app.models.parallel_rnng.stack_lstm.StackLSTM
         :type converters: app.data.converters.action.ActionConverter, app.data.converters.token.TokenConverter, app.data.converters.tag.TagConverter
         :type representation: app.representations.representation.Representation
         :type composer: app.composers.composer.Composer
@@ -56,8 +56,8 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         :type token_action_indices: torch.Tensor
         :rtype: torch.Tensor, torch.Tensor
         """
-        token_indices = preprocessed.token_index[token_action_indices]
-        tag_indices = preprocessed.tag_index[token_action_indices]
+        token_indices = preprocessed.token_index
+        tag_indices = preprocessed.tag_index
         word_embeddings = self.token_tag2embedding(token_indices, tag_indices, dim=1)
         return word_embeddings
 

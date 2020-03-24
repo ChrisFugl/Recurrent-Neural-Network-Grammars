@@ -49,7 +49,7 @@ class ParallelRNNG(Model):
             batch.tags.tensor,
             # plus one to account for start embeddings
             batch.actions.lengths + 1,
-            batch.tokens.lengths,
+            batch.tokens.lengths + 1,
             stack_size + 1,
         )
         output_shape = (batch.max_actions_length, batch.size, self.action_count)
@@ -223,7 +223,7 @@ class ParallelRNNG(Model):
         # SHIFT or GEN
         if len(token_action_indices) != 0:
             word_embeddings = self.get_word_embedding(preprocessed, token_action_indices)
-            stack_input[token_action_indices] = word_embeddings
+            stack_input[token_action_indices] = word_embeddings[token_action_indices]
             self.update_token_buffer(batch.size, token_action_indices, word_embeddings)
         # REDUCE
         if len(reduce_action_indices) != 0:
