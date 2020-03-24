@@ -67,9 +67,9 @@ class RNNG(Model):
         jobs_args = []
         for batch_index in range(batch.size):
             element = batch.get(batch_index)
-            tokens_tensor = element.tokens.tensor[:element.tokens.length, :]
-            tags_tensor = element.tags.tensor[:element.tags.length, :]
-            actions_tensor = element.actions.tensor[:element.actions.length, :]
+            tokens_tensor = element.tokens.tensor[:element.tokens.length]
+            tags_tensor = element.tags.tensor[:element.tags.length]
+            actions_tensor = element.actions.tensor[:element.actions.length]
             actions = element.actions.actions
             actions_max_length = element.actions.max_length
             job_args = (tokens_tensor, tags_tensor, actions_tensor, actions, actions_max_length)
@@ -117,7 +117,7 @@ class RNNG(Model):
             action_log_prob, stack_top, token_top, open_non_terminals_count, token_counter = action_outputs
             action_index = self.action_converter.action2integer(action)
             log_probs[sequence_index, action_index] = action_log_prob
-            action_tensor = actions_tensor[sequence_index:sequence_index+1, :]
+            action_tensor = actions_tensor[sequence_index].unsqueeze(dim=0)
             action_embedding = self.action_embedding(action_tensor)
             action_top = self.action_history.push(action_embedding, data=action, top=action_top)
         return log_probs

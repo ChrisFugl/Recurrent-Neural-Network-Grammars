@@ -16,6 +16,8 @@ def preprocess_batch(device, batch):
     max_stack_size = 0
     for action_index in range(batch.max_actions_length):
         actions_in_batch, actions = get_actions_at_index(actions_in_batch, action_index)
+        # nt_index = [PAD_INDEX for _ in range(batch.size)]
+        # compose_nt_index = [PAD_INDEX for _ in range(batch.size)]
         nt_index = [PAD_INDEX for _ in range(batch.size)]
         compose_nt_index = [PAD_INDEX for _ in range(batch.size)]
         token_index = [PAD_INDEX for _ in range(batch.size)]
@@ -27,7 +29,8 @@ def preprocess_batch(device, batch):
             node = Tree(action, parent=parent)
             if type == ACTION_SHIFT_TYPE:
                 shift_index = shift_indices[batch_index]
-                tokens_length = len(batch.tokens.tokens[batch_index])
+                # token buffer processes terminals in reverse order
+                tokens_length = batch.tokens.lengths[batch_index]
                 token_index[batch_index] = batch.tokens.tensor[tokens_length - shift_index - 1, batch_index]
                 tag_index[batch_index] = batch.tags.tensor[tokens_length - shift_index - 1, batch_index]
                 shift_indices[batch_index] = shift_index + 1
@@ -79,9 +82,9 @@ class Preprocessed:
         :type actions_indices: list of (int, app.data.actions.action.Action)
         :type non_terminal_index: torch.Tensor
         :type compose_non_terminal_index: torch.Tensor
+        :type number_of_children: torch.Tensor
         :token_index: torch.Tensor
         :tag_index: torch.Tensor
-        :type number_of_children: torch.Tensor
         """
         self.actions_indices = actions_indices
         self.non_terminal_index = non_terminal_index

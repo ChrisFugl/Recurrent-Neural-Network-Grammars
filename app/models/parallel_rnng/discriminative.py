@@ -1,3 +1,4 @@
+from app.data.action_set.discriminative import Discriminative
 from app.models.parallel_rnng.parallel_rnng import ParallelRNNG
 import torch
 from torch import nn
@@ -18,6 +19,7 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         """
         super().__init__(device, embeddings, structures, converters, representation, composer, sizes)
         self.generative = False
+        self.action_set = Discriminative()
         self.pos_embedding = pos_embedding
         self.activation = nn.ReLU()
         token_size = sizes[1]
@@ -27,6 +29,10 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         self.start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)
         start_tag_embedding = torch.FloatTensor(1, pos_size).uniform_(-1, 1)
         self.start_tag_embedding = nn.Parameter(start_tag_embedding, requires_grad=True)
+
+        self.reduce_index = self.action_converter.string2integer('REDUCE')
+        self.shift_index = self.action_converter.string2integer('SHIFT')
+        self.nt_start_index = self.action_converter.get_non_terminal_offset()
 
     def initialize_token_buffer(self, tokens_tensor, tags_tensor, token_lengths):
         """

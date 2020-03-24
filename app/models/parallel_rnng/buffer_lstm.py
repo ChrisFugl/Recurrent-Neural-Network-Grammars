@@ -70,7 +70,6 @@ class BufferLSTM(nn.Module):
     def hold_or_push(self, op):
         """
         :type op: torch.Tensor
-        :rtype: app.models.parallel_rnng.buffer_lstm.Buffer
         """
         self.pos = self.pos + op
 
