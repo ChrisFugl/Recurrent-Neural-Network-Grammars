@@ -57,7 +57,6 @@ class ParallelRNNG(Model):
         for action_index in range(batch.max_actions_length):
             preprocessed_batch = preprocessed_batches[action_index]
             representation = self.get_representation()
-            # output_log_probs[action_index] = self.get_log_probs(representation).clone()
             output_log_probs[action_index] = self.get_log_probs(representation)
             self.do_actions(batch, preprocessed_batch)
             action_tensor = batch.actions.tensor[action_index].unsqueeze(dim=0)

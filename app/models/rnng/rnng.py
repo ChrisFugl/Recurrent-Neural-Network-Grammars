@@ -10,8 +10,8 @@ from joblib import Parallel, delayed
 import torch
 from torch import nn
 
-# base actions: (REDUCE, GENERATE, NON_TERMINAL) or (REDUCE, SHIFT, NON_TERMINAL)
-ACTIONS_COUNT = 3
+# REDUCE/SHIFT or REDUCE/GEN
+BASE_ACTION_COUT = 2
 
 class RNNG(Model):
 
@@ -33,14 +33,15 @@ class RNNG(Model):
         self.action_converter, self.token_converter, self.tag_converter = converters
         self.non_terminal_count = self.action_converter.count_non_terminals()
         self.action_count = self.action_converter.count()
+        self.nt_action_start = BASE_ACTION_COUT
+        self.nt_action_end = self.nt_action_start + self.non_terminal_count
 
         self.action_embedding, self.token_embedding, self.nt_embedding, self.nt_compose_embedding = embeddings
         self.action_history, self.token_buffer, self.stack = structures
         self.representation = representation
-        self.representation2logits = nn.Linear(in_features=rnn_size, out_features=ACTIONS_COUNT, bias=True)
+        self.representation2logits = nn.Linear(in_features=rnn_size, out_features=BASE_ACTION_COUT + self.non_terminal_count, bias=True)
         self.composer = composer
         self.logits2log_prob = nn.LogSoftmax(dim=2)
-        self.representation2nt_logits = nn.Linear(in_features=rnn_size, out_features=self.non_terminal_count, bias=True)
 
         start_action_embedding = torch.FloatTensor(1, 1, action_size).uniform_(-1, 1)
         self.start_action_embedding = nn.Parameter(start_action_embedding, requires_grad=True)
@@ -107,6 +108,7 @@ class RNNG(Model):
             representation = self.get_representation(action_top, stack_top, token_top)
             valid_actions, action2index = self.action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
             assert action.index() in action2index, f'{action} is not a valid action. (action2index = {action2index})'
+            self.expand_valid_actions_to_nt(valid_actions, action2index)
             base_logits = self.representation2logits(representation)
             valid_base_logits = base_logits[:, :, valid_actions]
             valid_base_log_probs = self.logits2log_prob(valid_base_logits)
@@ -179,7 +181,9 @@ class RNNG(Model):
         valid_base_actions, action2index = self.action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
         index2action_index = []
         singleton_offset = self.action_converter.get_singleton_offset()
+        nt_offset = self.action_converter.get_non_terminal_offset()
         index2action_index.extend([singleton_offset + index for index in valid_base_actions])
+        self.expand_valid_actions_to_nt(valid_base_actions, action2index)
         # base log probabilities
         base_logits = self.representation2logits(representation)
         valid_base_logits = base_logits[:, :, valid_base_actions]
@@ -212,14 +216,11 @@ class RNNG(Model):
         if ACTION_NON_TERMINAL_INDEX in valid_base_actions:
             index2action_index.remove(singleton_offset + ACTION_NON_TERMINAL_INDEX)
             if include_nt:
-                non_terminal_logits = self.representation2nt_logits(representation)
-                base_non_terminal_log_prob = valid_base_log_probs[action2index[ACTION_NON_TERMINAL_INDEX]]
-                conditional_non_terminal_log_probs = self.logits2log_prob(posterior_scaling * non_terminal_logits).view((-1,))
-                non_terminal_log_probs = base_non_terminal_log_prob + conditional_non_terminal_log_probs
-                log_probs_list.append(non_terminal_log_probs)
-                non_terminal_offset = self.action_converter.get_non_terminal_offset()
-                non_terminal2action_index = [non_terminal_offset + index for index in range(self.non_terminal_count)]
-                index2action_index.extend(non_terminal2action_index)
+                nt_valid_indices = [action2index[nt_index] for nt_index in range(self.nt_action_start, self.nt_action_end)]
+                non_terminal_log_probs = [lp.view(1) for lp in valid_base_log_probs[nt_valid_indices].view(-1)]
+                log_probs_list.extend(non_terminal_log_probs)
+                nt_action_indices = [nt_offset + nt_index for nt_index in range(self.non_terminal_count)]
+                index2action_index.extend(nt_action_indices)
         log_probs = torch.cat(log_probs_list, dim=0)
         return log_probs, index2action_index
 
@@ -268,11 +269,7 @@ class RNNG(Model):
         if log_probs is None:
             action_log_prob = None
         else:
-            non_terminal_log_prob = self.get_base_log_prop(log_probs, ACTION_NON_TERMINAL_INDEX)
-            non_terminal_logits = self.representation2nt_logits(log_probs.representation)
-            conditional_non_terminal_log_probs = self.logits2log_prob(non_terminal_logits)
-            conditional_non_terminal_log_prob = conditional_non_terminal_log_probs[:, :, argument_index]
-            action_log_prob = non_terminal_log_prob + conditional_non_terminal_log_prob
+            action_log_prob = self.get_base_log_prop(log_probs, self.nt_action_start + action.argument_index)
         open_non_terminals_count = outputs.open_non_terminals_count + 1
         return outputs.update(action_log_prob=action_log_prob, stack_top=stack_top, open_non_terminals_count=open_non_terminals_count)
 
@@ -325,3 +322,13 @@ class RNNG(Model):
             stack_embedding, stack_top.length_as_tensor(self.device),
             token_buffer_embedding, token_top.length_as_tensor(self.device),
         )
+
+    def expand_valid_actions_to_nt(self, valid_actions, action2index):
+        if ACTION_NON_TERMINAL_INDEX in valid_actions:
+            valid_actions.remove(ACTION_NON_TERMINAL_INDEX)
+            action_nt_index_counter = len(valid_actions)
+            valid_actions.extend(range(self.nt_action_start, self.nt_action_end))
+            del action2index[ACTION_NON_TERMINAL_INDEX]
+            for nt_index in range(self.nt_action_start, self.nt_action_end):
+                action2index[nt_index] = action_nt_index_counter
+                action_nt_index_counter += 1
