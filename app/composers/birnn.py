@@ -1,5 +1,4 @@
 from app.composers.composer import Composer
-from app.constants import PAD_INDEX
 import torch
 from torch import nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
@@ -24,12 +23,13 @@ class BiRNNComposer(Composer):
         :rtype: torch.Tensor
         """
         tensors = torch.cat((non_terminal_embedding, popped_stack_items), dim=0)
-        packed = pack_padded_sequence(tensors, lengths, enforce_sorted=False)
+        lengths_cat = lengths + 1
+        packed = pack_padded_sequence(tensors, lengths_cat, enforce_sorted=False)
         _, batch_size, _ = tensors.shape
         state = self.birnn.initial_state(batch_size)
         packed_output, _ = self.birnn(packed, state)
-        unpacked_output, _ = pad_packed_sequence(packed_output, padding_value=PAD_INDEX)
-        affine_input = self.pick_last(unpacked_output, lengths)
+        unpacked_output, _ = pad_packed_sequence(packed_output)
+        affine_input = self.pick_last(unpacked_output, lengths_cat)
         output = self.activation(self.affine(affine_input))
         return output
 
