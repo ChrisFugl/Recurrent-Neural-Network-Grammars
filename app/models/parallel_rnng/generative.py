@@ -1,3 +1,4 @@
+from app.data.action_set.generative import Generative
 from app.models.parallel_rnng.parallel_rnng import ParallelRNNG
 import torch
 from torch import nn
@@ -14,7 +15,9 @@ class GenerativeParallelRNNG(ParallelRNNG):
         :type composer: app.composers.composer.Composer
         :type sizes: int, int, int, int
         """
+        self.generative = True
         super().__init__(device, embeddings, structures, converters, representation, composer, sizes)
+        self.action_set = Generative()
         token_size = sizes[1]
         start_token_embedding = torch.FloatTensor(1, token_size).uniform_(-1, 1)
         self.start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)
@@ -52,6 +55,31 @@ class GenerativeParallelRNNG(ParallelRNNG):
         op = self.hold_op(batch_size)
         op[token_action_indices] = 1
         self.token_buffer.hold_or_push(op)
+
+    def inference_initialize_token_buffer(self, tokens_tensor, tags_tensor):
+        """
+        :type tokens_tensor: torch.Tensor
+        :type tags_tensor: torch.Tensor
+        :rtype: app.models.parallel_rnng.buffer_lstm.BufferState
+        """
+        batch_size = tokens_tensor.size(1)
+        push_op = self.push_op(batch_size)
+        start_token_embedding = self.batch_one_element_tensor(self.start_token_embedding, batch_size).unsqueeze(dim=0)
+        token_embeddings = self.token_embedding(tokens_tensor)
+        token_embeddings = torch.cat((start_token_embedding, token_embeddings), dim=0)
+        state = self.token_buffer.inference_initialize(token_embeddings)
+        state = self.token_buffer.inference_hold_or_push(state, push_op)
+        return state
+
+    def inference_update_token_buffer(self, state):
+        """
+        :type state: app.models.parallel_rnng.buffer_lstm.BufferState
+        :rtype: app.models.parallel_rnng.buffer_lstm.BufferState
+        """
+        batch_size = state.inputs.size(1)
+        push_op = self.push_op(batch_size)
+        state = self.token_buffer.inference_hold_or_push(state, push_op)
+        return state
 
     def __str__(self):
         return (

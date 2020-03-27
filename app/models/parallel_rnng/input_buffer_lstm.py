@@ -1,4 +1,4 @@
-from app.models.parallel_rnng.buffer_lstm import BufferLSTM
+from app.models.parallel_rnng.buffer_lstm import BufferLSTM, BufferState
 import torch
 
 class InputBufferLSTM(BufferLSTM):
@@ -28,6 +28,35 @@ class InputBufferLSTM(BufferLSTM):
         :type op: torch.Tensor
         """
         self.lengths = self.lengths + op
+
+    def inference_initialize(self, inputs, lengths):
+        """
+        :type inputs: torch.Tensor
+        :type lengths: torch.Tensor
+        :rtype: app.models.parallel_rnng.buffer_lstm.BufferState
+        """
+        buffer, _ = self.lstm(inputs)
+        return BufferState(buffer, inputs, lengths)
+
+    def inference_hold_or_pop(self, state, op):
+        """
+        :type state: app.models.parallel_rnng.buffer_lstm.BufferState
+        :type op: torch.Tensor
+        :rtype: app.models.parallel_rnng.buffer_lstm.BufferState
+        """
+        next_lengths = state.lengths + op
+        return BufferState(state.buffer, state.inputs, next_lengths)
+
+    def inference_top_embeddings(self, state):
+        """
+        :type state: app.models.parallel_rnng.buffer_lstm.BufferState
+        :rtype: torch.Tensor
+        """
+        batch_size = state.inputs.size(1)
+        top = state.lengths - 1
+        top = top.view(1, batch_size, 1).expand(1, batch_size, self.input_size)
+        output = torch.gather(state.inputs, 0, top).view(batch_size, self.input_size)
+        return output
 
     def __str__(self):
         return f'InputBufferLSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers})'

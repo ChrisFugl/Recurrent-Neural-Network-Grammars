@@ -17,8 +17,8 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         :type pos_size: int
         :type pos_embedding: torch.nn.Embedding
         """
-        super().__init__(device, embeddings, structures, converters, representation, composer, sizes)
         self.generative = False
+        super().__init__(device, embeddings, structures, converters, representation, composer, sizes)
         self.action_set = Discriminative()
         self.pos_embedding = pos_embedding
         self.activation = nn.ReLU()
@@ -80,6 +80,34 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         words = torch.cat((tokens, tags), dim=dim)
         words = self.activation(self.word2buffer(words))
         return words
+
+    def inference_initialize_token_buffer(self, tokens_tensor, tags_tensor):
+        """
+        :type tokens_tensor: torch.Tensor
+        :type tags_tensor: torch.Tensor
+        :rtype: app.models.parallel_rnng.buffer_lstm.BufferState
+        """
+        batch_size = tokens_tensor.size(1)
+        start_token_embedding = self.batch_one_element_tensor(self.start_token_embedding, batch_size).unsqueeze(dim=0)
+        start_tag_embedding = self.batch_one_element_tensor(self.start_tag_embedding, batch_size).unsqueeze(dim=0)
+        start_word_embedding = self.token_tag2word(start_token_embedding, start_tag_embedding)
+        # add tokens in reverse order
+        word_embeddings = self.token_tag2embedding(tokens_tensor, tags_tensor).flip(dims=[0])
+        word_embeddings = torch.cat((start_word_embedding, word_embeddings), dim=0)
+        token_lengths = word_embeddings.size(0)
+        token_lengths = torch.tensor([token_lengths], device=self.device, dtype=torch.long)
+        state = self.token_buffer.inference_initialize(word_embeddings, token_lengths)
+        return state
+
+    def inference_update_token_buffer(self, state):
+        """
+        :type state: app.models.parallel_rnng.buffer_lstm.BufferState
+        :rtype: app.models.parallel_rnng.buffer_lstm.BufferState
+        """
+        batch_size = state.inputs.size(1)
+        pop_op = self.pop_op(batch_size)
+        state = self.token_buffer.inference_hold_or_pop(state, pop_op)
+        return state
 
     def __str__(self):
         return (

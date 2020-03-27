@@ -31,9 +31,6 @@ class VanillaRepresentation(Representation):
         :type token_buffer_lengths: torch.Tensor
         :rtype: torch.Tensor
         """
-        # print(stack.shape, stack_lengths)
-        # print(token_buffer.shape, token_buffer_lengths)
-        # print(action_history.shape, action_history_lengths)
         embeddings = [
             self.dropout(self.pick_last(action_history, action_history_lengths)),
             self.dropout(self.pick_last(stack, stack_lengths)),

@@ -57,5 +57,62 @@ class HistoryLSTM(nn.Module):
         self.state = next_state
         self.history.append(output)
 
+    def inference_initialize(self, batch_size):
+        """
+        :type batch_size: int
+        :rtype: app.models.parallel_rnng.history_lstm.HistoryState
+        """
+        previous = None
+        length = 0
+        output = None
+        state_shape = (self.num_layers, batch_size, self.hidden_size)
+        hidden = torch.zeros(state_shape, device=self.device, dtype=torch.float)
+        cell = torch.zeros(state_shape, device=self.device, dtype=torch.float)
+        hidden_states = (hidden, cell)
+        return HistoryState(batch_size, previous, length, output, hidden_states)
+
+    def inference_push(self, state, input):
+        """
+        :type state: app.models.parallel_rnng.history_lstm.HistoryState
+        :type input: torch.Tensor
+        :rtype: app.models.parallel_rnng.history_lstm.HistoryState
+        """
+        next_previous = state
+        next_length = state.length + 1
+        next_output, next_hidden_states = self.lstm(input, state.hidden_states)
+        return HistoryState(state.batch_size, next_previous, next_length, next_output, next_hidden_states)
+
+    def inference_contents(self, state):
+        """
+        :type state: app.models.parallel_rnng.history_lstm.HistoryState
+        :returns: history contents and batch lengths
+        :rtype: torch.Tensor, torch.Tensor
+        """
+        history = []
+        node = state
+        while node.output is not None:
+            history.append(node.output)
+            node = node.previous
+        history.reverse()
+        contents = torch.cat(history, dim=0)
+        lengths = torch.tensor([state.length] * state.batch_size, device=self.device, dtype=torch.long)
+        return contents, lengths
+
     def __str__(self):
         return f'HistoryLSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers})'
+
+class HistoryState:
+
+    def __init__(self, batch_size, previous, length, output, hidden_states):
+        """
+        :type batch_size: int
+        :type previous: app.models.parallel_rnng.history_lstm.HistoryState
+        :type length: int
+        :type output: torch.Tensor
+        :type hidden_states: (torch.Tensor, torch.Tensor)
+        """
+        self.batch_size = batch_size
+        self.previous = previous
+        self.length = length
+        self.output = output
+        self.hidden_states = hidden_states

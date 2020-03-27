@@ -103,6 +103,7 @@ class EvaluateTask(Task):
         """
         :type samples: list of app.samplers.sample.Sample
         """
+        log_probs, probs, perplexities = [], [], []
         if type == 'gold' or type == 'predicted':
             if type == 'gold':
                 items = [sample.gold.actions for sample in samples]
@@ -110,11 +111,15 @@ class EvaluateTask(Task):
             else:
                 items = [sample.prediction.actions for sample in samples]
                 log_probs = [sample.prediction.log_prob for sample in samples]
-            probs = [exp(log_prob) for log_prob in log_probs]
-            perplexities = [exp(- log_prob / len(items[index])) for index, log_prob in enumerate(log_probs)]
+            for index, log_prob in enumerate(log_probs):
+                try:
+                    probs.append(exp(log_prob))
+                    perplexities.append(exp(- log_prob / len(items[index])))
+                except Exception:
+                    self._logger.warning(f'Failed to compute probability/perplexity of {type} tree at index {index}')
         else:
-            probs, log_probs, perplexities = [], [], []
-            for sample in samples:
+            log_probs = []
+            for index, sample in enumerate(samples):
                 if sample.tokens_prob is not None:
                     try:
                         log_prob = log(sample.tokens_prob)
@@ -122,8 +127,8 @@ class EvaluateTask(Task):
                         log_probs.append(log_prob)
                         perplexities.append(exp(- log_prob / len(sample.gold.tokens)))
                     except ValueError:
-                        pass
-        if len(probs) == 0:
+                        self._logger.warning(f'Failed to compute probability/perplexity of tokens at index {index}')
+        if len(log_probs) == 0 or len(probs) == 0 or len(perplexities) == 0:
             return None
         log_likelihood = sum(log_probs) / len(log_probs)
         likelihood = sum(probs) / len(probs)

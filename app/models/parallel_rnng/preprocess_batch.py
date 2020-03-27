@@ -2,27 +2,32 @@ from app.constants import ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_NON_TE
 
 import torch
 
-def preprocess_batch(device, batch):
+def preprocess_batch(device, batch_size, max_action_length, batch_actions, batch_tokens_lengths, batch_tokens_tensor, batch_tags_tensor):
     """
     :type device: torch.device
-    :type batch: app.data.batch.Batch
+    :type batch_size: int
+    :type max_action_length: int
+    :type batch_actions: list of list of app.data.actions.action.Action
+    :type batch_tokens_lengths: list of int
+    :type batch_tokens_tensor: torch.Tensor
+    :type batch_tags_tensor: torch.Tensor
     :rtype: list of app.models.parallel_rnng.preprocess_batch.Preprocessed, int
     """
-    shift_indices = [0 for _ in range(batch.size)]
-    parents = [None for _ in range(batch.size)]
+    shift_indices = [0 for _ in range(batch_size)]
+    parents = [None for _ in range(batch_size)]
     output = []
-    actions_in_batch = enumerate(batch.actions.actions)
-    stack_size = [0 for _ in range(batch.size)]
+    actions_in_batch = enumerate(batch_actions)
+    stack_size = [0 for _ in range(batch_size)]
     max_stack_size = 0
-    for action_index in range(batch.max_actions_length):
+    for action_index in range(max_action_length):
         actions_in_batch, actions = get_actions_at_index(actions_in_batch, action_index)
-        # nt_index = [PAD_INDEX for _ in range(batch.size)]
-        # compose_nt_index = [PAD_INDEX for _ in range(batch.size)]
-        nt_index = [PAD_INDEX for _ in range(batch.size)]
-        compose_nt_index = [PAD_INDEX for _ in range(batch.size)]
-        token_index = [PAD_INDEX for _ in range(batch.size)]
-        tag_index = [PAD_INDEX for _ in range(batch.size)]
-        number_of_children = [0 for _ in range(batch.size)]
+        # nt_index = [PAD_INDEX for _ in range(batch_size)]
+        # compose_nt_index = [PAD_INDEX for _ in range(batch_size)]
+        nt_index = [PAD_INDEX for _ in range(batch_size)]
+        compose_nt_index = [PAD_INDEX for _ in range(batch_size)]
+        token_index = [PAD_INDEX for _ in range(batch_size)]
+        tag_index = [PAD_INDEX for _ in range(batch_size)]
+        number_of_children = [0 for _ in range(batch_size)]
         for batch_index, action in actions:
             type = action.type()
             parent = parents[batch_index]
@@ -30,9 +35,9 @@ def preprocess_batch(device, batch):
             if type == ACTION_SHIFT_TYPE:
                 shift_index = shift_indices[batch_index]
                 # token buffer processes terminals in reverse order
-                tokens_length = batch.tokens.lengths[batch_index]
-                token_index[batch_index] = batch.tokens.tensor[tokens_length - shift_index - 1, batch_index]
-                tag_index[batch_index] = batch.tags.tensor[tokens_length - shift_index - 1, batch_index]
+                tokens_length = batch_tokens_lengths[batch_index]
+                token_index[batch_index] = batch_tokens_tensor[tokens_length - shift_index - 1, batch_index]
+                tag_index[batch_index] = batch_tags_tensor[tokens_length - shift_index - 1, batch_index]
                 shift_indices[batch_index] = shift_index + 1
                 stack_size[batch_index] = stack_size[batch_index] + 1
                 parent.add_child(node)
