@@ -20,7 +20,7 @@ class RNNG(Model):
         :type device: torch.device
         :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
         :type structures: app.models.rnng.stack.Stack, app.models.rnng.stack.Stack, app.models.rnng.stack.Stack
-        :type converters: app.data.converters.action.ActionConverter, app.data.converters.token.TokenConverter, app.data.converters.tag.TagConverter
+        :type converters: app.data.converters.action.ActionConverter, app.data.converters.token.TokenConverter, app.data.converters.tag.TagConverter, app.data.converters.non_terminal.NonTerminalConverter
         :type representation: app.representations.representation.Representation
         :type composer: app.composers.composer.Composer
         :type sizes: int, int, int, int
@@ -30,7 +30,7 @@ class RNNG(Model):
         action_size, token_size, rnn_input_size, rnn_size = sizes
         self.device = device
         self.threads = threads
-        self.action_converter, self.token_converter, self.tag_converter = converters
+        self.action_converter, self.token_converter, self.tag_converter, self.non_terminal_converter = converters
         self.non_terminal_count = self.action_converter.count_non_terminals()
         self.action_count = self.action_converter.count()
         self.nt_action_start = BASE_ACTION_COUT
@@ -298,9 +298,10 @@ class RNNG(Model):
         return torch.tensor([[index]], device=self.device, dtype=torch.long)
 
     def get_nt_embedding(self, embeddings, action):
-        argument_index = action.argument_index_as_tensor()
-        nt_embeding = embeddings(argument_index).unsqueeze(dim=0).unsqueeze(dim=0)
-        return nt_embeding, argument_index
+        nt_index = self.non_terminal_converter.non_terminal2integer(action.argument)
+        nt_tensor = torch.tensor([nt_index], device=self.device, dtype=torch.long)
+        nt_embedding = embeddings(nt_tensor).unsqueeze(dim=0)
+        return nt_embedding, action.argument_index_as_tensor()
 
     def get_base_log_prop(self, log_probs, action_index):
         if log_probs is None:

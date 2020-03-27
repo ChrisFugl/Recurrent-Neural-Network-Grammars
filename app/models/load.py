@@ -1,4 +1,5 @@
 from app.data.converters.action import ActionConverter
+from app.data.converters.non_terminal import NonTerminalConverter
 from app.data.converters.tag import TagConverter
 from app.data.converters.token import TokenConverter
 from app.data.loaders import get_loader
@@ -20,7 +21,8 @@ def load_saved_model(device, load_dir):
     token_converter = TokenConverter(unknownified_tokens)
     tag_converter = TagConverter(tags)
     action_converter = ActionConverter(token_converter, generative, actions)
-    model = get_model(device, generative, action_converter, token_converter, tag_converter, training_config.model)
+    non_terminal_converter = NonTerminalConverter(actions)
+    model = get_model(device, generative, action_converter, token_converter, tag_converter, non_terminal_converter, training_config.model)
     load_model_params(model, load_dir)
     return model, action_converter
 

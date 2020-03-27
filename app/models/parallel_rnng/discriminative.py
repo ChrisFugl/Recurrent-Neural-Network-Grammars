@@ -10,7 +10,7 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         :type device: torch.device
         :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
         :type structures: app.models.parallel_rnng.history_lstm.HistoryLSTM, app.models.parallel_rnng.input_buffer_lstm.InputBufferLSTM, app.models.parallel_rnng.stack_lstm.StackLSTM
-        :type converters: app.data.converters.action.ActionConverter, app.data.converters.token.TokenConverter, app.data.converters.tag.TagConverter
+        :type converters: app.data.converters.action.ActionConverter, app.data.converters.token.TokenConverter, app.data.converters.tag.TagConverter, app.data.converters.non_terminal.NonTerminalConverter
         :type representation: app.representations.representation.Representation
         :type composer: app.composers.composer.Composer
         :type sizes: int, int, int, int
@@ -29,10 +29,6 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         self.start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)
         start_tag_embedding = torch.FloatTensor(1, pos_size).uniform_(-1, 1)
         self.start_tag_embedding = nn.Parameter(start_tag_embedding, requires_grad=True)
-
-        self.reduce_index = self.action_converter.string2integer('REDUCE')
-        self.shift_index = self.action_converter.string2integer('SHIFT')
-        self.nt_start_index = self.action_converter.get_non_terminal_offset()
 
     def initialize_token_buffer(self, tokens_tensor, tags_tensor, token_lengths):
         """

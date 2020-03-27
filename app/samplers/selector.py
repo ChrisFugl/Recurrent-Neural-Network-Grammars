@@ -1,4 +1,5 @@
 from app.data.converters.action import ActionConverter
+from app.data.converters.non_terminal import NonTerminalConverter
 from app.data.converters.tag import TagConverter
 from app.data.converters.token import TokenConverter
 from app.data.iterators import get_iterator
@@ -50,7 +51,8 @@ def _load_from_dir(device, data, iterator_config, load_dir):
     token_converter = TokenConverter(unknownified_tokens_train)
     tag_converter = TagConverter(tags_train)
     action_converter = ActionConverter(token_converter, generative, actions_train)
-    model = get_model(device, generative, action_converter, token_converter, tag_converter, training_config.model)
+    non_terminal_converter = NonTerminalConverter(actions_train)
+    model = get_model(device, generative, action_converter, token_converter, tag_converter, non_terminal_converter, training_config.model)
     load_model_params(model, load_dir)
     iterator = get_iterator(device, action_converter, token_converter, tag_converter, unknownified_tokens_eval, actions_eval, tags_eval, iterator_config)
     return model, iterator, action_converter

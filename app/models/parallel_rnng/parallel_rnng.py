@@ -16,14 +16,14 @@ class ParallelRNNG(Model):
         :type device: torch.device
         :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
         :type structures: app.models.parallel_rnng.history_lstm.HistoryLSTM, app.models.parallel_rnng.buffer_lstm.BufferLSTM, app.models.parallel_rnng.stack_lstm.StackLSTM
-        :type converters: app.data.converters.action.ActionConverter, app.data.converters.token.TokenConverter, app.data.converters.tag.TagConverter
+        :type converters: app.data.converters.action.ActionConverter, app.data.converters.token.TokenConverter, app.data.converters.tag.TagConverter, app.data.converters.non_terminal.NonTerminalConverter
         :type representation: app.representations.representation.Representation
         :type composer: app.composers.composer.Composer
         :type sizes: int, int, int, int
         """
         super().__init__()
         self.device = device
-        self.action_converter, self.token_converter, self.tag_converter = converters
+        self.action_converter, self.token_converter, self.tag_converter, self.non_terminal_converter = converters
         action_size, token_size, rnn_input_size, rnn_size = sizes
         self.action_count = self.action_converter.count()
         self.rnn_input_size = rnn_input_size
@@ -59,6 +59,7 @@ class ParallelRNNG(Model):
         """
         preprocessed_batches, stack_size = preprocess_batch(
             self.device,
+            self.non_terminal_converter,
             batch.size,
             batch.max_actions_length,
             batch.actions.actions,
@@ -106,6 +107,7 @@ class ParallelRNNG(Model):
         actions_length = torch.tensor([len(actions)], device=self.device, dtype=torch.long)
         preprocessed, stack_size = preprocess_batch(
             self.device,
+            self.non_terminal_converter,
             batch_size,
             actions_max_length,
             [actions],
@@ -128,7 +130,7 @@ class ParallelRNNG(Model):
             preprocessed_batch = preprocessed[sequence_index]
             representation = self.get_representation()
             action = actions[sequence_index]
-            action_index = self.action_converter.action2integer(a)
+            action_index = self.action_converter.action2integer(action)
             log_probs = self.get_log_probs(representation)
             action_log_prob = log_probs[:, :, action_index]
             output_log_probs[sequence_index, action_index] = action_log_prob
@@ -181,8 +183,10 @@ class ParallelRNNG(Model):
         token_counter = state.token_counter
         open_nt_count = state.open_nt_count
         if action.type() == ACTION_NON_TERMINAL_TYPE:
-            nt_embeddings = self.nt_embedding(action.argument_index_as_tensor()).unsqueeze(dim=0)
-            stack_state = self.stack.inference_hold_or_push(stack_state, [action], nt_embeddings, push_op)
+            nt_index = self.non_terminal_converter.non_terminal2integer(action.argument)
+            nt_tensor = torch.tensor([nt_index], device=self.device, dtype=torch.long)
+            nt_embedding = self.nt_embedding(nt_tensor)
+            stack_state = self.stack.inference_hold_or_push(stack_state, [action], nt_embedding, push_op)
             open_nt_count = open_nt_count + 1
         elif action.type() == ACTION_SHIFT_TYPE or action.type() == ACTION_GENERATE_TYPE:
             buffer_state = self.inference_update_token_buffer(buffer_state)
@@ -203,9 +207,11 @@ class ParallelRNNG(Model):
             children_tensor = torch.stack(children, dim=0)
             compose_action = NonTerminalAction(self.device, child_action.argument, child_action.argument_index, open=False)
             stack_state, _ = self.stack.inference_hold_or_pop(stack_state, pop_op)
-            nt_embeding = self.nt_compose_embedding(compose_action.argument_index_as_tensor()).view(1, 1, -1)
+            nt_index = self.non_terminal_converter.non_terminal2integer(compose_action.argument)
+            nt_tensor = torch.tensor([nt_index], device=self.device, dtype=torch.long)
+            nt_embedding = self.nt_compose_embedding(nt_tensor).view(1, 1, -1)
             children_lengths = torch.tensor([len(children)], device=self.device, dtype=torch.long)
-            composed = self.composer(nt_embeding, children_tensor, children_lengths).view(1, -1)
+            composed = self.composer(nt_embedding, children_tensor, children_lengths).view(1, -1)
             stack_state = self.stack.inference_hold_or_push(stack_state, [compose_action], composed, push_op)
             open_nt_count = open_nt_count - 1
         # add to history
@@ -368,7 +374,6 @@ class ParallelRNNG(Model):
         log_probs = self.logits2log_prob(logits)
         return log_probs
 
-    # def do_actions(self, batch, preprocessed):
     def do_actions(self, batch_size, preprocessed):
         """
         :type batch_size: int
