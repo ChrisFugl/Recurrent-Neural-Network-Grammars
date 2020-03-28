@@ -1,6 +1,5 @@
 from app.data.iterators.iterable import Iterable
 from app.data.iterators.iterator import Iterator
-from functools import partial
 
 class UnorderedIterator(Iterator):
 
@@ -17,7 +16,7 @@ class UnorderedIterator(Iterator):
         :type tags: list of list of str
         """
         super().__init__()
-        self._actions = self._convert(partial(action_converter.string2action, device), actions_strings)
+        self._actions = self._convert(action_converter.string2action, actions_strings)
         self._actions_integers = self._convert(action_converter.string2integer, actions_strings)
         self._tokens_strings = tokens
         self._tokens_integers = self._convert(token_converter.token2integer, tokens)

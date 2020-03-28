@@ -40,7 +40,7 @@ class Hypothesis:
         log_probs, index2action_index = model.next_action_log_probs(self.state, token=token, include_gen=False, include_nt=include_nt)
         for index, log_prob in enumerate(log_probs):
             action_index = index2action_index[index]
-            action = action_converter.integer2action(self._device, action_index)
+            action = action_converter.integer2action(action_index)
             next_state = model.next_state(self.state, action)
             next_log_prob = self.log_prob + float(log_prob)
             successor = Hypothesis(self._device, next_state, action, next_log_prob, parent=self)

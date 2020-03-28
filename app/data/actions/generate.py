@@ -3,21 +3,12 @@ from app.data.actions.action import Action
 
 class GenerateAction(Action):
 
-    def __init__(self, device, argument, argument_index):
+    def __init__(self, argument):
         """
-        :type device: torch.device
         :type argument: str
-        :type argument_index: int
         """
-        super().__init__(device)
+        super().__init__()
         self.argument = argument
-        self.argument_index = argument_index
-
-    def argument_index_as_tensor(self):
-        """
-        :rtype: torch.Tensor
-        """
-        return self._to_long_tensor(self.argument_index)
 
     def index(self):
         """

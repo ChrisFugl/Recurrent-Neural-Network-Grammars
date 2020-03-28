@@ -94,7 +94,7 @@ class ImportanceSampler(Sampler):
             log_probs, index2action_index = self._model_dis.next_action_log_probs(state, posterior_scaling=self._posterior_scaling)
             distribution = Categorical(logits=log_probs)
             sample = index2action_index[distribution.sample()]
-            action = self._action_converter_dis.integer2action(self._device, sample)
+            action = self._action_converter_dis.integer2action(sample)
             actions.append(action)
             state = self._model_dis.next_state(state, action)
         return actions
@@ -107,15 +107,13 @@ class ImportanceSampler(Sampler):
         for action_dis in actions_dis:
             type = action_dis.type()
             if type == ACTION_REDUCE_TYPE:
-                action_gen = ReduceAction(self._device)
+                action_gen = ReduceAction()
             elif type == ACTION_NON_TERMINAL_TYPE:
                 argument = action_dis.argument
-                argument_index = self._action_converter_gen.non_terminal2integer(argument) - non_terminal_offset
-                action_gen = NonTerminalAction(self._device, argument, argument_index)
+                action_gen = NonTerminalAction(argument)
             else:
                 argument = tokens[token_index]
-                argument_index = self._action_converter_gen.token2integer(argument) - terminal_offset
-                action_gen = GenerateAction(self._device, argument, argument_index)
+                action_gen = GenerateAction(argument)
                 token_index += 1
             actions_gen.append(action_gen)
         return actions_gen

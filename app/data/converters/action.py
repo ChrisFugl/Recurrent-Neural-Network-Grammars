@@ -90,14 +90,13 @@ class ActionConverter:
             argument = None
         return self._action_args2integer(action.type(), argument)
 
-    def integer2action(self, device, index):
+    def integer2action(self, index):
         """
-        :type device: torch.device
         :type integer: int
         :rtype: app.data.actions.action.Action
         """
         string = self.integer2string(index)
-        action = self.string2action(device, string)
+        action = self.string2action(string)
         return action
 
     def integer2string(self, index):
@@ -118,9 +117,8 @@ class ActionConverter:
         non_terminal = self._index2non_terminal[index - non_terminal_offset]
         return f'NT({non_terminal})'
 
-    def string2action(self, device, action_string):
+    def string2action(self, action_string):
         """
-        :type device: torch.device
         :type action_string: str
         :rtype: app.actions.action.Action
         """
@@ -129,21 +127,18 @@ class ActionConverter:
         type, argument = parse_action(action_string)
         if self._generative:
             if type == ACTION_REDUCE_TYPE:
-                return ReduceAction(device)
+                return ReduceAction()
             elif type == ACTION_GENERATE_TYPE:
-                argument_index = self._terminal2index[argument]
-                return GenerateAction(device, argument, argument_index)
+                return GenerateAction(argument)
             else:
-                argument_index = self._non_terminal2index[argument]
-                return NonTerminalAction(device, argument, argument_index)
+                return NonTerminalAction(argument)
         else:
             if type == ACTION_REDUCE_TYPE:
-                return ReduceAction(device)
+                return ReduceAction()
             elif type == ACTION_SHIFT_TYPE:
-                return ShiftAction(device)
+                return ShiftAction()
             else:
-                argument_index = self._non_terminal2index[argument]
-                return NonTerminalAction(device, argument, argument_index)
+                return NonTerminalAction(argument)
 
     def string2integer(self, action_string):
         """

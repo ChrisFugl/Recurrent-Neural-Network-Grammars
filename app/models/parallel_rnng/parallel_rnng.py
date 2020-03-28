@@ -207,7 +207,7 @@ class ParallelRNNG(Model):
                 children.append(child)
             children.reverse()
             children_tensor = torch.stack(children, dim=0)
-            compose_action = NonTerminalAction(self.device, child_action.argument, child_action.argument_index, open=False)
+            compose_action = NonTerminalAction(child_action.argument, open=False)
             stack_state, _ = self.stack.inference_hold_or_pop(stack_state, pop_op)
             nt_index = self.non_terminal_converter.non_terminal2integer(compose_action.argument)
             nt_tensor = torch.tensor([nt_index], device=self.device, dtype=torch.long)

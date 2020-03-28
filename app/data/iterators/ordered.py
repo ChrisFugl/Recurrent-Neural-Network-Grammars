@@ -1,6 +1,5 @@
 from app.data.iterators.iterable import Iterable
 from app.data.iterators.iterator import Iterator
-from functools import partial
 from math import ceil
 from operator import itemgetter
 
@@ -26,7 +25,7 @@ class OrderedIterator(Iterator):
         self._batch_size = batch_size
         self._shuffle = shuffle
 
-        actions = self._convert(partial(action_converter.string2action, device), actions_strings)
+        actions = self._convert(action_converter.string2action, actions_strings)
         actions_integers = self._convert(action_converter.string2integer, actions_strings)
         tokens_integers = self._convert(token_converter.token2integer, tokens_strings)
         tags_integers = self._convert(tag_converter.tag2integer, tags)

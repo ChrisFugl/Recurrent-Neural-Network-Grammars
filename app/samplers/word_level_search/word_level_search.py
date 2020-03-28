@@ -172,7 +172,7 @@ class WordLevelSearchSampler(Sampler):
         reduce_count = len(list(filter(lambda action: action.type() == ACTION_REDUCE_TYPE, actions)))
         open_non_terminals_count = non_terminal_count - reduce_count
         while 0 < open_non_terminals_count:
-            actions.append(ReduceAction(self._device))
+            actions.append(ReduceAction())
             open_non_terminals_count -= 1
         action_indices = [self._action_converter.action2integer(action) for action in actions]
         actions_tensor = torch.tensor(action_indices, device=self._device, dtype=torch.long).view(len(actions), 1)

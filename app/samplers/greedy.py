@@ -55,7 +55,7 @@ class GreedySampler(Sampler):
         while not self._is_finished_sampling(actions, tokens_length):
             log_probs, index2action_index = self._model.next_action_log_probs(state, posterior_scaling=self._posterior_scaling)
             sample = index2action_index[log_probs.argmax()]
-            action = self._action_converter.integer2action(self._device, sample)
+            action = self._action_converter.integer2action(sample)
             actions.append(action)
             state = self._model.next_state(state, action)
         return actions

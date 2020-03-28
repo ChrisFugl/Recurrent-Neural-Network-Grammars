@@ -253,9 +253,9 @@ class RNNG(Model):
             children.append(state)
         children.reverse()
         children_tensor = torch.cat(children, dim=0)
-        compose_action = NonTerminalAction(self.device, action.argument, action.argument_index, open=False)
+        compose_action = NonTerminalAction(action.argument, open=False)
         stack_top = self.stack.pop(stack_top)
-        nt_embeding, _ = self.get_nt_embedding(self.nt_compose_embedding, compose_action)
+        nt_embeding = self.get_nt_embedding(self.nt_compose_embedding, compose_action)
         children_lengths = torch.tensor([len(children)], device=self.device, dtype=torch.long)
         composed = self.composer(nt_embeding, children_tensor, children_lengths)
         stack_top = self.stack.push(composed, data=compose_action, top=stack_top)
@@ -264,12 +264,13 @@ class RNNG(Model):
         return outputs.update(action_log_prob=action_log_prob, stack_top=stack_top, open_non_terminals_count=open_non_terminals_count)
 
     def non_terminal(self, log_probs, outputs, action):
-        nt_embeding, argument_index = self.get_nt_embedding(self.nt_embedding, action)
+        nt_embeding = self.get_nt_embedding(self.nt_embedding, action)
         stack_top = self.stack.push(nt_embeding, data=action, top=outputs.stack_top)
         if log_probs is None:
             action_log_prob = None
         else:
-            action_log_prob = self.get_base_log_prop(log_probs, self.nt_action_start + action.argument_index)
+            nt_action_index = self.action_converter.action2integer(action) - self.action_converter.get_non_terminal_offset()
+            action_log_prob = self.get_base_log_prop(log_probs, self.nt_action_start + nt_action_index)
         open_non_terminals_count = outputs.open_non_terminals_count + 1
         return outputs.update(action_log_prob=action_log_prob, stack_top=stack_top, open_non_terminals_count=open_non_terminals_count)
 
@@ -301,7 +302,7 @@ class RNNG(Model):
         nt_index = self.non_terminal_converter.non_terminal2integer(action.argument)
         nt_tensor = torch.tensor([nt_index], device=self.device, dtype=torch.long)
         nt_embedding = embeddings(nt_tensor).unsqueeze(dim=0)
-        return nt_embedding, action.argument_index_as_tensor()
+        return nt_embedding
 
     def get_base_log_prop(self, log_probs, action_index):
         if log_probs is None:
