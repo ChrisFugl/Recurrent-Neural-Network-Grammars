@@ -60,6 +60,7 @@ class ParallelRNNG(Model):
         preprocessed_batches, stack_size = preprocess_batch(
             self.device,
             self.non_terminal_converter,
+            self.token_converter,
             batch.size,
             batch.max_actions_length,
             batch.actions.actions,
@@ -108,6 +109,7 @@ class ParallelRNNG(Model):
         preprocessed, stack_size = preprocess_batch(
             self.device,
             self.non_terminal_converter,
+            self.token_converter,
             batch_size,
             actions_max_length,
             [actions],

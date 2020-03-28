@@ -2,10 +2,11 @@ from app.constants import ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_NON_TE
 
 import torch
 
-def preprocess_batch(device, non_terminal_converter, batch_size, max_action_length, batch_actions, batch_tokens_lengths, batch_tokens_tensor, batch_tags_tensor):
+def preprocess_batch(device, non_terminal_converter, token_converter, batch_size, max_action_length, batch_actions, batch_tokens_lengths, batch_tokens_tensor, batch_tags_tensor):
     """
     :type device: torch.device
     :type non_terminal_converter: app.data.converters.non_terminal.NonTerminalConverter
+    :type token_converter: app.data.converters.token.TokenConverter
     :type batch_size: int
     :type max_action_length: int
     :type batch_actions: list of list of app.data.actions.action.Action
@@ -42,7 +43,7 @@ def preprocess_batch(device, non_terminal_converter, batch_size, max_action_leng
                 stack_size[batch_index] = stack_size[batch_index] + 1
                 parent.add_child(node)
             elif type == ACTION_GENERATE_TYPE:
-                token_index[batch_index] = action.argument_index
+                token_index[batch_index] = token_converter.token2integer(action.argument)
                 stack_size[batch_index] = stack_size[batch_index] + 1
                 parent.add_child(node)
             elif type == ACTION_NON_TERMINAL_TYPE:

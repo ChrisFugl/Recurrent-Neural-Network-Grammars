@@ -19,19 +19,18 @@ class ActionConverter:
     * non-terminals (NT)
     """
 
-    def __init__(self, token_converter, is_generative, trees):
+    def __init__(self, is_generative, trees):
         """
-        :type token_converter: app.data.converters.token.TokenConverter
         :type is_generative: bool
         :type trees: list of list of str
         """
         self._generative = is_generative
         self._singleton2index, self._index2singleton = self._get_singleton_actions(self._generative)
         self._singleton_count = len(self._index2singleton)
-        self._terminal2index, self._index2terminal = self._get_terminal_actions(self._generative, token_converter)
+        self._terminal2index, self._index2terminal = self._get_terminal_actions(self._generative, trees)
         self._terminal_count = len(self._index2terminal)
         self._terminal_offset = ACTION_EMBEDDING_OFFSET + self._singleton_count
-        self._non_terminal2index, self._index2non_terminal = self._get_non_terminal_actions(self._generative, trees)
+        self._non_terminal2index, self._index2non_terminal = self._get_non_terminal_actions(trees)
         self._non_terminal_count = len(self._index2non_terminal)
         self._non_terminal_offset = ACTION_EMBEDDING_OFFSET + self._singleton_count + self._terminal_count
         self._actions_count = ACTION_EMBEDDING_OFFSET + self._singleton_count + self._terminal_count + self._non_terminal_count
@@ -185,17 +184,23 @@ class ActionConverter:
             action2index = {'REDUCE': 0, 'SHIFT': 1}
         return action2index, index2action
 
-    def _get_terminal_actions(self, generative, token_converter):
+    def _get_terminal_actions(self, generative, trees):
         index2action = []
         action2index = {}
         if generative:
-            tokens = token_converter.tokens()
-            for index, token in enumerate(tokens):
-                index2action.append(token)
-                action2index[token] = index
+            counter = 0
+            for tree in trees:
+                for action_string in tree:
+                    action_type, action_argument = parse_action(action_string)
+                    if action_type == ACTION_GENERATE_TYPE:
+                        terminal = action_argument
+                        if not terminal in action2index:
+                            index2action.append(terminal)
+                            action2index[terminal] = counter
+                            counter += 1
         return action2index, index2action
 
-    def _get_non_terminal_actions(self, generative, trees):
+    def _get_non_terminal_actions(self, trees):
         index2action = []
         action2index = {}
         counter = 0

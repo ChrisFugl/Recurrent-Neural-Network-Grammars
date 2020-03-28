@@ -26,7 +26,7 @@ def _main(config):
     device = get_device(config.gpu)
     token_converter = TokenConverter(unknownified_tokens_train)
     tag_converter = TagConverter(tags_train)
-    action_converter = ActionConverter(token_converter, generative, actions_train)
+    action_converter = ActionConverter(generative, actions_train)
     non_terminal_converter = NonTerminalConverter(actions_train)
     iterator_converters = (action_converter, token_converter, tag_converter)
     model_converters = (action_converter, token_converter, tag_converter, non_terminal_converter)

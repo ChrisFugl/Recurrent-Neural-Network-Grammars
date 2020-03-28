@@ -20,7 +20,7 @@ def load_saved_model(device, load_dir):
     _, actions, _, unknownified_tokens, tags = loader.load_train()
     token_converter = TokenConverter(unknownified_tokens)
     tag_converter = TagConverter(tags)
-    action_converter = ActionConverter(token_converter, generative, actions)
+    action_converter = ActionConverter(generative, actions)
     non_terminal_converter = NonTerminalConverter(actions)
     model = get_model(device, generative, action_converter, token_converter, tag_converter, non_terminal_converter, training_config.model)
     load_model_params(model, load_dir)
