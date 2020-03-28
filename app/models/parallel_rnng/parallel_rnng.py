@@ -9,9 +9,11 @@ from app.models.parallel_rnng.state import State
 import torch
 from torch import nn
 
+INVALID_ACTION_FILL = -9999999999.0
+
 class ParallelRNNG(Model):
 
-    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes):
+    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, action_set, generative):
         """
         :type device: torch.device
         :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
@@ -20,8 +22,12 @@ class ParallelRNNG(Model):
         :type representation: app.representations.representation.Representation
         :type composer: app.composers.composer.Composer
         :type sizes: int, int, int, int
+        :type action_set: app.data.action_set.action_set.ActionSet
+        :type generative: bool
         """
         super().__init__()
+        self.action_set = action_set
+        self.generative = generative
         self.device = device
         self.action_converter, self.token_converter, self.tag_converter, self.non_terminal_converter = converters
         action_size, token_size, rnn_input_size, rnn_size = sizes
@@ -43,12 +49,16 @@ class ParallelRNNG(Model):
         self.reduce_index = self.action_converter.string2integer('REDUCE')
         if not self.generative:
             self.shift_index = self.action_converter.string2integer('SHIFT')
+        else:
+            self.shift_index = None
         nt_start = self.action_converter.get_non_terminal_offset()
         nt_count = self.action_converter.count_non_terminals()
         self.nt_indices = list(range(nt_start, nt_start + nt_count))
         gen_start = self.action_converter.get_terminal_offset()
         gen_count = self.action_converter.count_terminals()
         self.gen_indices = list(range(gen_start, gen_start + gen_count))
+
+        self.valid_args = (self.action_set, self.generative, self.action_count, self.reduce_index, self.shift_index, gen_start, gen_count, nt_start, nt_count)
 
     def batch_log_likelihood(self, batch):
         """
@@ -59,6 +69,7 @@ class ParallelRNNG(Model):
         """
         preprocessed_batches, stack_size = preprocess_batch(
             self.device,
+            self.valid_args,
             self.non_terminal_converter,
             self.token_converter,
             batch.size,
@@ -83,7 +94,7 @@ class ParallelRNNG(Model):
         for sequence_index in range(batch.max_actions_length):
             preprocessed_batch = preprocessed_batches[sequence_index]
             representation = self.get_representation()
-            output_log_probs[sequence_index] = self.get_log_probs(representation)
+            output_log_probs[sequence_index] = self.get_log_probs(representation, preprocessed_batch.invalid_mask)
             self.do_actions(batch.size, preprocessed_batch)
             action_tensor = batch.actions.tensor[sequence_index].unsqueeze(dim=0)
             action_embedding = self.action_embedding(action_tensor)
@@ -108,6 +119,7 @@ class ParallelRNNG(Model):
         actions_length = torch.tensor([len(actions)], device=self.device, dtype=torch.long)
         preprocessed, stack_size = preprocess_batch(
             self.device,
+            self.valid_args,
             self.non_terminal_converter,
             self.token_converter,
             batch_size,
@@ -133,7 +145,7 @@ class ParallelRNNG(Model):
             representation = self.get_representation()
             action = actions[sequence_index]
             action_index = self.action_converter.action2integer(action)
-            log_probs = self.get_log_probs(representation)
+            log_probs = self.get_log_probs(representation, preprocessed_batch.invalid_mask)
             action_log_prob = log_probs[:, :, action_index]
             output_log_probs[sequence_index, action_index] = action_log_prob
             self.do_actions(batch_size, preprocessed_batch)
@@ -366,14 +378,15 @@ class ParallelRNNG(Model):
             token_buffer_embedding, token_buffer_lengths
         )
 
-    def get_log_probs(self, representation):
+    def get_log_probs(self, representation, invalid_mask):
         """
         :type representation: torch.Tensor
-        :type forbidden_actions: torch.Tensor
+        :type invalid_mask: torch.Tensor
         :rtype: torch.Tensor
         """
         logits = self.representation2logits(representation)
-        log_probs = self.logits2log_prob(logits)
+        valid_logits = logits.masked_fill(invalid_mask, INVALID_ACTION_FILL)
+        log_probs = self.logits2log_prob(valid_logits)
         return log_probs
 
     def do_actions(self, batch_size, preprocessed):

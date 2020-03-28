@@ -15,9 +15,9 @@ class GenerativeParallelRNNG(ParallelRNNG):
         :type composer: app.composers.composer.Composer
         :type sizes: int, int, int, int
         """
-        self.generative = True
-        super().__init__(device, embeddings, structures, converters, representation, composer, sizes)
-        self.action_set = Generative()
+        action_set = Generative()
+        generative = True
+        super().__init__(device, embeddings, structures, converters, representation, composer, sizes, action_set, generative)
         token_size = sizes[1]
         start_token_embedding = torch.FloatTensor(1, token_size).uniform_(-1, 1)
         self.start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)

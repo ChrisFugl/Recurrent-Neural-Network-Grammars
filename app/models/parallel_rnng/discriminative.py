@@ -17,9 +17,9 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         :type pos_size: int
         :type pos_embedding: torch.nn.Embedding
         """
-        self.generative = False
-        super().__init__(device, embeddings, structures, converters, representation, composer, sizes)
-        self.action_set = Discriminative()
+        action_set = Discriminative()
+        generative = False
+        super().__init__(device, embeddings, structures, converters, representation, composer, sizes, action_set, generative)
         self.pos_embedding = pos_embedding
         self.activation = nn.ReLU()
         token_size = sizes[1]
