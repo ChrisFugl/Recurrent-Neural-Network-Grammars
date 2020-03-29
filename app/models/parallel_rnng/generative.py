@@ -36,10 +36,9 @@ class GenerativeParallelRNNG(ParallelRNNG):
         self.token_buffer.initialize(token_embeddings)
         self.token_buffer.hold_or_push(push_op)
 
-    def get_word_embedding(self, preprocessed, token_action_indices):
+    def get_word_embedding(self, preprocessed):
         """
         :type preprocessed: app.models.parallel_rnng.preprocessed_batch.Preprocessed
-        :type token_action_indices: torch.Tensor
         :rtype: torch.Tensor, torch.Tensor
         """
         token_indices = preprocessed.token_index

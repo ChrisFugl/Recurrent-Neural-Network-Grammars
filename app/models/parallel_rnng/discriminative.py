@@ -46,10 +46,9 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         word_embeddings = torch.cat((start_word_embedding, word_embeddings), dim=0)
         self.token_buffer.initialize(word_embeddings, token_lengths)
 
-    def get_word_embedding(self, preprocessed, token_action_indices):
+    def get_word_embedding(self, preprocessed):
         """
         :type preprocessed: app.models.parallel_rnng.preprocessed_batch.Preprocessed
-        :type token_action_indices: torch.Tensor
         :rtype: torch.Tensor, torch.Tensor
         """
         token_indices = preprocessed.token_index

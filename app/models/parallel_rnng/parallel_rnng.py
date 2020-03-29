@@ -78,12 +78,13 @@ class ParallelRNNG(Model):
             stack_size + 1,
         )
         output_shape = (batch.max_actions_length, batch.size, self.action_count)
-        output_log_probs = torch.zeros(output_shape, device=self.device, dtype=torch.float)
+        output_log_probs = torch.ones(output_shape, device=self.device, dtype=torch.float)
         batch_indices = torch.arange(0, batch.size, device=self.device, dtype=torch.long)
         for sequence_index in range(batch.max_actions_length):
             preprocessed_batch = preprocessed_batches[sequence_index]
             representation = self.get_representation()
-            output_log_probs[sequence_index] = self.get_log_probs(representation)
+            log_probs = self.get_log_probs(representation)
+            output_log_probs[sequence_index] = log_probs[0]
             self.do_actions(batch.size, preprocessed_batch)
             action_tensor = batch.actions.tensor[sequence_index].unsqueeze(dim=0)
             action_embedding = self.action_embedding(action_tensor)
@@ -319,10 +320,9 @@ class ParallelRNNG(Model):
         """
         raise NotImplementedError('must be implemented by subclass')
 
-    def get_word_embedding(self, preprocessed, token_action_indices):
+    def get_word_embedding(self, preprocessed):
         """
         :type preprocessed: app.models.parallel_rnng.preprocessed_batch.Preprocessed
-        :type token_action_indices: torch.Tensor
         :rtype: torch.Tensor
         """
         raise NotImplementedError('must be implemented by subclass')
@@ -393,7 +393,7 @@ class ParallelRNNG(Model):
             stack_input[non_terminal_action_indices] = nt_embeddings
         # SHIFT or GEN
         if len(token_action_indices) != 0:
-            word_embeddings = self.get_word_embedding(preprocessed, token_action_indices)
+            word_embeddings = self.get_word_embedding(preprocessed)
             stack_input[token_action_indices] = word_embeddings[token_action_indices]
             self.update_token_buffer(batch_size, token_action_indices, word_embeddings)
         # REDUCE
@@ -401,20 +401,22 @@ class ParallelRNNG(Model):
             children = []
             max_reduce_children = torch.max(preprocessed.number_of_children)
             for child_index in range(max_reduce_children):
+                batch_pop = child_index < preprocessed.number_of_children
                 reduce_children_op = self.hold_op(batch_size)
-                reduce_children_op[child_index < preprocessed.number_of_children] = -1
+                reduce_children_op[batch_pop] = -1
                 output = self.stack.hold_or_pop(reduce_children_op)
                 children.append(output[reduce_action_indices])
             children.reverse()
-            children = torch.stack(children, dim=0)
+            children_tensor = torch.stack(children, dim=0)
             # pop non-terminal from stack
             non_terminal_pop_op = self.hold_op(batch_size)
             non_terminal_pop_op[reduce_action_indices] = -1
             self.stack.hold_or_pop(non_terminal_pop_op)
             # compose and push composed constituent to stack
             compose_nt_index = preprocessed.compose_non_terminal_index[reduce_action_indices]
-            reduce_nt_embeddings = self.nt_compose_embedding(compose_nt_index).unsqueeze(dim=0)
-            composed = self.composer(reduce_nt_embeddings, children, preprocessed.number_of_children[reduce_action_indices])
+            compose_nt_embeddings = self.nt_compose_embedding(compose_nt_index).unsqueeze(dim=0)
+            compose_lengths = preprocessed.number_of_children[reduce_action_indices]
+            composed = self.composer(compose_nt_embeddings, children_tensor, compose_lengths)
             stack_input[reduce_action_indices] = composed[0]
         stack_op = self.hold_op(batch_size)
         stack_op[non_pad_indices] = 1
