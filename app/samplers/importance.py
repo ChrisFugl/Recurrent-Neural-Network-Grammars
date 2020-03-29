@@ -12,6 +12,7 @@ class ImportanceSampler(Sampler):
         device, posterior_scaling, samples,
         model_dis, iterator_dis, action_converter_dis,
         model_gen, iterator_gen, action_converter_gen,
+        log=True
     ):
         """
         :type device: torch.device
@@ -23,8 +24,9 @@ class ImportanceSampler(Sampler):
         :type iterator_gen: app.data.iterators.iterator.Iterator
         :type action_converter_dis: app.data.converters.action.ActionConverter
         :type action_converter_gen: app.data.converters.action.ActionConverter
+        :type log: bool
         """
-        super().__init__()
+        super().__init__(log=log)
         self._device = device
         self._posterior_scaling = posterior_scaling
         self._samples = samples

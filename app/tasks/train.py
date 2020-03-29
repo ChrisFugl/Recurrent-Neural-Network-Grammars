@@ -1,3 +1,4 @@
+from app.scores import scores_from_samples
 from app.tasks.task import Task
 import hydra
 import logging
@@ -13,7 +14,7 @@ class TrainTask(Task):
         device,
         iterator_train, iterator_val,
         model, loss, optimizer, learning_rate_scheduler,
-        stopping_criterion, checkpoint, evaluator,
+        stopping_criterion, checkpoint, evaluator, sampler,
         log_train_every, load_checkpoint, token_count, tag_count, non_terminal_count, action_count
     ):
         """
@@ -27,6 +28,7 @@ class TrainTask(Task):
         :type stopping_criterion: app.stopping_criteria.stopping_criterion.StoppingCriterion
         :type checkpoint: app.checkpoints.checkpoint.Checkpoint
         :type evaluator: app.evaluators.evaluator.Evaluator
+        :type sampler: app.samplers.sampler.Sampler
         :type log_train_every: int
         :type load_checkpoint: str
         :type token_count: int
@@ -45,6 +47,7 @@ class TrainTask(Task):
         self.stopping_criterion = stopping_criterion
         self.checkpoint = checkpoint
         self.evaluator = evaluator
+        self.sampler = sampler
         self.log_train_every = log_train_every
 
         self.token_count = token_count
@@ -84,23 +87,23 @@ class TrainTask(Task):
         batch_count = self.start_batch_count
         epoch = self.start_epoch
         losses = []
-        best_loss_val = None
+        best_val_score = None
         self.model.train()
         if self.evaluator.should_evaluate(epoch, batch_count, pretraining=True):
-            best_loss_val = self.evaluate(epoch, batch_count, best_loss_val)
+            best_val_score = self.evaluate(epoch, batch_count, best_val_score)
         # assumes a single learning rate for all parameters
         learning_rate = self.optimizer.param_groups[0]['lr']
         self.log_epoch(epoch, batch_count, learning_rate)
         while True:
-            epoch, batch_count, done, losses, best_loss_val = self.train_epoch(time_start, epoch, batch_count, losses, best_loss_val)
+            epoch, batch_count, done, losses, best_val_score = self.train_epoch(time_start, epoch, batch_count, losses, best_val_score)
             if done:
                 break
             if self.evaluator.should_evaluate(epoch, batch_count, end_of_epoch=True):
-                best_loss_val = self.evaluate(epoch, batch_count, best_loss_val)
+                best_val_score = self.evaluate(epoch, batch_count, best_val_score)
             self.stopping_criterion.add_epoch(epoch)
             if self.stopping_criterion.is_done():
                 break
-        self.evaluate(epoch, batch_count, best_loss_val)
+        self.evaluate(epoch, batch_count, best_val_score)
         time_stop = time.time()
         time_seconds = self.get_seconds(time_start, time_stop)
         time_hours = time_seconds / 3600
@@ -108,7 +111,7 @@ class TrainTask(Task):
         self.logger.info(f'Training time: {time_seconds:0.2f} s/{time_hours:0.2f} h/{time_days:0.2f} d')
         self.logger.info('Finished training')
 
-    def train_epoch(self, time_start, epoch, batch_count, losses, best_loss_val):
+    def train_epoch(self, time_start, epoch, batch_count, losses, best_val_score):
         time_epoch_start = time.time()
         start_of_epoch = True
         for batch in self.iterator_train:
@@ -119,9 +122,9 @@ class TrainTask(Task):
                 self.log_loss(self.writer_train, batch_count, losses)
                 losses = []
             if self.evaluator.should_evaluate(epoch, batch_count):
-                best_loss_val = self.evaluate(epoch, batch_count, best_loss_val)
+                best_val_score = self.evaluate(epoch, batch_count, best_val_score)
             if self.stopping_criterion.is_done():
-                return epoch, batch_count, True, losses, best_loss_val
+                return epoch, batch_count, True, losses, best_val_score
             if self.checkpoint.should_save_checkpoint(epoch, batch_count, start_of_epoch):
                 self.save_checkpoint(time_start, epoch, batch_count)
             start_of_epoch = False
@@ -134,7 +137,7 @@ class TrainTask(Task):
         self.log_epoch(epoch, batch_count, learning_rate)
         self.writer_train.add_scalar('time/epoch_s', self.get_seconds(time_epoch_start, time_epoch_stop), batch_count)
         self.writer_train.add_scalar('time/total_s', time_total, batch_count)
-        return epoch, batch_count, False, losses, best_loss_val
+        return epoch, batch_count, False, losses, best_val_score
 
     def train_batch(self, batch, batch_count):
         self.start_measure_memory()
@@ -170,10 +173,52 @@ class TrainTask(Task):
         loss.backward()
         self.optimizer.step()
 
-    def evaluate(self, epoch, batch_count, best_loss_val):
+    def evaluate(self, epoch, batch_count, best_score):
         self.start_measure_memory()
-        time_val_start = time.time()
+        time_evaluate_start = time.time()
         self.model.eval()
+        losses, total_actions, total_tokens, total_sentences, time_val = self.evaluate_loss()
+        if self.sampler is not None:
+            samples, time_sample = self.sample()
+            scores, _, _, _ = scores_from_samples(samples)
+            f1, precision, recall = scores
+        self.model.train()
+        time_evaluate_stop = time.time()
+        self.log_memory(self.writer_val, batch_count)
+        time_evaluate = self.get_seconds(time_evaluate_start, time_evaluate_stop)
+        loss_val = self.log_loss(self.writer_val, batch_count, losses)
+        self.stopping_criterion.add_val_loss(loss_val)
+        actions_per_second = total_actions / time_val
+        tokens_per_second = total_tokens / time_val
+        sentences_per_second = total_sentences / time_val
+        self.writer_val.add_scalar('time/evaluate_s', time_evaluate, batch_count)
+        self.writer_val.add_scalar('time/val_s', time_val, batch_count)
+        self.writer_val.add_scalar('time/actions_per_s', actions_per_second, batch_count)
+        self.writer_val.add_scalar('time/tokens_per_s', tokens_per_second, batch_count)
+        self.writer_val.add_scalar('time/sentences_per_s', sentences_per_second, batch_count)
+        if self.sampler is not None:
+            self.writer_val.add_scalar('time/sample_s', time_sample, batch_count)
+            self.writer_val.add_scalar('training/f1', f1, batch_count)
+            self.writer_val.add_scalar('training/precision', precision, batch_count)
+            self.writer_val.add_scalar('training/recall', recall, batch_count)
+            self.logger.info(f'epoch={epoch}, batch={batch_count}, loss_val={loss_val:0.6f}, f1_val={f1:0.2f}')
+            score = f1
+            is_new_best_score = best_score is None or best_score < score
+        else:
+            self.logger.info(f'epoch={epoch}, batch={batch_count}, loss_val={loss_val:0.8f}')
+            score = loss_val
+            is_new_best_score = best_score is None or score < best_score
+
+        # save model with best performing score
+        if is_new_best_score:
+            if best_score is not None:
+                self.save()
+            return score
+        else:
+            return best_score
+
+    def evaluate_loss(self):
+        time_start = time.time()
         losses = []
         total_actions = 0
         total_tokens = 0
@@ -185,28 +230,16 @@ class TrainTask(Task):
             losses.append(loss_scalar)
             total_actions += self.count_actions(batch)
             total_tokens += self.count_tokens(batch)
-        self.model.train()
-        time_val_stop = time.time()
-        self.log_memory(self.writer_val, batch_count)
-        time_val = self.get_seconds(time_val_start, time_val_stop)
-        loss_val = self.log_loss(self.writer_val, batch_count, losses)
-        self.stopping_criterion.add_val_loss(loss_val)
-        self.logger.info(f'epoch={epoch}, batch={batch_count}, loss_val={loss_val:0.8f}')
-        actions_per_second = total_actions / time_val
-        tokens_per_second = total_tokens / time_val
-        sentences_per_second = total_sentences / time_val
-        self.writer_val.add_scalar('time/val_s', time_val, batch_count)
-        self.writer_val.add_scalar('time/actions_per_s', actions_per_second, batch_count)
-        self.writer_val.add_scalar('time/tokens_per_s', tokens_per_second, batch_count)
-        self.writer_val.add_scalar('time/sentences_per_s', sentences_per_second, batch_count)
+        time_stop = time.time()
+        time_taken = self.get_seconds(time_start, time_stop)
+        return losses, total_actions, total_tokens, total_sentences, time_taken
 
-        # save model with best performing validation loss
-        if best_loss_val is None or loss_val < best_loss_val:
-            if best_loss_val is not None:
-                self.save()
-            return loss_val
-        else:
-            return best_loss_val
+    def sample(self):
+        time_start = time.time()
+        samples = self.sampler.evaluate()
+        time_stop = time.time()
+        time_taken = self.get_seconds(time_start, time_stop)
+        return samples, time_taken
 
     def get_seconds(self, start, stop):
         seconds = stop - start

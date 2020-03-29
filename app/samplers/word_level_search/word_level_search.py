@@ -9,7 +9,7 @@ import torch
 
 class WordLevelSearchSampler(Sampler):
 
-    def __init__(self, device, model, iterator, action_converter, beam_size, samples, fast_track):
+    def __init__(self, device, model, iterator, action_converter, beam_size, samples, fast_track, log=True):
         """
         :type device: torch.device
         :type model: app.models.model.Model
@@ -18,8 +18,9 @@ class WordLevelSearchSampler(Sampler):
         :type beam_size: int
         :type samples: int
         :type fast_track: int
+        :type log: bool
         """
-        super().__init__()
+        super().__init__(log=log)
         self._device = device
         self._model = model
         self._iterator = iterator

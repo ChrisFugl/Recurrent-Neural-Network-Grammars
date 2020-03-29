@@ -5,7 +5,11 @@ import torch
 
 class Sampler:
 
-    def __init__(self):
+    def __init__(self, log=True):
+        """
+        :type log: bool
+        """
+        self._log = log
         self._logger = logging.getLogger('sampler')
 
     def evaluate(self):
@@ -24,7 +28,7 @@ class Sampler:
                 samples.append(sample)
                 tree_counter += 1
                 threshold_counter += 1
-                if threshold <= threshold_counter:
+                if self._log and threshold <= threshold_counter:
                     self._logger.info(f'Sampling: {tree_counter:,} / {count:,} ({tree_counter/count:0.2%})')
                     threshold_counter = 0
         return samples

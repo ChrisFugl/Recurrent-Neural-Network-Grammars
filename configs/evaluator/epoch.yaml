@@ -1,4 +1,4 @@
 evaluator:
   type: epoch
   epoch: 1
-  pretraining: true
+  pretraining: false

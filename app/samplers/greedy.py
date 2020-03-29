@@ -3,7 +3,7 @@ from app.samplers.sampler import Sampler
 
 class GreedySampler(Sampler):
 
-    def __init__(self, device, model, iterator, action_converter, posterior_scaling):
+    def __init__(self, device, model, iterator, action_converter, posterior_scaling, log=True):
         """
         :type device: torch.device
         :type action_converter: app.data.converters.action.ActionConverter
@@ -11,8 +11,9 @@ class GreedySampler(Sampler):
         :type iterator: app.data.iterators.iterator.Iterator
         :type action_converter: app.data.converters.action.ActionConverter
         :type posterior_scaling: float
+        :type log: bool
         """
-        super().__init__()
+        super().__init__(log=log)
         self._device = device
         self._model = model
         self._iterator = iterator

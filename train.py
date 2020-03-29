@@ -11,6 +11,7 @@ from app.learning_rate_schedulers import get_learning_rate_scheduler
 from app.losses import get_loss
 from app.models import get_model
 from app.optimizers import get_optimizer
+from app.samplers.greedy import GreedySampler
 from app.stopping_criteria import get_stopping_criterion
 from app.tasks.train import TrainTask
 from app.utils import get_device, is_generative, set_seed
@@ -37,6 +38,10 @@ def _main(config):
     optimizer = get_optimizer(config.optimizer, model.parameters())
     learning_rate_scheduler = get_learning_rate_scheduler(optimizer, config.lr_scheduler)
     stopping_criterion = get_stopping_criterion(config.stopping_criterion)
+    if generative:
+        sampler = None
+    else:
+        sampler = GreedySampler(device, model, iterator_val, action_converter, 1.0, log=False)
     checkpoint = get_checkpoint(config.checkpoint)
     evaluator = get_evaluator(config.evaluator)
     task = TrainTask(
@@ -50,6 +55,7 @@ def _main(config):
         stopping_criterion,
         checkpoint,
         evaluator,
+        sampler,
         config.log_train_every,
         config.load_checkpoint,
         token_converter.count() - TOKEN_EMBEDDING_OFFSET,
