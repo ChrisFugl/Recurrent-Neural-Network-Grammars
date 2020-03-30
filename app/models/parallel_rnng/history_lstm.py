@@ -34,6 +34,10 @@ class HistoryLSTM(nn.Module):
         """
         contents = torch.cat(self.history, dim=0)
         return contents, self.lengths
+        # length = contents.size(0)
+        # batch_size = contents.size(1)
+        # lengths = torch.tensor([length] * batch_size, device=self.device, dtype=torch.long)
+        # return contents, lengths
 
     def initialize(self, lengths):
         """
@@ -97,6 +101,10 @@ class HistoryLSTM(nn.Module):
         contents = torch.cat(history, dim=0)
         lengths = torch.tensor([state.length] * state.batch_size, device=self.device, dtype=torch.long)
         return contents, lengths
+        # length = contents.size(0)
+        # batch_size = contents.size(1)
+        # lengths = torch.tensor([length] * batch_size, device=self.device, dtype=torch.long)
+        # return contents, lengths
 
     def __str__(self):
         return f'HistoryLSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers})'

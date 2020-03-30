@@ -1,4 +1,5 @@
 from app.composers.composer import Composer
+from app.utils import batched_index_select
 import torch
 from torch import nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
@@ -30,16 +31,9 @@ class BiRNNComposer(Composer):
         state = self.birnn.initial_state(batch_size)
         packed_output, _ = self.birnn(packed, state)
         unpacked_output, _ = pad_packed_sequence(packed_output)
-        affine_input = self.pick_last(unpacked_output, lengths_cat)
+        affine_input = batched_index_select(unpacked_output, lengths_cat - 1)
         output = self.activation(self.affine(affine_input))
         return output
-
-    def pick_last(self, values, lengths):
-        _, batch_size, hidden_size = values.shape
-        last_index = lengths - 1
-        top = last_index.view(1, batch_size, 1).expand(1, batch_size, hidden_size)
-        last = torch.gather(values, 0, top).view(1, batch_size, hidden_size)
-        return last
 
     def __str__(self):
         return f'BiRNN(birnn={self.birnn})'

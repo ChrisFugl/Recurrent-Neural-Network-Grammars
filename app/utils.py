@@ -46,3 +46,16 @@ def get_training_config(load_dir):
     :rtype: OmegaConf
     """
     return get_config(load_dir, '.hydra/config')
+
+def batched_index_select(inputs, indices):
+    """
+    :type inputs: torch.Tensor
+    :type indices: torch.Tensor
+    :rtype: torch.Tensor
+    """
+    batch_size = inputs.size(1)
+    hidden_shape = inputs.shape[2:]
+    indices_expanded = indices.view(1, batch_size, *[1] * len(hidden_shape))
+    indices_expanded = indices_expanded.expand(1, batch_size, *hidden_shape)
+    selected = torch.gather(inputs, 0, indices_expanded)
+    return selected

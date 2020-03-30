@@ -1,4 +1,5 @@
 from app.models.parallel_rnng.multi_layer_lstm_cell import MultiLayerLSTMCell
+from app.utils import batched_index_select
 import torch
 from torch import nn
 
@@ -63,9 +64,8 @@ class StackLSTM(nn.Module):
         :type op: torch.Tensor
         """
         batch_size = input.size(0)
-        top = self.pos.unsqueeze(0).unsqueeze(2).unsqueeze(3).expand(1, batch_size, self.hidden_size, self.num_layers)
-        hidden_state = torch.gather(self.hidden_stack, 0, top).view(batch_size, self.hidden_size, self.num_layers)
-        cell_state = torch.gather(self.cell_stack, 0, top).view(batch_size, self.hidden_size, self.num_layers)
+        hidden_state = batched_index_select(self.hidden_stack, self.pos).view(batch_size, self.hidden_size, self.num_layers)
+        cell_state = batched_index_select(self.cell_stack, self.pos).view(batch_size, self.hidden_size, self.num_layers)
         next_hidden, next_cell = self.lstm(input, (hidden_state, cell_state))
         self.hidden_stack = self.hidden_stack.clone()
         self.cell_stack = self.cell_stack.clone()
@@ -78,8 +78,7 @@ class StackLSTM(nn.Module):
         :rtype: torch.Tensor
         """
         batch_size = len(self.pos)
-        top = self.pos.unsqueeze(0).unsqueeze(2).unsqueeze(3).expand(1, batch_size, self.hidden_size, self.num_layers)
-        output = torch.gather(self.hidden_stack, 0, top).view(batch_size, self.hidden_size, self.num_layers)
+        output = batched_index_select(self.hidden_stack, self.pos).view(batch_size, self.hidden_size, self.num_layers)
         output = output[:, :, self.num_layers - 1]
         return output
 

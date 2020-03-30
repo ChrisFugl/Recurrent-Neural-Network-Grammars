@@ -1,4 +1,5 @@
 from app.representations.representation import Representation
+from app.utils import batched_index_select
 import torch
 from torch import nn
 
@@ -32,22 +33,15 @@ class VanillaRepresentation(Representation):
         :rtype: torch.Tensor
         """
         embeddings = [
-            self.dropout(self.pick_last(action_history, action_history_lengths)),
-            self.dropout(self.pick_last(stack, stack_lengths)),
-            self.dropout(self.pick_last(token_buffer, token_buffer_lengths)),
+            self.dropout(batched_index_select(action_history, action_history_lengths - 1)),
+            self.dropout(batched_index_select(stack, stack_lengths - 1)),
+            self.dropout(batched_index_select(token_buffer, token_buffer_lengths - 1)),
         ]
         # concatenate along last dimension, as inputs have shape S, B, H (sequence length, batch size, hidden size)
         feedforward_input = torch.cat(embeddings, dim=2)
         output = self.feedforward(feedforward_input)
         output = self.activation(output)
         return output
-
-    def pick_last(self, embeddings, lengths):
-        _, batch_size, hidden_size = embeddings.shape
-        last_index = lengths - 1
-        top = last_index.view(1, batch_size, 1).expand(1, batch_size, hidden_size)
-        last = torch.gather(embeddings, 0, top).view(1, batch_size, hidden_size)
-        return last
 
     def __str__(self):
         return f'Vanilla(size={self.representation_size})'
