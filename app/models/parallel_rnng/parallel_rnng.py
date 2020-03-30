@@ -31,7 +31,7 @@ class ParallelRNNG(Model):
         self.action_embedding, self.token_embedding, self.nt_embedding, self.nt_compose_embedding = embeddings
         self.action_history, self.token_buffer, self.stack = structures
         self.representation = representation
-        self.representation2logits = nn.Linear(in_features=rnn_size, out_features=self.action_count, bias=True)
+        self.representation2logits = nn.Linear(in_features=rnn_input_size, out_features=self.action_count, bias=True)
         self.composer = composer
         self.logits2log_prob = nn.LogSoftmax(dim=2)
 
@@ -78,8 +78,7 @@ class ParallelRNNG(Model):
             stack_size + 1,
         )
         output_shape = (batch.max_actions_length, batch.size, self.action_count)
-        output_log_probs = torch.ones(output_shape, device=self.device, dtype=torch.float)
-        batch_indices = torch.arange(0, batch.size, device=self.device, dtype=torch.long)
+        output_log_probs = torch.zeros(output_shape, device=self.device, dtype=torch.float, requires_grad=False)
         for sequence_index in range(batch.max_actions_length):
             preprocessed_batch = preprocessed_batches[sequence_index]
             representation = self.get_representation()

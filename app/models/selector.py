@@ -20,7 +20,7 @@ def get_model(device, generative, action_converter, token_converter, tag_convert
         non_terminal_count = non_terminal_converter.count()
         action_embedding = get_embedding(action_converter.count(), config.size.action, config.embedding)
         non_terminal_embedding = get_embedding(non_terminal_count, config.size.rnn, config.embedding)
-        non_terminal_compose_embedding = get_embedding(non_terminal_count, config.size.rnn, config.embedding)
+        non_terminal_compose_embedding = get_embedding(non_terminal_count, config.rnn.hidden_size, config.embedding)
         token_embedding = get_embedding(token_converter.count(), token_size, config.embedding)
         embeddings = (action_embedding, token_embedding, non_terminal_embedding, non_terminal_compose_embedding)
         converters = (action_converter, token_converter, tag_converter, non_terminal_converter)

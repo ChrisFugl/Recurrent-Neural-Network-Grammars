@@ -5,14 +5,15 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 class BiRNNComposer(Composer):
 
-    def __init__(self, birnn, output_size):
+    def __init__(self, birnn, stack_hidden_size, stack_input_size):
         """
         :type birnn: app.rnn.rnn.RNN
-        :type birnn_output_size: int
+        :type stack_hidden_size: int
+        :type stack_input_size: int
         """
         super().__init__()
         self.birnn = birnn
-        self.affine = nn.Linear(in_features=2 * output_size, out_features=output_size, bias=True)
+        self.affine = nn.Linear(in_features=2 * stack_hidden_size, out_features=stack_input_size, bias=True)
         self.activation = nn.ReLU()
 
     def forward(self, non_terminal_embedding, popped_stack_items, lengths):

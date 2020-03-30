@@ -15,6 +15,6 @@ def get_composer(device, config):
         rnn_config['dropout'] = config.composer.dropout
         rnn_config['num_layers'] = config.composer.num_layers
         birnn = get_rnn(device, config.rnn.hidden_size, rnn_config)
-        return BiRNNComposer(birnn, config.size.rnn)
+        return BiRNNComposer(birnn, config.rnn.hidden_size, config.size.rnn)
     else:
         raise Exception(f'Unknown composer: {type}')
