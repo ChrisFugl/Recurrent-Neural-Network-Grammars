@@ -1,5 +1,4 @@
 from app.constants import ACTION_NON_TERMINAL_TYPE, ACTION_REDUCE_TYPE, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE
-from app.data.preprocessing.unknowns import fine_grained_unknownifier
 import logging
 import torch
 

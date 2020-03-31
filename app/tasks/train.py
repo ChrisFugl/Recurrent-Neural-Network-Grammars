@@ -1,5 +1,6 @@
 from app.scores import scores_from_samples
 from app.tasks.task import Task
+from app.visualizations.actions import visualize_action_probs
 from app.visualizations.gradients import visualize_gradients, visualize_gradients_compose_only, visualize_gradients_exclude_representation
 from app.visualizations.trees import visualize_tree
 import hydra
@@ -192,7 +193,10 @@ class TrainTask(Task):
         self.model.train()
         gradients_all, gradients_compose_only, gradients_exclude_rep = self.make_gradient_visualizations()
         if self.sampler is not None:
-            groundtruth_tree, predicted_tree = self.make_tree_visualizations(samples)
+            sample_index = random.randint(0, len(samples) - 1)
+            sample = samples[sample_index]
+            groundtruth_tree, predicted_tree = self.make_tree_visualizations(sample)
+            groundtruth_probs, predicted_probs = self.make_action_visualizations(sample)
         time_evaluate_stop = time.time()
         time_evaluate = time_evaluate_stop - time_evaluate_start
         actions_per_second = total_actions / time_val
@@ -213,6 +217,8 @@ class TrainTask(Task):
         if self.sampler is not None:
             self.writer_val.add_figure('tree/groundtruth', groundtruth_tree, batch_count, time_elapsed)
             self.writer_val.add_figure('tree/predicted', predicted_tree, batch_count, time_elapsed)
+            self.writer_val.add_figure('actions/groundtruth', groundtruth_probs, batch_count, time_elapsed)
+            self.writer_val.add_figure('actions/predicted', predicted_probs, batch_count, time_elapsed)
             self.writer_val.add_scalar('time/sample_s', time_sample, batch_count, time_elapsed)
             self.writer_val.add_scalar('training/f1', f1, batch_count, time_elapsed)
             self.writer_val.add_scalar('training/precision', precision, batch_count, time_elapsed)
@@ -262,11 +268,14 @@ class TrainTask(Task):
         gradients_exclude_rep = visualize_gradients_exclude_representation(self.model.named_parameters())
         return gradients_all, gradients_compose_only, gradients_exclude_rep
 
-    def make_tree_visualizations(self, samples):
-        sample_index = random.randint(0, len(samples) - 1)
-        sample = samples[sample_index]
+    def make_tree_visualizations(self, sample):
         groundtruth = visualize_tree(sample.gold.actions, sample.gold.tokens)
         predicted = visualize_tree(sample.prediction.actions, sample.gold.tokens)
+        return groundtruth, predicted
+
+    def make_action_visualizations(self, sample):
+        groundtruth = visualize_action_probs(sample.gold.actions, sample.gold.probs)
+        predicted = visualize_action_probs(sample.prediction.actions, sample.prediction.probs)
         return groundtruth, predicted
 
     def sample(self):

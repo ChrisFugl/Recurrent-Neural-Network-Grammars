@@ -33,12 +33,18 @@ class GreedySampler(Sampler):
         predicted_tree = self._sample_from_tokens_tensor(tokens_tensor, tags_tensor)
         predicted_tree_tensor = self._actions2tensor(self._action_converter, predicted_tree)
         predicted_tree_log_probs = self._model.tree_log_probs(tokens_tensor, tags_tensor, predicted_tree_tensor, predicted_tree)
+        predicted_tree_probs = [prob.cpu().item() for prob in predicted_tree_log_probs.sum(dim=1).exp()]
         predicted_tree_log_prob = predicted_tree_log_probs.sum().cpu().item()
         gold_tree = element.actions.actions
         gold_tree_tensor = element.actions.tensor[:element.actions.length, :]
         gold_log_probs = self._model.tree_log_probs(tokens_tensor, tags_tensor, gold_tree_tensor, gold_tree)
+        gold_probs = [prob.cpu().item() for prob in gold_log_probs.sum(dim=1).exp()]
         gold_log_prob = gold_log_probs.sum().cpu().item()
-        return Sample(gold_tree, element.tokens.tokens, element.tags.tags, gold_log_prob, predicted_tree, predicted_tree_log_prob, None)
+        return Sample(
+            gold_tree, element.tokens.tokens, element.tags.tags, gold_log_prob, gold_probs,
+            predicted_tree, predicted_tree_log_prob, predicted_tree_probs,
+            None
+        )
 
     def get_batch_size(self, batch):
         """
