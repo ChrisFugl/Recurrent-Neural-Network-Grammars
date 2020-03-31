@@ -6,6 +6,7 @@ This work has only been tested on the following dependencies:
 
 * g++
 * Python v3.7.5
+* [Graphviz](http://graphviz.org/) (for visualizing trees)
 
 ## Installation
 First clone the project.
@@ -19,6 +20,12 @@ cd masters_thesis
 
 ``` sh
 sh install.sh
+```
+
+pygraphviz might fail to install if Graphviz has not been properly installed. This depends on the system. For example, the following had to be installed on Ubuntu before pygraphviz could be installed:
+
+``` sh
+apt install graphviz libgraphviz-dev
 ```
 
 ### Virtual Environment (optional)

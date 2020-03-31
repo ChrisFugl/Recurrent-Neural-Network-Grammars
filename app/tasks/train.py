@@ -1,10 +1,12 @@
 from app.scores import scores_from_samples
 from app.tasks.task import Task
 from app.visualizations.gradients import visualize_gradients, visualize_gradients_compose_only, visualize_gradients_exclude_representation
+from app.visualizations.trees import visualize_tree
 import hydra
 import logging
 import numpy as np
 import os
+import random
 import time
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -188,7 +190,9 @@ class TrainTask(Task):
             scores, _, _, _ = scores_from_samples(samples)
             f1, precision, recall = scores
         self.model.train()
-        gradients_all, gradients_compose_only, gradients_exclude_rep = self.make_gradient_visualiations()
+        gradients_all, gradients_compose_only, gradients_exclude_rep = self.make_gradient_visualizations()
+        if self.sampler is not None:
+            groundtruth_tree, predicted_tree = self.make_tree_visualizations(samples)
         time_evaluate_stop = time.time()
         time_evaluate = time_evaluate_stop - time_evaluate_start
         actions_per_second = total_actions / time_val
@@ -207,6 +211,8 @@ class TrainTask(Task):
         self.writer_val.add_scalar('time/tokens_per_s', tokens_per_second, batch_count, time_elapsed)
         self.writer_val.add_scalar('time/sentences_per_s', sentences_per_second, batch_count, time_elapsed)
         if self.sampler is not None:
+            self.writer_val.add_figure('tree/groundtruth', groundtruth_tree, batch_count, time_elapsed)
+            self.writer_val.add_figure('tree/predicted', predicted_tree, batch_count, time_elapsed)
             self.writer_val.add_scalar('time/sample_s', time_sample, batch_count, time_elapsed)
             self.writer_val.add_scalar('training/f1', f1, batch_count, time_elapsed)
             self.writer_val.add_scalar('training/precision', precision, batch_count, time_elapsed)
@@ -244,7 +250,7 @@ class TrainTask(Task):
         time_taken = time_stop - time_start
         return losses, total_actions, total_tokens, total_sentences, time_taken
 
-    def make_gradient_visualiations(self):
+    def make_gradient_visualizations(self):
         for batch in self.iterator_val:
             log_probs = self.model.batch_log_likelihood(batch)
             loss = self.loss(log_probs, batch.actions.tensor, batch.actions.lengths)
@@ -255,6 +261,13 @@ class TrainTask(Task):
         gradients_compose_only = visualize_gradients_compose_only(self.model.named_parameters())
         gradients_exclude_rep = visualize_gradients_exclude_representation(self.model.named_parameters())
         return gradients_all, gradients_compose_only, gradients_exclude_rep
+
+    def make_tree_visualizations(self, samples):
+        sample_index = random.randint(0, len(samples) - 1)
+        sample = samples[sample_index]
+        groundtruth = visualize_tree(sample.gold.actions, sample.gold.tokens)
+        predicted = visualize_tree(sample.prediction.actions, sample.gold.tokens)
+        return groundtruth, predicted
 
     def sample(self):
         time_start = time.time()
