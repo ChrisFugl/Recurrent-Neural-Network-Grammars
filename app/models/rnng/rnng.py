@@ -39,7 +39,7 @@ class RNNG(Model):
         self.action_embedding, self.token_embedding, self.nt_embedding, self.nt_compose_embedding = embeddings
         self.action_history, self.token_buffer, self.stack = structures
         self.representation = representation
-        self.representation2logits = nn.Linear(in_features=rnn_size, out_features=BASE_ACTION_COUT + self.non_terminal_count, bias=True)
+        self.representation2logits = nn.Linear(in_features=rnn_input_size, out_features=BASE_ACTION_COUT + self.non_terminal_count, bias=True)
         self.composer = composer
         self.logits2log_prob = nn.LogSoftmax(dim=2)
 

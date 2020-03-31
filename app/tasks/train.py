@@ -1,5 +1,6 @@
 from app.scores import scores_from_samples
 from app.tasks.task import Task
+from app.visualizations.gradients import visualize_gradients, visualize_gradients_compose_only, visualize_gradients_exclude_representation
 import hydra
 import logging
 import numpy as np
@@ -187,6 +188,7 @@ class TrainTask(Task):
             scores, _, _, _ = scores_from_samples(samples)
             f1, precision, recall = scores
         self.model.train()
+        gradients_all, gradients_compose_only, gradients_exclude_rep = self.make_gradient_visualiations()
         time_evaluate_stop = time.time()
         time_evaluate = time_evaluate_stop - time_evaluate_start
         actions_per_second = total_actions / time_val
@@ -196,6 +198,9 @@ class TrainTask(Task):
         loss_val = self.log_loss(self.writer_val, batch_count, losses, time_elapsed)
         self.stopping_criterion.add_val_loss(loss_val)
         self.log_memory(self.writer_val, batch_count, time_elapsed)
+        self.writer_val.add_figure('gradients/all', gradients_all, batch_count, walltime=time_elapsed)
+        self.writer_val.add_figure('gradients/compose_only', gradients_compose_only, batch_count, walltime=time_elapsed)
+        self.writer_val.add_figure('gradients/exclude_representation', gradients_exclude_rep, batch_count, walltime=time_elapsed)
         self.writer_val.add_scalar('time/evaluate_s', time_evaluate, batch_count, time_elapsed)
         self.writer_val.add_scalar('time/val_s', time_val, batch_count, time_elapsed)
         self.writer_val.add_scalar('time/actions_per_s', actions_per_second, batch_count, time_elapsed)
@@ -238,6 +243,18 @@ class TrainTask(Task):
         time_stop = time.time()
         time_taken = time_stop - time_start
         return losses, total_actions, total_tokens, total_sentences, time_taken
+
+    def make_gradient_visualiations(self):
+        for batch in self.iterator_val:
+            log_probs = self.model.batch_log_likelihood(batch)
+            loss = self.loss(log_probs, batch.actions.tensor, batch.actions.lengths)
+            self.model.zero_grad()
+            loss.backward()
+            break
+        gradients_all = visualize_gradients(self.model.named_parameters())
+        gradients_compose_only = visualize_gradients_compose_only(self.model.named_parameters())
+        gradients_exclude_rep = visualize_gradients_exclude_representation(self.model.named_parameters())
+        return gradients_all, gradients_compose_only, gradients_exclude_rep
 
     def sample(self):
         time_start = time.time()

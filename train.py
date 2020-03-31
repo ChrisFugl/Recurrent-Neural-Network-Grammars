@@ -15,6 +15,7 @@ from app.samplers.greedy import GreedySampler
 from app.stopping_criteria import get_stopping_criterion
 from app.tasks.train import TrainTask
 from app.utils import get_device, is_generative, set_seed
+from copy import deepcopy
 import hydra
 
 @hydra.main(config_path='configs/train.yaml')
@@ -32,7 +33,9 @@ def _main(config):
     iterator_converters = (action_converter, token_converter, tag_converter)
     model_converters = (action_converter, token_converter, tag_converter, non_terminal_converter)
     iterator_train = get_iterator(device, *iterator_converters, unknownified_tokens_train, actions_train, tags_train, config.iterator)
-    iterator_val = get_iterator(device, *iterator_converters, unknownified_tokens_val, actions_val, tags_val, config.iterator)
+    iterator_val_config = deepcopy(config.iterator)
+    iterator_val_config.shuffle = False
+    iterator_val = get_iterator(device, *iterator_converters, unknownified_tokens_val, actions_val, tags_val, iterator_val_config)
     model = get_model(device, generative, *model_converters, config.model)
     loss = get_loss(device, config.loss)
     optimizer = get_optimizer(config.optimizer, model.parameters())
