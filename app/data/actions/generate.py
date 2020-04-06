@@ -1,4 +1,4 @@
-from app.constants import ACTION_GENERATE_INDEX, ACTION_GENERATE_TYPE
+from app.constants import ACTION_GENERATE_TYPE
 from app.data.actions.action import Action
 
 class GenerateAction(Action):
@@ -9,12 +9,6 @@ class GenerateAction(Action):
         """
         super().__init__()
         self.argument = argument
-
-    def index(self):
-        """
-        :rtype: int
-        """
-        return ACTION_GENERATE_INDEX
 
     def type(self):
         """

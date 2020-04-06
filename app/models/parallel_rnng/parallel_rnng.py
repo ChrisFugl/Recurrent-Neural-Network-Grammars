@@ -1,7 +1,4 @@
-from app.constants import (
-    ACTION_SHIFT_INDEX, ACTION_GENERATE_INDEX, ACTION_REDUCE_INDEX, ACTION_NON_TERMINAL_INDEX,
-    ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_REDUCE_TYPE, ACTION_NON_TERMINAL_TYPE
-)
+from app.constants import ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_REDUCE_TYPE, ACTION_NON_TERMINAL_TYPE
 from app.data.actions.non_terminal import NonTerminalAction
 from app.models.model import Model
 from app.models.parallel_rnng.preprocess_batch import preprocess_batch
@@ -242,30 +239,11 @@ class ParallelRNNG(Model):
             stack_embedding, stack_lengths,
             token_buffer_embedding, token_buffer_lengths
         )
-        valid_actions, _ = self.action_set.valid_actions(
-            state.tokens_length,
-            state.token_counter,
-            state.last_action,
-            state.open_nt_count
-        )
-        valid_indices = []
-        if ACTION_REDUCE_INDEX in valid_actions:
-            valid_indices.extend([self.reduce_index])
-        if not self.generative and ACTION_SHIFT_INDEX in valid_actions:
-            valid_indices.extend([self.shift_index])
-        if self.generative and ACTION_GENERATE_INDEX in valid_actions:
-            gen_indices = []
-            if token is None and include_gen:
-                gen_indices = self.gen_indices
-            elif token is not None:
-                token_action_index = self.action_converter.token2integer(token)
-                gen_indices = [token_action_index]
-            valid_indices.extend(gen_indices)
-        if include_nt and ACTION_NON_TERMINAL_INDEX in valid_actions:
-            valid_indices.extend(self.nt_indices)
+        valid_actions = self.action_set.valid_actions(state.tokens_length, state.token_counter, state.last_action, state.open_nt_count)
+        valid_indices = self.get_valid_indices(valid_actions, token=token, include_gen=include_gen, include_nt=include_nt)
         logits = self.representation2logits(representation)
         valid_logits = logits[:, :, valid_indices]
-        log_probs = self.logits2log_prob(valid_logits).view(-1)
+        log_probs = self.logits2log_prob(posterior_scaling * valid_logits).view(-1)
         return log_probs, valid_indices
 
     def save(self, path):
@@ -434,3 +412,21 @@ class ParallelRNNG(Model):
     def get_indices_for_action(self, actions_indices, condition):
         indices = [index for index, action in actions_indices if condition(action)]
         return indices
+
+    def get_valid_indices(self, valid_actions, include_nt=True, include_gen=True, token=None):
+        valid_indices = []
+        if ACTION_REDUCE_TYPE in valid_actions:
+            valid_indices.append(self.reduce_index)
+        if not self.generative and ACTION_SHIFT_TYPE in valid_actions:
+            valid_indices.append(self.shift_index)
+        if self.generative and ACTION_GENERATE_TYPE in valid_actions:
+            gen_indices = []
+            if token is None and include_gen:
+                gen_indices = self.gen_indices
+            elif token is not None:
+                token_action_index = self.action_converter.token2integer(token)
+                gen_indices = [token_action_index]
+            valid_indices.extend(gen_indices)
+        if include_nt and ACTION_NON_TERMINAL_TYPE in valid_actions:
+            valid_indices.extend(self.nt_indices)
+        return valid_indices

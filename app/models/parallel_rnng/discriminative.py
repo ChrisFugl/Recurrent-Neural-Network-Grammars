@@ -1,4 +1,4 @@
-from app.data.action_set.discriminative import Discriminative
+from app.data.action_sets.discriminative import DiscriminativeActionSet
 from app.models.parallel_rnng.parallel_rnng import ParallelRNNG
 import torch
 from torch import nn
@@ -19,7 +19,7 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         """
         self.generative = False
         super().__init__(device, embeddings, structures, converters, representation, composer, sizes)
-        self.action_set = Discriminative()
+        self.action_set = DiscriminativeActionSet()
         self.pos_embedding = pos_embedding
         self.activation = nn.ReLU()
         token_size = sizes[1]

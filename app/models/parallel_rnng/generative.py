@@ -1,4 +1,4 @@
-from app.data.action_set.generative import Generative
+from app.data.action_sets.generative import GenerativeActionSet
 from app.models.parallel_rnng.parallel_rnng import ParallelRNNG
 import torch
 from torch import nn
@@ -17,7 +17,7 @@ class GenerativeParallelRNNG(ParallelRNNG):
         """
         self.generative = True
         super().__init__(device, embeddings, structures, converters, representation, composer, sizes)
-        self.action_set = Generative()
+        self.action_set = GenerativeActionSet()
         token_size = sizes[1]
         start_token_embedding = torch.FloatTensor(1, token_size).uniform_(-1, 1)
         self.start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)
