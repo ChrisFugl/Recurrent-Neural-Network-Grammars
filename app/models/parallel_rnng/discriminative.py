@@ -17,17 +17,15 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         :type pos_size: int
         :type pos_embedding: torch.nn.Embedding
         """
-        self.generative = False
-        super().__init__(device, embeddings, structures, converters, representation, composer, sizes)
-        self.action_set = DiscriminativeActionSet()
+        action_set = DiscriminativeActionSet()
+        generative = False
+        super().__init__(device, embeddings, structures, converters, representation, composer, sizes, action_set, generative)
         self.pos_embedding = pos_embedding
         self.activation = nn.ReLU()
         token_size = sizes[1]
         rnn_input_size = sizes[2]
         self.word2buffer = nn.Linear(in_features=token_size + pos_size, out_features=rnn_input_size, bias=True)
-        start_token_embedding = torch.FloatTensor(1, token_size).uniform_(-1, 1)
-        self.start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)
-        start_tag_embedding = torch.FloatTensor(1, pos_size).uniform_(-1, 1)
+        start_tag_embedding = torch.FloatTensor(pos_size).uniform_(-1, 1)
         self.start_tag_embedding = nn.Parameter(start_tag_embedding, requires_grad=True)
 
     def initialize_token_buffer(self, tokens_tensor, tags_tensor, token_lengths):
@@ -38,8 +36,8 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         :rtype: app.models.parallel_rnng.buffer_lstm.Buffer
         """
         batch_size = tokens_tensor.size(1)
-        start_token_embedding = self.batch_one_element_tensor(self.start_token_embedding, batch_size).unsqueeze(dim=0)
-        start_tag_embedding = self.batch_one_element_tensor(self.start_tag_embedding, batch_size).unsqueeze(dim=0)
+        start_token_embedding = self.start_token_embedding.view(1, 1, -1).expand(1, batch_size, -1)
+        start_tag_embedding = self.start_tag_embedding.view(1, 1, -1).expand(1, batch_size, -1)
         start_word_embedding = self.token_tag2word(start_token_embedding, start_tag_embedding)
         # add tokens in reverse order
         word_embeddings = self.token_tag2embedding(tokens_tensor, tags_tensor).flip(dims=[0])
@@ -83,8 +81,8 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         :rtype: app.models.parallel_rnng.buffer_lstm.BufferState
         """
         batch_size = tokens_tensor.size(1)
-        start_token_embedding = self.batch_one_element_tensor(self.start_token_embedding, batch_size).unsqueeze(dim=0)
-        start_tag_embedding = self.batch_one_element_tensor(self.start_tag_embedding, batch_size).unsqueeze(dim=0)
+        start_token_embedding = self.start_token_embedding.view(1, 1, -1).expand(1, batch_size, -1)
+        start_tag_embedding = self.start_tag_embedding.view(1, 1, -1).expand(1, batch_size, -1)
         start_word_embedding = self.token_tag2word(start_token_embedding, start_tag_embedding)
         # add tokens in reverse order
         word_embeddings = self.token_tag2embedding(tokens_tensor, tags_tensor).flip(dims=[0])

@@ -42,7 +42,7 @@ class GenerativeRNNG(RNNG):
         :type length: int
         :rtype: app.models.rnng.stack.StackNode
         """
-        token_top = self.token_buffer.push(self.start_token_embedding)
+        token_top = self.token_buffer.push(self.start_token_embedding.view(1, 1, -1))
         return token_top
 
     def __str__(self):

@@ -26,7 +26,7 @@ class DiscriminativeRNNG(RNNG):
         token_size = sizes[1]
         rnn_input_size = sizes[2]
         self.word2buffer = nn.Linear(in_features=token_size + pos_size, out_features=rnn_input_size, bias=True)
-        start_tag_embedding = torch.FloatTensor(1, 1, pos_size).uniform_(-1, 1)
+        start_tag_embedding = torch.FloatTensor(pos_size).uniform_(-1, 1)
         self.start_tag_embedding = nn.Parameter(start_tag_embedding, requires_grad=True)
 
     def shift(self, log_probs, outputs, action):
@@ -44,7 +44,7 @@ class DiscriminativeRNNG(RNNG):
         :type length: int
         :rtype: app.models.rnng.stack.StackNode
         """
-        start_word_embedding = self.token_tag2word(self.start_token_embedding, self.start_tag_embedding)
+        start_word_embedding = self.token_tag2word(self.start_token_embedding.view(1, 1, -1), self.start_tag_embedding.view(1, 1, -1))
         token_top = self.token_buffer.push(start_word_embedding, data=start_word_embedding)
         # discriminative model processes tokens in reverse order
         word_embeddings = self.get_word_embedding(tokens_tensor, tags_tensor)

@@ -1,13 +1,13 @@
 from app.data.actions.non_terminal import NonTerminalAction
 from app.constants import ACTION_REDUCE_TYPE, ACTION_NON_TERMINAL_TYPE, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE
-from app.models.model import Model
+from app.models.abstract_rnng import AbstractRNNG
 from app.models.rnng.action_args import ActionOutputs, ActionLogProbs
 from app.models.rnng.state import RNNGState
 from joblib import Parallel, delayed
 import torch
 from torch import nn
 
-class RNNG(Model):
+class RNNG(AbstractRNNG):
 
     def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, threads, action_set, generative):
         """
@@ -22,40 +22,14 @@ class RNNG(Model):
         :type action_set: app.data.action_sets.action_set.ActionSet
         :type generative: bool
         """
-        super().__init__()
-        self.action_set = action_set
-        self.generative = generative
-        action_size, token_size, rnn_input_size, rnn_size = sizes
-        self.device = device
+        action_converter = converters[0]
+        self.action_count = action_converter.count()
+        base_action_count = self.action_count
+        if generative:
+            base_action_count = self.action_count - action_converter.count_terminals() + 1
+        super().__init__(device, embeddings, structures, converters, representation, composer, sizes, action_set, generative, base_action_count)
         self.threads = threads
-        self.action_converter, self.token_converter, self.tag_converter, self.non_terminal_converter = converters
         self.nt_count = self.action_converter.count_non_terminals()
-        self.action_count = self.action_converter.count()
-        if self.generative:
-            self.base_action_count = self.action_count - self.action_converter.count_terminals() + 1
-        else:
-            self.base_action_count = self.action_count
-        self.action_embedding, self.token_embedding, self.nt_embedding, self.nt_compose_embedding = embeddings
-        self.action_history, self.token_buffer, self.stack = structures
-        self.representation = representation
-        self.representation2logits = nn.Linear(in_features=rnn_input_size, out_features=self.base_action_count, bias=True)
-        self.composer = composer
-        self.logits2log_prob = nn.LogSoftmax(dim=2)
-
-        start_action_embedding = torch.FloatTensor(1, 1, action_size).uniform_(-1, 1)
-        self.start_action_embedding = nn.Parameter(start_action_embedding, requires_grad=True)
-        start_token_embedding = torch.FloatTensor(1, 1, token_size).uniform_(-1, 1)
-        self.start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)
-        start_stack_embedding = torch.FloatTensor(1, 1, rnn_input_size).uniform_(-1, 1)
-        self.start_stack_embedding = nn.Parameter(start_stack_embedding, requires_grad=True)
-
-        self.type2action = {
-            ACTION_REDUCE_TYPE: self.reduce,
-            ACTION_NON_TERMINAL_TYPE: self.non_terminal,
-            ACTION_SHIFT_TYPE: self.shift,
-            ACTION_GENERATE_TYPE: self.generate,
-        }
-
         self.reduce_index = self.action_converter.string2integer('REDUCE')
         if self.generative:
             self.gen_index = self.action_converter.get_terminal_offset()
@@ -64,6 +38,12 @@ class RNNG(Model):
             self.shift_index = self.action_converter.string2integer('SHIFT')
             self.nt_start = self.action_converter.get_non_terminal_offset()
         self.nt_indices = list(range(self.nt_start, self.nt_start + self.nt_count))
+        self.type2action = {
+            ACTION_REDUCE_TYPE: self.reduce,
+            ACTION_NON_TERMINAL_TYPE: self.non_terminal,
+            ACTION_SHIFT_TYPE: self.shift,
+            ACTION_GENERATE_TYPE: self.generate,
+        }
 
     def batch_log_likelihood(self, batch):
         """
@@ -119,10 +99,10 @@ class RNNG(Model):
             logits = self.representation2logits(representation)
             valid_logits = logits[:, :, valid_indices]
             valid_log_probs = self.logits2log_prob(valid_logits)
-            # get log probability of action
             action_args_log_probs = ActionLogProbs(representation, valid_log_probs, action2index)
             action_args_outputs = ActionOutputs(stack_top, token_top, open_non_terminals_count, token_counter)
-            action_outputs = self.type2action[action.type()](action_args_log_probs, action_args_outputs, action)
+            action_fn = self.type2action[action.type()]
+            action_outputs = action_fn(action_args_log_probs, action_args_outputs, action)
             action_log_prob, stack_top, token_top, open_non_terminals_count, token_counter = action_outputs
             action_index = self.action_converter.action2integer(action)
             log_probs[sequence_index, action_index] = action_log_prob
@@ -223,24 +203,6 @@ class RNNG(Model):
         log_probs = torch.cat(log_probs_list, dim=0)
         return log_probs, index2action_index
 
-    def save(self, path):
-        """
-        Save model parameters.
-
-        :type path: str
-        """
-        state_dict = self.state_dict()
-        torch.save(state_dict, path)
-
-    def load(self, path):
-        """
-        Load model parameters from file.
-
-        :type path: str
-        """
-        state_dict = torch.load(path, map_location=self.device)
-        self.load_state_dict(state_dict)
-
     def reduce(self, log_probs, outputs, action):
         stack_top = outputs.stack_top
         children = []
@@ -280,8 +242,8 @@ class RNNG(Model):
         raise NotImplementedError('must be implemented by subclass')
 
     def initialize_structures(self, tokens, tags, length):
-        action_top = self.action_history.push(self.start_action_embedding)
-        stack_top = self.stack.push(self.start_stack_embedding)
+        action_top = self.action_history.push(self.start_action_embedding.view(1, 1, -1))
+        stack_top = self.stack.push(self.start_stack_embedding.view(1, 1, -1))
         token_top = self.initialize_token_buffer(tokens, tags, length)
         return action_top, stack_top, token_top
 
