@@ -1,8 +1,7 @@
 from app.composers.composer import Composer
-from app.utils import batched_index_select
 import torch
 from torch import nn
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+from torch.nn.utils.rnn import pack_padded_sequence
 
 class BiRNNComposer(Composer):
 
@@ -28,10 +27,15 @@ class BiRNNComposer(Composer):
         lengths_cat = lengths + 1
         packed = pack_padded_sequence(tensors, lengths_cat, enforce_sorted=False)
         _, batch_size, _ = tensors.shape
-        state = self.birnn.initial_state(batch_size)
-        packed_output, _ = self.birnn(packed, state)
-        unpacked_output, _ = pad_packed_sequence(packed_output)
-        affine_input = batched_index_select(unpacked_output, lengths_cat - 1)
+        initial_state = self.birnn.initial_state(batch_size)
+        _, (hidden_state, _) = self.birnn(packed, initial_state)
+        num_layers = hidden_state.size(0) // 2
+        hidden_size = hidden_state.size(2)
+        unpacked_state = hidden_state.view(num_layers, 2, batch_size, hidden_size)
+        last_layer_states = unpacked_state[-1]
+        forward_state = last_layer_states[0]
+        backward_state = last_layer_states[1]
+        affine_input = torch.cat((forward_state, backward_state), dim=1).unsqueeze(dim=0)
         output = self.activation(self.affine(affine_input))
         return output
 
