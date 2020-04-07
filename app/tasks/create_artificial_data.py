@@ -90,7 +90,7 @@ class CreateArtificialDataTask(Task):
         else:
             # vp --> v
             verb = self._create_verb(word_index)
-            return verb
+            return f'(VP {verb})'
 
     def _create_determiner(self, word_index):
         if word_index is None:
