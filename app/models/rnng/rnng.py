@@ -5,7 +5,6 @@ from app.models.rnng.action_args import ActionOutputs, ActionLogProbs
 from app.models.rnng.state import RNNGState
 from joblib import Parallel, delayed
 import torch
-from torch import nn
 
 class RNNG(AbstractRNNG):
 
@@ -31,6 +30,7 @@ class RNNG(AbstractRNNG):
         self.threads = threads
         self.nt_count = self.action_converter.count_non_terminals()
         self.nt_offset = self.action_converter.get_non_terminal_offset()
+        self.nt_action_indices = list(range(self.nt_offset, self.nt_offset + self.nt_count))
 
         # start at 1 since index 0 is reserved for padding
         self.reduce_index = 1
@@ -170,7 +170,6 @@ class RNNG(AbstractRNNG):
         valid_actions = self.action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
         valid_indices, action2index = self.get_valid_indices(valid_actions)
         index2action_index = []
-        singleton_offset = self.action_converter.get_singleton_offset()
         # base log probabilities
         logits = self.representation2logits(representation)
         valid_logits = logits[:, :, valid_indices]
@@ -201,7 +200,7 @@ class RNNG(AbstractRNNG):
             nt_valid_indices = [action2index[nt_index] for nt_index in self.nt_indices]
             non_terminal_log_probs = [lp.view(1) for lp in valid_log_probs[nt_valid_indices].view(-1)]
             log_probs_list.extend(non_terminal_log_probs)
-            index2action_index.extend(self.nt_indices)
+            index2action_index.extend(self.nt_action_indices)
         log_probs = torch.cat(log_probs_list, dim=0)
         return log_probs, index2action_index
 

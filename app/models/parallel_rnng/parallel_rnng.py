@@ -3,9 +3,7 @@ from app.data.actions.non_terminal import NonTerminalAction
 from app.models.abstract_rnng import AbstractRNNG
 from app.models.parallel_rnng.preprocess_batch import preprocess_batch
 from app.models.parallel_rnng.state import State
-from app.utils import padded_reverse
 import torch
-from torch import nn
 
 INVALID_ACTION_FILL = -9999999999.0
 

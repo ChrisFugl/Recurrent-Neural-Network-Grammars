@@ -1,5 +1,6 @@
 from app.data.action_sets.generative import GenerativeActionSet
 from app.models.rnng.rnng import RNNG
+import torch
 
 class GenerativeRNNG(RNNG):
 
@@ -22,7 +23,7 @@ class GenerativeRNNG(RNNG):
 
     def generate(self, log_probs, outputs, action):
         token_index = self.token_converter.token2integer(action.argument)
-        token_tensor = self.index2tensor(token_index)
+        token_tensor = torch.tensor([[token_index]], device=self.device, dtype=torch.long)
         token_embedding = self.token_embedding(token_tensor)
         stack_top = self.stack.push(token_embedding, data=action, top=outputs.stack_top)
         token_top = self.token_buffer.push(token_embedding, top=outputs.token_top)

@@ -1,8 +1,8 @@
 from app.composers.composer import Composer
-from app.utils import batched_index_select, padded_reverse
+from app.utils import padded_reverse
 import torch
 from torch import nn
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+from torch.nn.utils.rnn import pack_padded_sequence
 
 class BiRNNComposer(Composer):
 
