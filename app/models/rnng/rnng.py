@@ -30,13 +30,15 @@ class RNNG(AbstractRNNG):
         super().__init__(device, embeddings, structures, converters, representation, composer, sizes, action_set, generative, base_action_count)
         self.threads = threads
         self.nt_count = self.action_converter.count_non_terminals()
-        self.reduce_index = self.action_converter.string2integer('REDUCE')
+        self.nt_offset = self.action_converter.get_non_terminal_offset()
+
+        # start at 1 since index 0 is reserved for padding
+        self.reduce_index = 1
         if self.generative:
-            self.gen_index = self.action_converter.get_terminal_offset()
-            self.nt_start = self.gen_index + 1
+            self.gen_index = 2
         else:
-            self.shift_index = self.action_converter.string2integer('SHIFT')
-            self.nt_start = self.action_converter.get_non_terminal_offset()
+            self.shift_index = 2
+        self.nt_start = 3
         self.nt_indices = list(range(self.nt_start, self.nt_start + self.nt_count))
         self.type2action = {
             ACTION_REDUCE_TYPE: self.reduce,
@@ -145,7 +147,7 @@ class RNNG(AbstractRNNG):
         action_outputs = self.type2action[action.type()](None, action_args_outputs, action)
         _, stack_top, token_top, open_non_terminals_count, token_counter = action_outputs
         action_index = self.action_converter.action2integer(action)
-        action_tensor = self.index2tensor(action_index)
+        action_tensor = torch.tensor([[action_index]], device=self.device, dtype=torch.long)
         action_embedding = self.action_embedding(action_tensor)
         action_top = self.action_history.push(action_embedding, data=action, top=state.action_top)
         return state.next(stack_top, action_top, token_top, open_non_terminals_count, token_counter)
@@ -207,30 +209,29 @@ class RNNG(AbstractRNNG):
         stack_top = outputs.stack_top
         children = []
         while True:
-            action, state = stack_top.data, stack_top.output
-            if action.type() == ACTION_NON_TERMINAL_TYPE and action.open:
+            popped_action, state = stack_top.data, stack_top.output
+            if popped_action.type() == ACTION_NON_TERMINAL_TYPE and popped_action.open:
                 break
             stack_top = self.stack.pop(stack_top)
             children.append(state)
-        children.reverse()
         children_tensor = torch.cat(children, dim=0)
-        compose_action = NonTerminalAction(action.argument, open=False)
+        compose_action = NonTerminalAction(popped_action.argument, open=False)
         stack_top = self.stack.pop(stack_top)
-        nt_embeding = self.get_nt_embedding(self.nt_compose_embedding, compose_action)
+        nt_embedding = self.get_nt_embedding(self.nt_compose_embedding, compose_action)
         children_lengths = torch.tensor([len(children)], device=self.device, dtype=torch.long)
-        composed = self.composer(nt_embeding, children_tensor, children_lengths)
+        composed = self.composer(nt_embedding, children_tensor, children_lengths)
         stack_top = self.stack.push(composed, data=compose_action, top=stack_top)
         action_log_prob = self.get_base_log_prop(log_probs, self.reduce_index)
         open_non_terminals_count = outputs.open_non_terminals_count - 1
         return outputs.update(action_log_prob=action_log_prob, stack_top=stack_top, open_non_terminals_count=open_non_terminals_count)
 
     def non_terminal(self, log_probs, outputs, action):
-        nt_embeding = self.get_nt_embedding(self.nt_embedding, action)
-        stack_top = self.stack.push(nt_embeding, data=action, top=outputs.stack_top)
+        nt_embedding = self.get_nt_embedding(self.nt_embedding, action)
+        stack_top = self.stack.push(nt_embedding, data=action, top=outputs.stack_top)
         if log_probs is None:
             action_log_prob = None
         else:
-            nt_action_index = self.action_converter.action2integer(action) - self.action_converter.get_non_terminal_offset()
+            nt_action_index = self.action_converter.action2integer(action) - self.nt_offset
             action_log_prob = self.get_base_log_prop(log_probs, self.nt_start + nt_action_index)
         open_non_terminals_count = outputs.open_non_terminals_count + 1
         return outputs.update(action_log_prob=action_log_prob, stack_top=stack_top, open_non_terminals_count=open_non_terminals_count)
@@ -255,9 +256,6 @@ class RNNG(AbstractRNNG):
         :rtype: app.models.rnng.stack.StackNode
         """
         raise NotImplementedError('must be implemented by subclass')
-
-    def index2tensor(self, index):
-        return torch.tensor([[index]], device=self.device, dtype=torch.long)
 
     def get_nt_embedding(self, embeddings, action):
         nt_index = self.non_terminal_converter.non_terminal2integer(action.argument)

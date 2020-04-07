@@ -3,6 +3,7 @@ from app.data.actions.non_terminal import NonTerminalAction
 from app.models.abstract_rnng import AbstractRNNG
 from app.models.parallel_rnng.preprocess_batch import preprocess_batch
 from app.models.parallel_rnng.state import State
+from app.utils import padded_reverse
 import torch
 from torch import nn
 
@@ -184,13 +185,11 @@ class ParallelRNNG(AbstractRNNG):
             pop_op = self.pop_op(batch_size)
             children = []
             while True:
-                # action, state = stack_top.data, stack_top.output
                 child_action = stack_state.actions[0]
                 if child_action.type() == ACTION_NON_TERMINAL_TYPE and child_action.open:
                     break
                 stack_state, child = self.stack.inference_hold_or_pop(stack_state, pop_op)
                 children.append(child)
-            children.reverse()
             children_tensor = torch.stack(children, dim=0)
             compose_action = NonTerminalAction(child_action.argument, open=False)
             stack_state, _ = self.stack.inference_hold_or_pop(stack_state, pop_op)
@@ -350,7 +349,6 @@ class ParallelRNNG(AbstractRNNG):
                 reduce_children_op[batch_pop] = -1
                 output = self.stack.hold_or_pop(reduce_children_op)
                 children.append(output[reduce_action_indices])
-            children.reverse()
             children_tensor = torch.stack(children, dim=0)
             # pop non-terminal from stack
             non_terminal_pop_op = self.hold_op(batch_size)
