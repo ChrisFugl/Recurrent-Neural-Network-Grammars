@@ -12,6 +12,7 @@ class ImportanceSampler(Sampler):
         device, posterior_scaling, samples,
         model_dis, iterator_dis, action_converter_dis,
         model_gen, iterator_gen, action_converter_gen,
+        log=True
     ):
         """
         :type device: torch.device
@@ -23,8 +24,9 @@ class ImportanceSampler(Sampler):
         :type iterator_gen: app.data.iterators.iterator.Iterator
         :type action_converter_dis: app.data.converters.action.ActionConverter
         :type action_converter_gen: app.data.converters.action.ActionConverter
+        :type log: bool
         """
-        super().__init__()
+        super().__init__(log=log)
         self._device = device
         self._posterior_scaling = posterior_scaling
         self._samples = samples
@@ -52,26 +54,33 @@ class ImportanceSampler(Sampler):
         tags_tensor_gen = element_gen.tags.tensor[:element_gen.tags.length, :]
         weights = []
         best_tree = None
+        best_probs = None
         best_log_prob = None
         for _ in range(self._samples):
             tree_dis = self._sample_from_tokens_tensor(tokens_tensor_dis, tags_tensor_dis)
             tree_dis_tensor = self._actions2tensor(self._action_converter_dis, tree_dis)
             tree_gen = self._discriminative2generative(tree_dis, element_gen.tokens.tokens)
             tree_gen_tensor = self._actions2tensor(self._action_converter_gen, tree_gen)
-            log_prob_dis = self._get_tree_log_prob(self._model_dis, tokens_tensor_dis, tags_tensor_dis, tree_dis_tensor, tree_dis)
-            log_prob_gen = self._get_tree_log_prob(self._model_gen, tokens_tensor_gen, tags_tensor_gen, tree_gen_tensor, tree_gen)
+            _, log_prob_dis = self._get_tree_log_prob(self._model_dis, tokens_tensor_dis, tags_tensor_dis, tree_dis_tensor, tree_dis)
+            log_probs, log_prob_gen = self._get_tree_log_prob(self._model_gen, tokens_tensor_gen, tags_tensor_gen, tree_gen_tensor, tree_gen)
             weight = (log_prob_gen - log_prob_dis).exp().cpu().item()
             weights.append(weight)
             if best_log_prob is None or best_log_prob < log_prob_gen:
                 best_tree = tree_gen
+                best_probs = [prob.cpu().item() for prob in log_probs.sum(dim=1).exp()]
                 best_log_prob = log_prob_gen
         gold_tree = element_gen.actions.actions
         gold_tree_tensor = element_gen.actions.tensor[:element_gen.actions.length, :]
         gold_log_probs = self._model_gen.tree_log_probs(tokens_tensor_gen, tags_tensor_gen, gold_tree_tensor, gold_tree)
+        gold_probs = [prob.cpu().item() for prob in gold_log_probs.sum(dim=1).exp()]
         gold_log_prob = gold_log_probs.sum()
         best_log_prob = best_log_prob.cpu().item()
         tokens_prob = sum(weights) / len(weights)
-        return Sample(gold_tree, element_gen.tokens.tokens, element_gen.tags.tags, gold_log_prob, best_tree, best_log_prob, tokens_prob)
+        return Sample(
+            gold_tree, element_gen.tokens.tokens, element_gen.tags.tags, gold_log_prob, gold_probs,
+            best_tree, best_log_prob, best_probs,
+            tokens_prob
+        )
 
     def get_batch_size(self, batch):
         """
@@ -121,7 +130,7 @@ class ImportanceSampler(Sampler):
     def _get_tree_log_prob(self, model, tokens_tensor, tags_tensor, tree_tensor, tree):
         log_probs = model.tree_log_probs(tokens_tensor, tags_tensor, tree_tensor, tree)
         log_prob = log_probs.sum()
-        return log_prob
+        return logs_probs, log_prob
 
     def __str__(self):
         return f'Importance(posterior_scaling={self._posterior_scaling}, samples={self._samples})'

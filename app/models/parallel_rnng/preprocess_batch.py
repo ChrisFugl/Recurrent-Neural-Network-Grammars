@@ -1,8 +1,4 @@
-from app.constants import (
-    ACTION_SHIFT_INDEX, ACTION_GENERATE_INDEX, ACTION_NON_TERMINAL_INDEX, ACTION_REDUCE_INDEX,
-    ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_NON_TERMINAL_TYPE,
-    PAD_INDEX
-)
+from app.constants import ACTION_REDUCE_TYPE, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_NON_TERMINAL_TYPE, PAD_INDEX
 import torch
 
 def preprocess_batch(
@@ -112,14 +108,14 @@ def get_invalid_mask(device, valid_args, tokens_length, token_counter, last_acti
     batch_size = len(token_counter)
     mask = torch.ones((batch_size, action_count), device=device, dtype=torch.bool)
     for i in range(batch_size):
-        valid_actions, _ = action_set.valid_actions(tokens_length[i], token_counter[i], last_action[i], open_nt_count[i])
-        if ACTION_REDUCE_INDEX in valid_actions:
+        valid_actions = action_set.valid_actions(tokens_length[i], token_counter[i], last_action[i], open_nt_count[i])
+        if ACTION_REDUCE_TYPE in valid_actions:
             mask[i, reduce_index] = 0
-        if generative and ACTION_GENERATE_INDEX in valid_actions:
+        if generative and ACTION_GENERATE_TYPE in valid_actions:
             mask[i, gen_start:gen_start + gen_count] = 0
-        if not generative and ACTION_SHIFT_INDEX in valid_actions:
+        if not generative and ACTION_SHIFT_TYPE in valid_actions:
             mask[i, shift_index] = 0
-        if ACTION_NON_TERMINAL_INDEX in valid_actions:
+        if ACTION_NON_TERMINAL_TYPE in valid_actions:
             mask[i, nt_start:nt_start + nt_count] = 0
     return mask
 

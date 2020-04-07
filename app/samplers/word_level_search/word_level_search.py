@@ -9,7 +9,7 @@ import torch
 
 class WordLevelSearchSampler(Sampler):
 
-    def __init__(self, device, model, iterator, action_converter, beam_size, samples, fast_track):
+    def __init__(self, device, model, iterator, action_converter, beam_size, samples, fast_track, log=True):
         """
         :type device: torch.device
         :type model: app.models.model.Model
@@ -18,8 +18,9 @@ class WordLevelSearchSampler(Sampler):
         :type beam_size: int
         :type samples: int
         :type fast_track: int
+        :type log: bool
         """
-        super().__init__()
+        super().__init__(log=log)
         self._device = device
         self._model = model
         self._iterator = iterator
@@ -58,12 +59,20 @@ class WordLevelSearchSampler(Sampler):
             if best_log_prob is None or best_log_prob < log_prob:
                 best_tree = tree
                 best_log_prob = log_prob
+        predicted_tree_tensor = self._actions2tensor(self._action_converter, best_tree)
+        predicted_tree_log_probs = self._model.tree_log_probs(tokens_tensor, tags_tensor, predicted_tree_tensor, best_tree)
+        predicted_probs = [prob.cpu().item() for prob in predicted_tree_log_probs.sum(dim=1).exp()]
         gold_tree = element.actions.actions
         gold_tree_tensor = element.actions.tensor[:element.actions.length, :]
         gold_log_probs = self._model.tree_log_probs(tokens_tensor, tags_tensor, gold_tree_tensor, gold_tree)
+        gold_probs = [prob.cpu().item() for prob in gold_log_probs.sum(dim=1).exp()]
         gold_log_prob = gold_log_probs.sum()
         tokens_prob = sum(sample_probs)
-        return Sample(gold_tree, element.tokens.tokens, element.tags.tags, gold_log_prob, best_tree, best_log_prob, tokens_prob)
+        return Sample(
+            gold_tree, element.tokens.tokens, element.tags.tags, gold_log_prob, gold_probs,
+            best_tree, best_log_prob, predicted_probs,
+            tokens_prob
+        )
 
     def _search(self, tokens, tokens_tensor, tags_tensor):
         """

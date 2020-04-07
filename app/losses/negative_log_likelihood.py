@@ -26,7 +26,8 @@ class NegativeLogLikelihoodLoss(Loss):
         for index, length in enumerate(lengths):
             mask[:length, index] = 1
         mask_flattened = mask.view(-1)
-        mask_expanded = mask_flattened.unsqueeze(dim=1).expand(-1, action_count)
+        mask_expanded = mask_flattened.unsqueeze(dim=1)
+        mask_expanded = mask_expanded.expand(len(mask_flattened), action_count)
         groundtruths_flattened = groundtruths.view(-1)
         groundtruths_masked = groundtruths_flattened.masked_select(mask_flattened)
         predictions_flattened = predictions.view(-1, action_count)

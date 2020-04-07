@@ -4,26 +4,26 @@ from app.embeddings import get_embedding
 from app.representations import get_representation
 from app.rnn import get_rnn
 
-def get_model(device, generative, action_converter, token_converter, tag_converter, non_terminal_converter, config):
+def get_model(device, generative, action_converter, token_converter, tag_converter, nt_converter, config):
     """
     :type device: torch.device
     :type generative: bool
     :type action_converter: app.data.converters.action.ActionConverter
     :type token_converter: app.data.converters.token.TokenConverter
     :type tag_converter: app.data.converters.tag.TagConverter
-    :type non_terminal_converter: app.data.converters.non_terminal.NonTerminalConverter
+    :type nt_converter: app.data.converters.non_terminal.NonTerminalConverter
     :type config: object
     :rtype: app.models.model.Model
     """
     if config.type == 'rnng' or config.type == 'parallel_rnng':
         token_size = config.size.rnn if generative else config.size.token
-        non_terminal_count = non_terminal_converter.count()
+        nt_count = nt_converter.count()
         action_embedding = get_embedding(action_converter.count(), config.size.action, config.embedding)
-        non_terminal_embedding = get_embedding(non_terminal_count, config.size.rnn, config.embedding)
-        non_terminal_compose_embedding = get_embedding(non_terminal_count, config.size.rnn, config.embedding)
+        nt_embedding = get_embedding(nt_count, config.size.rnn, config.embedding)
+        nt_compose_embedding = get_embedding(nt_count, config.rnn.hidden_size, config.embedding)
         token_embedding = get_embedding(token_converter.count(), token_size, config.embedding)
-        embeddings = (action_embedding, token_embedding, non_terminal_embedding, non_terminal_compose_embedding)
-        converters = (action_converter, token_converter, tag_converter, non_terminal_converter)
+        embeddings = (action_embedding, token_embedding, nt_embedding, nt_compose_embedding)
+        converters = (action_converter, token_converter, tag_converter, nt_converter)
         representation = get_representation(config.size.rnn, config.rnn.hidden_size, config.representation)
         composer = get_composer(device, config)
         sizes = (config.size.action, token_size, config.size.rnn, config.rnn.hidden_size)

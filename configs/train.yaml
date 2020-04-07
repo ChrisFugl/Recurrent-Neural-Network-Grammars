@@ -16,4 +16,4 @@ gpu: null
 seed: null
 hydra:
   run:
-    dir: ./outputs/train/${name}/${now:%Y-%m-%d_%H-%M-%S}
+    dir: ./outputs/train/${name}

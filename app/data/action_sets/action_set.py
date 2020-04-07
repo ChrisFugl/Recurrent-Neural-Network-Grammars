@@ -6,6 +6,6 @@ class ActionSet:
         :type token_counter: int
         :type last_action: app.actions.action.Action
         :type open_non_terminals_count: int
-        :rtype: list of int, dict
+        :rtype: list of int
         """
         raise NotImplementedError('must be implemented by subclass')

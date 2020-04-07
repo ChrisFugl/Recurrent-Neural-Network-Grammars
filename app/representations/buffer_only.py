@@ -1,5 +1,5 @@
 from app.representations.representation import Representation
-import torch
+from app.utils import batched_index_select
 from torch import nn
 
 class BufferOnlyRepresentation(Representation):
@@ -29,18 +29,11 @@ class BufferOnlyRepresentation(Representation):
         :type token_buffer_lengths: torch.Tensor
         :rtype: torch.Tensor
         """
-        output = self.pick_last(token_buffer, token_buffer_lengths)
+        output = batched_index_select(token_buffer, token_buffer_lengths - 1)
         output = self.dropout(output)
         output = self.feedforward(output)
         output = self.activation(output)
         return output
-
-    def pick_last(self, embeddings, lengths):
-        _, batch_size, hidden_size = embeddings.shape
-        last_index = lengths - 1
-        top = last_index.view(1, batch_size, 1).expand(1, batch_size, hidden_size)
-        last = torch.gather(embeddings, 0, top).view(1, batch_size, hidden_size)
-        return last
 
     def __str__(self):
         return f'BufferOnly(size={self.representation_size})'

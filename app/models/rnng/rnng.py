@@ -1,21 +1,15 @@
 from app.data.actions.non_terminal import NonTerminalAction
-from app.constants import (
-    ACTION_REDUCE_INDEX, ACTION_NON_TERMINAL_INDEX, ACTION_SHIFT_INDEX, ACTION_GENERATE_INDEX,
-    ACTION_REDUCE_TYPE, ACTION_NON_TERMINAL_TYPE, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE,
-)
-from app.models.model import Model
+from app.constants import ACTION_REDUCE_TYPE, ACTION_NON_TERMINAL_TYPE, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE
+from app.models.abstract_rnng import AbstractRNNG
 from app.models.rnng.action_args import ActionOutputs, ActionLogProbs
 from app.models.rnng.state import RNNGState
 from joblib import Parallel, delayed
 import torch
 from torch import nn
 
-# REDUCE/SHIFT or REDUCE/GEN
-BASE_ACTION_COUT = 2
+class RNNG(AbstractRNNG):
 
-class RNNG(Model):
-
-    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, threads):
+    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, threads, action_set, generative):
         """
         :type device: torch.device
         :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
@@ -25,31 +19,27 @@ class RNNG(Model):
         :type composer: app.composers.composer.Composer
         :type sizes: int, int, int, int
         :type threads: int
+        :type action_set: app.data.action_sets.action_set.ActionSet
+        :type generative: bool
         """
-        super().__init__()
-        action_size, token_size, rnn_input_size, rnn_size = sizes
-        self.device = device
+        action_converter = converters[0]
+        self.action_count = action_converter.count()
+        base_action_count = self.action_count
+        if generative:
+            base_action_count = self.action_count - action_converter.count_terminals() + 1
+        super().__init__(device, embeddings, structures, converters, representation, composer, sizes, action_set, generative, base_action_count)
         self.threads = threads
-        self.action_converter, self.token_converter, self.tag_converter, self.non_terminal_converter = converters
-        self.non_terminal_count = self.action_converter.count_non_terminals()
-        self.action_count = self.action_converter.count()
-        self.nt_action_start = BASE_ACTION_COUT
-        self.nt_action_end = self.nt_action_start + self.non_terminal_count
+        self.nt_count = self.action_converter.count_non_terminals()
+        self.nt_offset = self.action_converter.get_non_terminal_offset()
 
-        self.action_embedding, self.token_embedding, self.nt_embedding, self.nt_compose_embedding = embeddings
-        self.action_history, self.token_buffer, self.stack = structures
-        self.representation = representation
-        self.representation2logits = nn.Linear(in_features=rnn_size, out_features=BASE_ACTION_COUT + self.non_terminal_count, bias=True)
-        self.composer = composer
-        self.logits2log_prob = nn.LogSoftmax(dim=2)
-
-        start_action_embedding = torch.FloatTensor(1, 1, action_size).uniform_(-1, 1)
-        self.start_action_embedding = nn.Parameter(start_action_embedding, requires_grad=True)
-        start_token_embedding = torch.FloatTensor(1, 1, token_size).uniform_(-1, 1)
-        self.start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)
-        start_stack_embedding = torch.FloatTensor(1, 1, rnn_input_size).uniform_(-1, 1)
-        self.start_stack_embedding = nn.Parameter(start_stack_embedding, requires_grad=True)
-
+        # start at 1 since index 0 is reserved for padding
+        self.reduce_index = 1
+        if self.generative:
+            self.gen_index = 2
+        else:
+            self.shift_index = 2
+        self.nt_start = 3
+        self.nt_indices = list(range(self.nt_start, self.nt_start + self.nt_count))
         self.type2action = {
             ACTION_REDUCE_TYPE: self.reduce,
             ACTION_NON_TERMINAL_TYPE: self.non_terminal,
@@ -64,7 +54,6 @@ class RNNG(Model):
         :type batch: app.data.batch.Batch
         :rtype: torch.Tensor
         """
-        # stack operations
         jobs_args = []
         for batch_index in range(batch.size):
             element = batch.get(batch_index)
@@ -106,16 +95,16 @@ class RNNG(Model):
             action = actions[sequence_index]
             last_action = stack_top.data
             representation = self.get_representation(action_top, stack_top, token_top)
-            valid_actions, action2index = self.action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
-            assert action.index() in action2index, f'{action} is not a valid action. (action2index = {action2index})'
-            self.expand_valid_actions_to_nt(valid_actions, action2index)
-            base_logits = self.representation2logits(representation)
-            valid_base_logits = base_logits[:, :, valid_actions]
-            valid_base_log_probs = self.logits2log_prob(valid_base_logits)
-            # get log probability of action
-            action_args_log_probs = ActionLogProbs(representation, valid_base_log_probs, action2index)
+            valid_actions = self.action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
+            assert action.type() in valid_actions, f'{action} is not a valid action. (valid_actions = {valid_actions})'
+            valid_indices, action2index = self.get_valid_indices(valid_actions)
+            logits = self.representation2logits(representation)
+            valid_logits = logits[:, :, valid_indices]
+            valid_log_probs = self.logits2log_prob(valid_logits)
+            action_args_log_probs = ActionLogProbs(representation, valid_log_probs, action2index)
             action_args_outputs = ActionOutputs(stack_top, token_top, open_non_terminals_count, token_counter)
-            action_outputs = self.type2action[action.type()](action_args_log_probs, action_args_outputs, action)
+            action_fn = self.type2action[action.type()]
+            action_outputs = action_fn(action_args_log_probs, action_args_outputs, action)
             action_log_prob, stack_top, token_top, open_non_terminals_count, token_counter = action_outputs
             action_index = self.action_converter.action2integer(action)
             log_probs[sequence_index, action_index] = action_log_prob
@@ -152,13 +141,13 @@ class RNNG(Model):
         token_counter = state.token_counter
         last_action = state.stack_top.data
         open_non_terminals_count = state.open_non_terminals_count
-        valid_actions, action2index = self.action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
-        assert action.index() in action2index, f'{action} is not a valid action. (action2index = {action2index})'
+        valid_actions = self.action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
+        assert action.type() in valid_actions, f'{action} is not a valid action. (valid_actions = {valid_actions})'
         action_args_outputs = ActionOutputs(state.stack_top, state.token_top, open_non_terminals_count, token_counter)
         action_outputs = self.type2action[action.type()](None, action_args_outputs, action)
         _, stack_top, token_top, open_non_terminals_count, token_counter = action_outputs
         action_index = self.action_converter.action2integer(action)
-        action_tensor = self.index2tensor(action_index)
+        action_tensor = torch.tensor([[action_index]], device=self.device, dtype=torch.long)
         action_embedding = self.action_embedding(action_tensor)
         action_top = self.action_history.push(action_embedding, data=action, top=state.action_top)
         return state.next(stack_top, action_top, token_top, open_non_terminals_count, token_counter)
@@ -178,99 +167,72 @@ class RNNG(Model):
         last_action = state.stack_top.data
         open_non_terminals_count = state.open_non_terminals_count
         representation = self.get_representation(state.action_top, state.stack_top, state.token_top)
-        valid_base_actions, action2index = self.action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
+        valid_actions = self.action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
+        valid_indices, action2index = self.get_valid_indices(valid_actions)
         index2action_index = []
         singleton_offset = self.action_converter.get_singleton_offset()
-        nt_offset = self.action_converter.get_non_terminal_offset()
-        index2action_index.extend([singleton_offset + index for index in valid_base_actions])
-        self.expand_valid_actions_to_nt(valid_base_actions, action2index)
         # base log probabilities
-        base_logits = self.representation2logits(representation)
-        valid_base_logits = base_logits[:, :, valid_base_actions]
-        valid_base_log_probs = self.logits2log_prob(posterior_scaling * valid_base_logits).view((-1,))
-        # log_probs should not contain class actions: generate, non-terminal
+        logits = self.representation2logits(representation)
+        valid_logits = logits[:, :, valid_indices]
+        valid_log_probs = self.logits2log_prob(posterior_scaling * valid_logits).view((-1,))
         log_probs_list = []
-        if ACTION_REDUCE_INDEX in valid_base_actions:
-            log_probs_list.append(valid_base_log_probs[action2index[ACTION_REDUCE_INDEX]].view(1))
-        if not self.generative and ACTION_SHIFT_INDEX in valid_base_actions:
-            log_probs_list.append(valid_base_log_probs[action2index[ACTION_SHIFT_INDEX]].view(1))
+        if ACTION_REDUCE_TYPE in valid_actions:
+            log_probs_list.append(valid_log_probs[action2index[self.reduce_index]].view(1))
+            index2action_index.append(self.reduce_index)
+        if not self.generative and ACTION_SHIFT_TYPE in valid_actions:
+            log_probs_list.append(valid_log_probs[action2index[self.shift_index]].view(1))
+            index2action_index.append(self.shift_index)
         # token log probabilities for generative model
-        if self.generative and ACTION_GENERATE_INDEX in valid_base_actions:
-            index2action_index.remove(singleton_offset + ACTION_GENERATE_INDEX)
-            base_generate_log_prob = valid_base_log_probs[action2index[ACTION_GENERATE_INDEX]]
+        if self.generative and ACTION_GENERATE_TYPE in valid_actions:
+            gen_log_prob = valid_log_probs[action2index[self.gen_index]]
             if token is None and include_gen:
-                conditional_token_log_probs, token_index2action_index = self.token_distribution.log_probs(
-                    representation,
-                    posterior_scaling=posterior_scaling
-                )
-                token_log_probs = base_generate_log_prob + conditional_token_log_probs
+                tokens_log_probs, token_indices = self.token_distribution.log_probs(representation, posterior_scaling=posterior_scaling)
+                token_log_probs = gen_log_prob + tokens_log_probs
                 log_probs_list.append(token_log_probs)
-                index2action_index.extend(token_index2action_index)
+                index2action_index.extend(token_indices)
             if token is not None:
-                token_distribution_log_prob = self.token_distribution.log_prob(representation, token, posterior_scaling=posterior_scaling).view(1)
-                token_log_prob = base_generate_log_prob + token_distribution_log_prob
+                conditional_token_log_probs = self.token_distribution.log_prob(representation, token, posterior_scaling=posterior_scaling)
+                token_log_prob = gen_log_prob + conditional_token_log_probs.view(1)
                 log_probs_list.append(token_log_prob)
                 token_action_index = self.action_converter.token2integer(token)
                 index2action_index.append(token_action_index)
         # non-terminal log probabilities
-        if ACTION_NON_TERMINAL_INDEX in valid_base_actions:
-            index2action_index.remove(singleton_offset + ACTION_NON_TERMINAL_INDEX)
-            if include_nt:
-                nt_valid_indices = [action2index[nt_index] for nt_index in range(self.nt_action_start, self.nt_action_end)]
-                non_terminal_log_probs = [lp.view(1) for lp in valid_base_log_probs[nt_valid_indices].view(-1)]
-                log_probs_list.extend(non_terminal_log_probs)
-                nt_action_indices = [nt_offset + nt_index for nt_index in range(self.non_terminal_count)]
-                index2action_index.extend(nt_action_indices)
+        if include_nt and ACTION_NON_TERMINAL_TYPE in valid_actions:
+            nt_valid_indices = [action2index[nt_index] for nt_index in self.nt_indices]
+            non_terminal_log_probs = [lp.view(1) for lp in valid_log_probs[nt_valid_indices].view(-1)]
+            log_probs_list.extend(non_terminal_log_probs)
+            index2action_index.extend(self.nt_indices)
         log_probs = torch.cat(log_probs_list, dim=0)
         return log_probs, index2action_index
-
-    def save(self, path):
-        """
-        Save model parameters.
-
-        :type path: str
-        """
-        state_dict = self.state_dict()
-        torch.save(state_dict, path)
-
-    def load(self, path):
-        """
-        Load model parameters from file.
-
-        :type path: str
-        """
-        state_dict = torch.load(path, map_location=self.device)
-        self.load_state_dict(state_dict)
 
     def reduce(self, log_probs, outputs, action):
         stack_top = outputs.stack_top
         children = []
         while True:
-            action, state = stack_top.data, stack_top.output
-            if action.type() == ACTION_NON_TERMINAL_TYPE and action.open:
+            popped_action, state = stack_top.data, stack_top.output
+            if popped_action.type() == ACTION_NON_TERMINAL_TYPE and popped_action.open:
                 break
             stack_top = self.stack.pop(stack_top)
             children.append(state)
-        children.reverse()
         children_tensor = torch.cat(children, dim=0)
-        compose_action = NonTerminalAction(action.argument, open=False)
+        compose_action = NonTerminalAction(popped_action.argument, open=False)
         stack_top = self.stack.pop(stack_top)
-        nt_embeding = self.get_nt_embedding(self.nt_compose_embedding, compose_action)
+        nt_embedding = self.get_nt_embedding(self.nt_compose_embedding, compose_action)
         children_lengths = torch.tensor([len(children)], device=self.device, dtype=torch.long)
-        composed = self.composer(nt_embeding, children_tensor, children_lengths)
+        composed = self.composer(nt_embedding, children_tensor, children_lengths)
         stack_top = self.stack.push(composed, data=compose_action, top=stack_top)
-        action_log_prob = self.get_base_log_prop(log_probs, ACTION_REDUCE_INDEX)
+        action_log_prob = self.get_base_log_prop(log_probs, self.reduce_index)
         open_non_terminals_count = outputs.open_non_terminals_count - 1
         return outputs.update(action_log_prob=action_log_prob, stack_top=stack_top, open_non_terminals_count=open_non_terminals_count)
 
     def non_terminal(self, log_probs, outputs, action):
-        nt_embeding = self.get_nt_embedding(self.nt_embedding, action)
-        stack_top = self.stack.push(nt_embeding, data=action, top=outputs.stack_top)
+        nt_embedding = self.get_nt_embedding(self.nt_embedding, action)
+        stack_top = self.stack.push(nt_embedding, data=action, top=outputs.stack_top)
         if log_probs is None:
             action_log_prob = None
         else:
-            nt_action_index = self.action_converter.action2integer(action) - self.action_converter.get_non_terminal_offset()
-            action_log_prob = self.get_base_log_prop(log_probs, self.nt_action_start + nt_action_index)
+            nt_action_index = self.action_converter.action2integer(action) - self.nt_offset
+            action_log_prob = self.get_base_log_prop(log_probs, self.nt_start + nt_action_index)
         open_non_terminals_count = outputs.open_non_terminals_count + 1
         return outputs.update(action_log_prob=action_log_prob, stack_top=stack_top, open_non_terminals_count=open_non_terminals_count)
 
@@ -281,8 +243,8 @@ class RNNG(Model):
         raise NotImplementedError('must be implemented by subclass')
 
     def initialize_structures(self, tokens, tags, length):
-        action_top = self.action_history.push(self.start_action_embedding)
-        stack_top = self.stack.push(self.start_stack_embedding)
+        action_top = self.action_history.push(self.start_action_embedding.view(1, 1, -1))
+        stack_top = self.stack.push(self.start_stack_embedding.view(1, 1, -1))
         token_top = self.initialize_token_buffer(tokens, tags, length)
         return action_top, stack_top, token_top
 
@@ -294,9 +256,6 @@ class RNNG(Model):
         :rtype: app.models.rnng.stack.StackNode
         """
         raise NotImplementedError('must be implemented by subclass')
-
-    def index2tensor(self, index):
-        return torch.tensor([[index]], device=self.device, dtype=torch.long)
 
     def get_nt_embedding(self, embeddings, action):
         nt_index = self.non_terminal_converter.non_terminal2integer(action.argument)
@@ -325,12 +284,25 @@ class RNNG(Model):
             token_buffer_embedding, token_top.length_as_tensor(self.device),
         )
 
-    def expand_valid_actions_to_nt(self, valid_actions, action2index):
-        if ACTION_NON_TERMINAL_INDEX in valid_actions:
-            valid_actions.remove(ACTION_NON_TERMINAL_INDEX)
-            action_nt_index_counter = len(valid_actions)
-            valid_actions.extend(range(self.nt_action_start, self.nt_action_end))
-            del action2index[ACTION_NON_TERMINAL_INDEX]
-            for nt_index in range(self.nt_action_start, self.nt_action_end):
-                action2index[nt_index] = action_nt_index_counter
-                action_nt_index_counter += 1
+    def get_valid_indices(self, valid_actions):
+        valid_indices = []
+        action2index = {}
+        counter = 0
+        if ACTION_REDUCE_TYPE in valid_actions:
+            valid_indices.append(self.reduce_index)
+            action2index[self.reduce_index] = counter
+            counter += 1
+        if ACTION_SHIFT_TYPE in valid_actions:
+            valid_indices.append(self.shift_index)
+            action2index[self.shift_index] = counter
+            counter += 1
+        if ACTION_GENERATE_TYPE in valid_actions:
+            valid_indices.append(self.gen_index)
+            action2index[self.gen_index] = counter
+            counter += 1
+        if ACTION_NON_TERMINAL_TYPE in valid_actions:
+            valid_indices.extend(self.nt_indices)
+            for nt_index in self.nt_indices:
+                action2index[nt_index] = counter
+                counter += 1
+        return valid_indices, action2index

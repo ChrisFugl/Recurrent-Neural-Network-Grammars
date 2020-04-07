@@ -1,5 +1,4 @@
-from app.constants import ACTION_SHIFT_INDEX
-from app.data.action_set.discriminative import Discriminative as DiscriminativeActionSet
+from app.data.action_sets.discriminative import DiscriminativeActionSet
 from app.models.rnng.rnng import RNNG
 import torch
 from torch import nn
@@ -19,22 +18,22 @@ class DiscriminativeRNNG(RNNG):
         :type pos_size: int
         :type pos_embedding: torch.nn.Embedding
         """
-        super().__init__(device, embeddings, structures, converters, representation, composer, sizes, threads)
-        self.action_set = DiscriminativeActionSet()
-        self.generative = False
+        action_set = DiscriminativeActionSet()
+        generative = False
+        super().__init__(device, embeddings, structures, converters, representation, composer, sizes, threads, action_set, generative)
         self.pos_embedding = pos_embedding
         self.activation = nn.ReLU()
         token_size = sizes[1]
         rnn_input_size = sizes[2]
         self.word2buffer = nn.Linear(in_features=token_size + pos_size, out_features=rnn_input_size, bias=True)
-        start_tag_embedding = torch.FloatTensor(1, 1, pos_size).uniform_(-1, 1)
+        start_tag_embedding = torch.FloatTensor(pos_size).uniform_(-1, 1)
         self.start_tag_embedding = nn.Parameter(start_tag_embedding, requires_grad=True)
 
     def shift(self, log_probs, outputs, action):
         word_embedding = outputs.token_top.data
         token_top = self.token_buffer.pop(outputs.token_top)
         stack_top = self.stack.push(word_embedding, data=action, top=outputs.stack_top)
-        action_log_prob = self.get_base_log_prop(log_probs, ACTION_SHIFT_INDEX)
+        action_log_prob = self.get_base_log_prop(log_probs, self.shift_index)
         token_counter = outputs.token_counter + 1
         return outputs.update(action_log_prob=action_log_prob, stack_top=stack_top, token_top=token_top, token_counter=token_counter)
 
@@ -45,7 +44,7 @@ class DiscriminativeRNNG(RNNG):
         :type length: int
         :rtype: app.models.rnng.stack.StackNode
         """
-        start_word_embedding = self.token_tag2word(self.start_token_embedding, self.start_tag_embedding)
+        start_word_embedding = self.token_tag2word(self.start_token_embedding.view(1, 1, -1), self.start_tag_embedding.view(1, 1, -1))
         token_top = self.token_buffer.push(start_word_embedding, data=start_word_embedding)
         # discriminative model processes tokens in reverse order
         word_embeddings = self.get_word_embedding(tokens_tensor, tags_tensor)

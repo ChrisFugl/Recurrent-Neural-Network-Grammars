@@ -1,5 +1,4 @@
-from app.constants import ACTION_GENERATE_INDEX
-from app.data.action_set.generative import Generative as GenerativeActionSet
+from app.data.action_sets.generative import GenerativeActionSet
 from app.models.rnng.rnng import RNNG
 
 class GenerativeRNNG(RNNG):
@@ -16,9 +15,9 @@ class GenerativeRNNG(RNNG):
         :type threads: int
         :type token_distribution: app.distributions.distribution.Distribution
         """
-        super().__init__(device, embeddings, structures, converters, representation, composer, sizes, threads)
-        self.action_set = GenerativeActionSet()
-        self.generative = True
+        action_set = GenerativeActionSet()
+        generative = True
+        super().__init__(device, embeddings, structures, converters, representation, composer, sizes, threads, action_set, generative)
         self.token_distribution = token_distribution
 
     def generate(self, log_probs, outputs, action):
@@ -30,7 +29,7 @@ class GenerativeRNNG(RNNG):
         if log_probs is None:
             action_log_prob = None
         else:
-            generate_log_prob = self.get_base_log_prop(log_probs, ACTION_GENERATE_INDEX)
+            generate_log_prob = self.get_base_log_prop(log_probs, self.gen_index)
             token_log_prob = self.token_distribution.log_prob(log_probs.representation, action.argument)
             action_log_prob = generate_log_prob + token_log_prob
         token_counter = outputs.token_counter + 1
@@ -43,7 +42,7 @@ class GenerativeRNNG(RNNG):
         :type length: int
         :rtype: app.models.rnng.stack.StackNode
         """
-        token_top = self.token_buffer.push(self.start_token_embedding)
+        token_top = self.token_buffer.push(self.start_token_embedding.view(1, 1, -1))
         return token_top
 
     def __str__(self):

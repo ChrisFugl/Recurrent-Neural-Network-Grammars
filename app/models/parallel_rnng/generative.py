@@ -1,4 +1,4 @@
-from app.data.action_set.generative import Generative
+from app.data.action_sets.generative import GenerativeActionSet
 from app.models.parallel_rnng.parallel_rnng import ParallelRNNG
 import torch
 from torch import nn
@@ -15,11 +15,11 @@ class GenerativeParallelRNNG(ParallelRNNG):
         :type composer: app.composers.composer.Composer
         :type sizes: int, int, int, int
         """
-        action_set = Generative()
+        action_set = GenerativeActionSet()
         generative = True
         super().__init__(device, embeddings, structures, converters, representation, composer, sizes, action_set, generative)
         token_size = sizes[1]
-        start_token_embedding = torch.FloatTensor(1, token_size).uniform_(-1, 1)
+        start_token_embedding = torch.FloatTensor(token_size).uniform_(-1, 1)
         self.start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)
 
     def initialize_token_buffer(self, tokens_tensor, tags_tensor, token_lengths):
@@ -29,17 +29,16 @@ class GenerativeParallelRNNG(ParallelRNNG):
         :type token_lengths: torch.Tensor
         """
         batch_size = tokens_tensor.size(1)
-        start_token_embedding = self.batch_one_element_tensor(self.start_token_embedding, batch_size).unsqueeze(dim=0)
+        start_token_embedding = self.start_token_embedding.view(1, 1, -1).expand(1, batch_size, -1)
         push_op = self.push_op(batch_size)
         token_embeddings = self.token_embedding(tokens_tensor)
         token_embeddings = torch.cat((start_token_embedding, token_embeddings), dim=0)
         self.token_buffer.initialize(token_embeddings)
         self.token_buffer.hold_or_push(push_op)
 
-    def get_word_embedding(self, preprocessed, token_action_indices):
+    def get_word_embedding(self, preprocessed):
         """
         :type preprocessed: app.models.parallel_rnng.preprocessed_batch.Preprocessed
-        :type token_action_indices: torch.Tensor
         :rtype: torch.Tensor, torch.Tensor
         """
         token_indices = preprocessed.token_index
@@ -64,7 +63,7 @@ class GenerativeParallelRNNG(ParallelRNNG):
         """
         batch_size = tokens_tensor.size(1)
         push_op = self.push_op(batch_size)
-        start_token_embedding = self.batch_one_element_tensor(self.start_token_embedding, batch_size).unsqueeze(dim=0)
+        start_token_embedding = self.start_token_embedding.view(1, 1, -1).expand(1, batch_size, -1)
         token_embeddings = self.token_embedding(tokens_tensor)
         token_embeddings = torch.cat((start_token_embedding, token_embeddings), dim=0)
         state = self.token_buffer.inference_initialize(token_embeddings)

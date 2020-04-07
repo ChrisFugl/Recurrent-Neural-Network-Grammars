@@ -1,4 +1,4 @@
-from app.constants import ACTION_NON_TERMINAL_INDEX, ACTION_NON_TERMINAL_TYPE
+from app.constants import ACTION_NON_TERMINAL_TYPE
 from app.data.actions.action import Action
 
 class NonTerminalAction(Action):
@@ -11,12 +11,6 @@ class NonTerminalAction(Action):
         super().__init__()
         self.argument = argument
         self.open = open
-
-    def index(self):
-        """
-        :rtype: int
-        """
-        return ACTION_NON_TERMINAL_INDEX
 
     def type(self):
         """

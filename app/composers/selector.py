@@ -11,10 +11,11 @@ def get_composer(device, config):
     if type == 'birnn':
         from app.composers.birnn import BiRNNComposer
         rnn_config = deepcopy(config.rnn)
-        rnn_config['bidirectional'] = True
+        rnn_config['bidirectional'] = False
         rnn_config['dropout'] = config.composer.dropout
         rnn_config['num_layers'] = config.composer.num_layers
-        birnn = get_rnn(device, config.rnn.hidden_size, rnn_config)
-        return BiRNNComposer(birnn, config.size.rnn)
+        rnn_forward = get_rnn(device, config.rnn.hidden_size, rnn_config)
+        rnn_backward = get_rnn(device, config.rnn.hidden_size, rnn_config)
+        return BiRNNComposer(rnn_forward, rnn_backward, config.rnn.hidden_size, config.size.rnn)
     else:
         raise Exception(f'Unknown composer: {type}')
