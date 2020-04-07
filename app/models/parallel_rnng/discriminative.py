@@ -1,5 +1,6 @@
 from app.data.action_sets.discriminative import DiscriminativeActionSet
 from app.models.parallel_rnng.parallel_rnng import ParallelRNNG
+from app.utils import padded_reverse
 import torch
 from torch import nn
 
@@ -40,7 +41,9 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         start_tag_embedding = self.start_tag_embedding.view(1, 1, -1).expand(1, batch_size, -1)
         start_word_embedding = self.token_tag2word(start_token_embedding, start_tag_embedding)
         # add tokens in reverse order
-        word_embeddings = self.token_tag2embedding(tokens_tensor, tags_tensor).flip(dims=[0])
+        tokens_tensor_reversed = padded_reverse(tokens_tensor, token_lengths - 1)
+        tags_tensor_reversed = padded_reverse(tags_tensor, token_lengths - 1)
+        word_embeddings = self.token_tag2embedding(tokens_tensor_reversed, tags_tensor_reversed)
         word_embeddings = torch.cat((start_word_embedding, word_embeddings), dim=0)
         self.token_buffer.initialize(word_embeddings, token_lengths)
 
@@ -85,10 +88,13 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         start_tag_embedding = self.start_tag_embedding.view(1, 1, -1).expand(1, batch_size, -1)
         start_word_embedding = self.token_tag2word(start_token_embedding, start_tag_embedding)
         # add tokens in reverse order
-        word_embeddings = self.token_tag2embedding(tokens_tensor, tags_tensor).flip(dims=[0])
+        max_length = tokens_tensor.size(0)
+        token_lengths = torch.tensor([max_length] * batch_size, device=self.device, dtype=torch.long)
+        tokens_tensor_reversed = padded_reverse(tokens_tensor, token_lengths)
+        tags_tensor_reversed = padded_reverse(tags_tensor, token_lengths)
+        word_embeddings = self.token_tag2embedding(tokens_tensor_reversed, tags_tensor_reversed)
         word_embeddings = torch.cat((start_word_embedding, word_embeddings), dim=0)
-        token_lengths = word_embeddings.size(0)
-        token_lengths = torch.tensor([token_lengths], device=self.device, dtype=torch.long)
+        token_lengths = token_lengths + 1
         state = self.token_buffer.inference_initialize(word_embeddings, token_lengths)
         return state
 
