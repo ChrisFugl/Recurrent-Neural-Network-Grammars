@@ -1,0 +1,4 @@
+evaluator:
+  type: time
+  interval_s: 3600
+  pretraining: false

@@ -9,5 +9,8 @@ def get_evaluator(config):
     elif config.type == 'batch':
         from app.evaluators.batch import BatchEvaluator
         return BatchEvaluator(config.batch, config.pretraining)
+    elif config.type == 'time':
+        from app.evaluators.time import TimeEvaluator
+        return TimeEvaluator(config.interval_s, config.pretraining)
     else:
         raise Exception(f'Unknown evaluator: {config.type}')
