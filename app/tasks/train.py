@@ -6,6 +6,7 @@ from app.visualizations.trees import visualize_tree
 import hydra
 import logging
 import numpy as np
+from operator import itemgetter
 import os
 import random
 import time
@@ -90,7 +91,7 @@ class TrainTask(Task):
         self.logger.info(f'Model:\n{self.model}')
         batch_count = self.start_batch_count
         epoch = self.start_epoch
-        losses = []
+        log_values = []
         best_val_score = None
         self.model.train()
         if self.evaluator.should_evaluate(epoch, batch_count, pretraining=True):
@@ -99,7 +100,7 @@ class TrainTask(Task):
         learning_rate = self.optimizer.param_groups[0]['lr']
         self.log_epoch(epoch, batch_count, learning_rate)
         while True:
-            epoch, batch_count, done, losses, best_val_score = self.train_epoch(epoch, batch_count, losses, best_val_score)
+            epoch, batch_count, done, log_values, best_val_score = self.train_epoch(epoch, batch_count, log_values, best_val_score)
             if done:
                 break
             if self.evaluator.should_evaluate(epoch, batch_count, end_of_epoch=True):
@@ -117,20 +118,20 @@ class TrainTask(Task):
         self.writer_train.close()
         self.writer_val.close()
 
-    def train_epoch(self, epoch, batch_count, losses, best_val_score):
+    def train_epoch(self, epoch, batch_count, log_values, best_val_score):
         time_epoch_start = time.time()
         start_of_epoch = True
         for batch in self.iterator_train:
             batch_count += 1
-            loss_train = self.train_batch(batch, batch_count)
-            losses.append(loss_train)
+            batch_outputs = self.train_batch(batch, batch_count)
+            log_values.append(batch_outputs)
             if batch_count % self.log_train_every == 0:
-                self.log_loss(self.writer_train, batch_count, losses)
-                losses = []
+                self.log_train(log_values, batch_count)
+                log_values = []
             if self.evaluator.should_evaluate(epoch, batch_count):
                 best_val_score = self.evaluate(epoch, batch_count, best_val_score)
             if self.stopping_criterion.is_done():
-                return epoch, batch_count, True, losses, best_val_score
+                return epoch, batch_count, True, log_values, best_val_score
             if self.checkpoint.should_save_checkpoint(epoch, batch_count, start_of_epoch):
                 self.save_checkpoint(epoch, batch_count)
             start_of_epoch = False
@@ -144,7 +145,7 @@ class TrainTask(Task):
         self.log_epoch(epoch, batch_count, learning_rate)
         self.writer_train.add_scalar('time/epoch_s', time_epoch, batch_count)
         self.writer_train.add_scalar('time/total_s', time_total, batch_count)
-        return epoch, batch_count, False, losses, best_val_score
+        return epoch, batch_count, False, log_values, best_val_score
 
     def train_batch(self, batch, batch_count):
         self.start_measure_memory()
@@ -161,13 +162,12 @@ class TrainTask(Task):
         actions_per_second = self.count_actions(batch) / time_batch
         tokens_per_second = self.count_tokens(batch) / time_batch
         sentences_per_second = batch.size / time_batch
-        self.writer_train.add_scalar('time/actions_per_s', actions_per_second, batch_count)
-        self.writer_train.add_scalar('time/tokens_per_s', tokens_per_second, batch_count)
-        self.writer_train.add_scalar('time/sentences_per_s', sentences_per_second, batch_count)
-        self.writer_train.add_scalar('time/batch_s', time_batch, batch_count)
-        self.writer_train.add_scalar('time/optimize_s', time_optimize, batch_count)
-        self.log_memory(self.writer_train, batch_count)
-        return loss_scalar
+        memory = self.stop_measure_memory()
+        if memory is None:
+            allocated_gb, reserved_gb = None, None
+        else:
+            allocated_gb, reserved_gb = memory
+        return loss_scalar, allocated_gb, reserved_gb, actions_per_second, tokens_per_second, sentences_per_second, time_batch, time_optimize
 
     def optimize(self, loss):
         self.optimizer.zero_grad()
@@ -195,9 +195,14 @@ class TrainTask(Task):
         actions_per_second = total_actions / time_val
         tokens_per_second = total_tokens / time_val
         sentences_per_second = total_sentences / time_val
-        loss_val = self.log_loss(self.writer_val, batch_count, losses)
+        loss_val = sum(losses) / len(losses)
+        self.writer_val.add_scalar('training/loss', loss_val, batch_count)
         self.stopping_criterion.add_val_loss(loss_val)
-        self.log_memory(self.writer_val, batch_count)
+        memory = self.stop_measure_memory()
+        if memory is not None:
+            allocated_gb, reserved_gb = memory
+            self.writer_val.add_scalar('memory/allocated_gb', allocated_gb, batch_count)
+            self.writer_val.add_scalar('memory/reserved_gb', reserved_gb, batch_count)
         self.writer_val.add_figure('gradients/all', gradients_all, batch_count)
         self.writer_val.add_figure('gradients/compose_only', gradients_compose_only, batch_count)
         self.writer_val.add_figure('gradients/exclude_representation', gradients_exclude_rep, batch_count)
@@ -334,12 +339,12 @@ class TrainTask(Task):
         if self.uses_gpu:
             torch.cuda.reset_peak_memory_stats(self.device)
 
-    def log_memory(self, writer, batch_count):
+    def stop_measure_memory(self):
         if self.uses_gpu:
             allocated_gb = self.byte2gb(torch.cuda.max_memory_allocated(self.device))
             reserved_gb = self.byte2gb(torch.cuda.max_memory_reserved(self.device))
-            writer.add_scalar('memory/allocated_gb', allocated_gb, batch_count)
-            writer.add_scalar('memory/reserved_gb', reserved_gb, batch_count)
+            return allocated_gb, reserved_gb
+        return None
 
     def count_actions(self, batch):
         return sum(map(len, batch.actions.actions))
@@ -347,10 +352,32 @@ class TrainTask(Task):
     def count_tokens(self, batch):
         return sum(map(len, batch.tokens.tokens))
 
-    def log_loss(self, writer, batch_count, losses):
-        loss = sum(losses) / len(losses)
-        writer.add_scalar('training/loss', loss, batch_count)
-        return loss
-
     def get_time_elapsed(self):
         return self.total_time_offset + (time.time() - self.start_timestamp)
+
+    def log_train(self, values, batch_count):
+        # return loss_scalar, memory, actions_per_second, tokens_per_second, sentences_per_second, time_batch, time_optimize
+        loss = self.mean_from_tuple_index(values, 0)
+        allocated_gb = self.mean_from_tuple_index(values, 1)
+        reserved_gb = self.mean_from_tuple_index(values, 2)
+        actions_per_second = self.mean_from_tuple_index(values, 3)
+        tokens_per_second = self.mean_from_tuple_index(values, 4)
+        sentences_per_second = self.mean_from_tuple_index(values, 5)
+        time_batch = self.mean_from_tuple_index(values, 6)
+        time_optimize = self.mean_from_tuple_index(values, 7)
+        self.writer_train.add_scalar('training/loss', loss, batch_count)
+        self.writer_train.add_scalar('time/actions_per_s', actions_per_second, batch_count)
+        self.writer_train.add_scalar('time/tokens_per_s', tokens_per_second, batch_count)
+        self.writer_train.add_scalar('time/sentences_per_s', sentences_per_second, batch_count)
+        self.writer_train.add_scalar('time/batch_s', time_batch, batch_count)
+        self.writer_train.add_scalar('time/optimize_s', time_optimize, batch_count)
+        if allocated_gb is not None:
+            self.writer_train.add_scalar('memory/allocated_gb', allocated_gb, batch_count)
+        if reserved_gb is not None:
+            self.writer_train.add_scalar('memory/reserved_gb', reserved_gb, batch_count)
+
+    def mean_from_tuple_index(self, values, index):
+        if values[0][index] is None:
+            return None
+        elements = list(map(itemgetter(index), values))
+        return sum(elements) / len(elements)
