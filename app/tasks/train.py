@@ -161,19 +161,11 @@ class TrainTask(Task):
         actions_per_second = self.count_actions(batch) / time_batch
         tokens_per_second = self.count_tokens(batch) / time_batch
         sentences_per_second = batch.size / time_batch
-        action_count_mean = sum(batch.actions.lengths) / len(batch.actions.lengths)
-        token_count_mean = sum(batch.tokens.lengths) / len(batch.tokens.lengths)
         self.writer_train.add_scalar('time/actions_per_s', actions_per_second, batch_count)
         self.writer_train.add_scalar('time/tokens_per_s', tokens_per_second, batch_count)
         self.writer_train.add_scalar('time/sentences_per_s', sentences_per_second, batch_count)
         self.writer_train.add_scalar('time/batch_s', time_batch, batch_count)
         self.writer_train.add_scalar('time/optimize_s', time_optimize, batch_count)
-        self.writer_train.add_scalar('batch_stats/action_count_min', batch.actions.lengths.min(), batch_count)
-        self.writer_train.add_scalar('batch_stats/action_count_mean', action_count_mean, batch_count)
-        self.writer_train.add_scalar('batch_stats/action_count_max', batch.max_actions_length, batch_count)
-        self.writer_train.add_scalar('batch_stats/token_count_min', batch.tokens.lengths.min(), batch_count)
-        self.writer_train.add_scalar('batch_stats/token_count_mean', token_count_mean, batch_count)
-        self.writer_train.add_scalar('batch_stats/token_count_max', batch.max_tokens_length, batch_count)
         self.log_memory(self.writer_train, batch_count)
         return loss_scalar
 
