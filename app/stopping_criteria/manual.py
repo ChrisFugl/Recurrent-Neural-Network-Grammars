@@ -44,4 +44,8 @@ class ManualStoppingCriterion(StoppingCriterion):
 
     def _exit_requested(self, signum, frame):
         self._logger.info('Exit requested')
+        self._logger.info('Waiting for final evaluation before exiting')
+        self._logger.info('ctrl-c again to force exit without final evaluation')
         self._done = True
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
