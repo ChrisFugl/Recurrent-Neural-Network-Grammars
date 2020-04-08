@@ -23,8 +23,7 @@ class TimeEvaluator(Evaluator):
         if pretraining:
             return self.pretraining
         now = time.time()
-        if self.interval_s < now - self.timestamp:
-            self.timestamp = now
-            return True
-        else:
-            return False
+        return self.interval_s < now - self.timestamp
+
+    def evaluation_finished(self):
+        self.timestamp = time.time()

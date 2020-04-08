@@ -11,3 +11,6 @@ class Evaluator:
         :type end_of_epoch: bool
         """
         raise NotImplementedError('must be implemented by subclass')
+
+    def evaluation_finished(self):
+        raise NotImplementedError('must be implemented by subclass')

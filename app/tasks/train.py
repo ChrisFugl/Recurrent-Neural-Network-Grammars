@@ -230,7 +230,7 @@ class TrainTask(Task):
             self.logger.info(f'epoch={epoch}, batch={batch_count}, loss_val={loss_val:0.8f}')
             score = loss_val
             is_new_best_score = best_score is None or score < best_score
-
+        self.evaluator.evaluation_finished()
         # save model with best performing score
         if is_new_best_score:
             if best_score is not None:

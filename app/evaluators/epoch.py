@@ -21,3 +21,6 @@ class EpochEvaluator(Evaluator):
         if pretraining:
             return self.pretraining
         return end_of_epoch and epoch % self.epoch == 0
+
+    def evaluation_finished(self):
+        pass

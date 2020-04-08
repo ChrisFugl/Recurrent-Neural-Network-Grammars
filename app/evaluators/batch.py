@@ -21,3 +21,6 @@ class BatchEvaluator(Evaluator):
         if pretraining:
             return self.pretraining
         return not end_of_epoch and batch % self.batch == 0
+
+    def evaluation_finished(self):
+        pass
