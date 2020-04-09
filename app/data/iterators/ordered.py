@@ -1,3 +1,4 @@
+from app.data.batch_utils import map_sequences
 from app.data.iterators.iterable import Iterable
 from app.data.iterators.iterator import Iterator
 from math import ceil
@@ -25,10 +26,10 @@ class OrderedIterator(Iterator):
         self._batch_size = batch_size
         self._shuffle = shuffle
 
-        actions = self._convert(action_converter.string2action, actions_strings)
-        actions_integers = self._convert(action_converter.string2integer, actions_strings)
-        tokens_integers = self._convert(token_converter.token2integer, tokens_strings)
-        tags_integers = self._convert(tag_converter.tag2integer, tags)
+        actions = map_sequences(action_converter.string2action, actions_strings)
+        actions_integers = map_sequences(action_converter.string2integer, actions_strings)
+        tokens_integers = map_sequences(token_converter.token2integer, tokens_strings)
+        tags_integers = map_sequences(tag_converter.tag2integer, tags)
 
         ordered = self._order_by_actions_count(actions_integers, actions, tokens_integers, tokens_strings, tags_integers, tags)
         self._actions_counts = ordered[0]

@@ -29,13 +29,6 @@ class WordLevelSearchSampler(Sampler):
         self._samples = samples
         self._fast_track = fast_track
 
-    def get_batch_size(self, batch):
-        """
-        :type batch: app.data.batch.Batch
-        :rtype: int
-        """
-        return batch.size
-
     def get_iterator(self):
         return self._iterator, self._iterator.size()
 
@@ -59,7 +52,7 @@ class WordLevelSearchSampler(Sampler):
             if best_log_prob is None or best_log_prob < log_prob:
                 best_tree = tree
                 best_log_prob = log_prob
-        predicted_tree_tensor = self._actions2tensor(self._action_converter, best_tree)
+        predicted_tree_tensor = self.actions2tensor(self._action_converter, best_tree)
         predicted_tree_log_probs = self._model.tree_log_probs(tokens_tensor, tags_tensor, predicted_tree_tensor, best_tree)
         predicted_probs = [prob.cpu().item() for prob in predicted_tree_log_probs.sum(dim=1).exp()]
         gold_tree = element.actions.actions

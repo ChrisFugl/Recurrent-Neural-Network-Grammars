@@ -1,3 +1,4 @@
+from app.data.batch_utils import map_sequences
 from app.data.iterators.iterable import Iterable
 from app.data.iterators.iterator import Iterator
 
@@ -16,12 +17,12 @@ class UnorderedIterator(Iterator):
         :type tags: list of list of str
         """
         super().__init__()
-        self._actions = self._convert(action_converter.string2action, actions_strings)
-        self._actions_integers = self._convert(action_converter.string2integer, actions_strings)
+        self._actions = map_sequences(action_converter.string2action, actions_strings)
+        self._actions_integers = map_sequences(action_converter.string2integer, actions_strings)
         self._tokens_strings = tokens
-        self._tokens_integers = self._convert(token_converter.token2integer, tokens)
+        self._tokens_integers = map_sequences(token_converter.token2integer, tokens)
         self._tags_strings = tags
-        self._tags_integers = self._convert(tag_converter.tag2integer, tags)
+        self._tags_integers = map_sequences(tag_converter.tag2integer, tags)
         self._device = device
         self._batch_size = batch_size
         self._shuffle = shuffle

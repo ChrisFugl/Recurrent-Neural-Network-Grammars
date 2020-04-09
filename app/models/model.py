@@ -5,9 +5,6 @@ class Model(nn.Module):
     Base model that all models should inherit from.
     """
 
-    def __init__(self):
-        super().__init__()
-
     def batch_log_likelihood(self, batch):
         """
         Compute log likelihood of each sentence/tree in a batch.
@@ -29,22 +26,23 @@ class Model(nn.Module):
         """
         raise NotImplementedError('must be implemented by subclass')
 
-    def initial_state(self, tokens, tags):
+    def initial_state(self, tokens, tags, lengths):
         """
         Get initial state of model in a parse.
 
         :type tokens: torch.Tensor
         :type tags: torch.Tensor
+        :type lengths: torch.Tensor
         :returns: initial state
         """
         raise NotImplementedError('must be implemented by subclass')
 
-    def next_state(self, state, action):
+    def next_state(self, state, actions):
         """
         Advance state of the model to the next state.
 
         :param state: model specific state
-        :type action: app.data.actions.action.Action
+        :type actions: list of app.data.actions.action.Action
         """
         raise NotImplementedError('must be implemented by subclass')
 
@@ -56,7 +54,7 @@ class Model(nn.Module):
         :type token: str
         :type include_gen: bool
         :type include_nt: bool
-        :rtype: torch.Tensor, list of int
+        :rtype: torch.Tensor
         """
         raise NotImplementedError('must be implemented by subclass')
 

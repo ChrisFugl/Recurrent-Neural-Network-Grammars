@@ -38,7 +38,7 @@ class AncestralSampler(Sampler):
         best_tree_log_prob = None
         for _ in range(self._samples):
             predicted_tree = self._sample_from_tokens_tensor(tokens_tensor, tags_tensor)
-            predicted_tree_tensor = self._actions2tensor(self._action_converter, predicted_tree)
+            predicted_tree_tensor = self.actions2tensor(self._action_converter, predicted_tree)
             predicted_tree_log_probs = self._model.tree_log_probs(tokens_tensor, tags_tensor, predicted_tree_tensor, predicted_tree)
             predicted_tree_log_prob = predicted_tree_log_probs.sum().cpu().item()
             if best_tree_log_prob is None or best_tree_log_prob < predicted_tree_log_prob:
@@ -56,12 +56,6 @@ class AncestralSampler(Sampler):
             None
         )
 
-    def get_batch_size(self, batch):
-        """
-        :rtype: int
-        """
-        return batch.size
-
     def get_iterator(self):
         return self._iterator, self._iterator.size()
 
@@ -69,7 +63,7 @@ class AncestralSampler(Sampler):
         tokens_length = len(tokens)
         actions = []
         state = self._model.initial_state(tokens, tags)
-        while not self._is_finished_sampling(actions, tokens_length):
+        while not self.is_finished_sampling(actions, tokens_length):
             log_probs, index2action_index = self._model.next_action_log_probs(state, posterior_scaling=self._posterior_scaling)
             distribution = Categorical(logits=log_probs)
             sample = index2action_index[distribution.sample()]

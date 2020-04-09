@@ -58,9 +58,9 @@ class ImportanceSampler(Sampler):
         best_log_prob = None
         for _ in range(self._samples):
             tree_dis = self._sample_from_tokens_tensor(tokens_tensor_dis, tags_tensor_dis)
-            tree_dis_tensor = self._actions2tensor(self._action_converter_dis, tree_dis)
+            tree_dis_tensor = self.actions2tensor(self._action_converter_dis, tree_dis)
             tree_gen = self._discriminative2generative(tree_dis, element_gen.tokens.tokens)
-            tree_gen_tensor = self._actions2tensor(self._action_converter_gen, tree_gen)
+            tree_gen_tensor = self.actions2tensor(self._action_converter_gen, tree_gen)
             _, log_prob_dis = self._get_tree_log_prob(self._model_dis, tokens_tensor_dis, tags_tensor_dis, tree_dis_tensor, tree_dis)
             log_probs, log_prob_gen = self._get_tree_log_prob(self._model_gen, tokens_tensor_gen, tags_tensor_gen, tree_gen_tensor, tree_gen)
             weight = (log_prob_gen - log_prob_dis).exp().cpu().item()
@@ -82,13 +82,6 @@ class ImportanceSampler(Sampler):
             tokens_prob
         )
 
-    def get_batch_size(self, batch):
-        """
-        :rtype: int
-        """
-        batch_dis, _ = batch
-        return batch_dis.size
-
     def get_iterator(self):
         count = self._iterator_dis.size()
         iterator = zip(self._iterator_dis, self._iterator_gen)
@@ -99,7 +92,7 @@ class ImportanceSampler(Sampler):
         tokens_length = len(tokens)
         actions = []
         state = self._model_dis.initial_state(tokens, tags)
-        while not self._is_finished_sampling(actions, tokens_length):
+        while not self.is_finished_sampling(actions, tokens_length):
             log_probs, index2action_index = self._model_dis.next_action_log_probs(state, posterior_scaling=self._posterior_scaling)
             distribution = Categorical(logits=log_probs)
             sample = index2action_index[distribution.sample()]

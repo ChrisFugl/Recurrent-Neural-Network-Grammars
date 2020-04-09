@@ -23,6 +23,6 @@ class Distribution(nn.Module):
         :type representation: torch.Tensor
         :type posterior_scaling: float
         :rtype: torch.Tensor, list of int
-        :returns: log probabilities, log probability index to action index
+        :returns: log probabilities
         """
         raise NotImplementedError('must be implemented by subclass')
