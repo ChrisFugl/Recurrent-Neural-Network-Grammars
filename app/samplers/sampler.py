@@ -1,13 +1,19 @@
 from app.constants import ACTION_NON_TERMINAL_TYPE, ACTION_REDUCE_TYPE, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE
+from app.data.batch import Batch
+from app.data.batch_utils import sequences2lengths, sequences2tensor
 import logging
 import torch
 
 class Sampler:
 
-    def __init__(self, log=True):
+    def __init__(self, device, action_converter, log=True):
         """
+        :type device: torch.device
+        :type action_converter: app.data.converters.action.ActionConverter
         :type log: bool
         """
+        self._device = device
+        self._action_converter = action_converter
         self._log = log
         self._logger = logging.getLogger('sampler')
 
@@ -54,11 +60,78 @@ class Sampler:
             )
         )
 
+    def sample(self, batch):
+        """
+        :type batch: app.data.batch.Batch
+        :rtype: app.data.batch.Batch
+        """
+        state = self.get_initial_state(batch)
+        lengths_list = [length.cpu().item() for length in batch.tokens.lengths]
+        predicted_actions = [[] for _ in range(batch.size)]
+        finished_sampling = [False] * batch.size
+        while not all(finished_sampling):
+            log_probs = self.get_next_log_probs(state)
+            samples = self.sample_actions(log_probs)
+            actions = []
+            for i, finished in enumerate(finished_sampling):
+                if finished:
+                    # None represents padding
+                    actions.append(None)
+                else:
+                    sample = samples[i]
+                    action = self._action_converter.integer2action(sample)
+                    predicted_actions[i].append(action)
+                    finished_sampling[i] = self.is_finished_sampling(predicted_actions[i], lengths_list[i])
+                    actions.append(action)
+            state = self.get_next_state(state, actions)
+        # create batch from samples
+        predicted_tensor = sequences2tensor(self._device, self._action_converter.action2integer, predicted_actions)
+        predicted_lengths = sequences2lengths(self._device, predicted_actions)
+        return Batch(
+            predicted_tensor, predicted_lengths, predicted_actions,
+            batch.tokens.tensor, batch.tokens.lengths, batch.tokens.tokens,
+            batch.tags.tensor, batch.tags.lengths, batch.tags.tags,
+        )
+
+    def get_initial_state(self, batch):
+        raise NotImplementedError('must be implemented by subclass')
+
+    def get_next_log_probs(self, state):
+        raise NotImplementedError('must be implemented by subclass')
+
+    def get_next_state(self, state, actions):
+        raise NotImplementedError('must be implemented by subclass')
+
+    def sample_actions(self, log_probs):
+        """
+        :type log_probs: torch.Tensor
+        :rtype: torch.Tensor
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
+    def batch_stats(self, batch_log_probs, lengths):
+        """
+        :param batch_log_probs: tensor, S x B x A
+        :type batch_log_probs: torch.Tensor
+        :type lengths: torch.Tensor
+        :rtype: list of float, list of list of float
+        """
+        summed = batch_log_probs.sum(dim=2)
+        log_probs = [self.get_log_prob(summed[:length, i]) for i, length in enumerate(lengths)]
+        probs = [self.get_probs(summed[:length, i]) for i, length in enumerate(lengths)]
+        return log_probs, probs
+
+    def get_log_prob(self, log_probs):
+        return log_probs.sum().cpu().item()
+
+    def get_probs(self, log_probs):
+        return [prob.cpu().item() for prob in log_probs.exp()]
+
     def count_actions(self, actions, type):
         filtered = filter(lambda action: action.type() == type, actions)
         return len(list(filtered))
 
-    def actions2tensor(self, action_converter, actions):
-        action_integers = [action_converter.action2integer(action) for action in actions]
+    def actions2tensor(self, actions):
+        action_integers = [self._action_converter.action2integer(action) for action in actions]
         actions_tensor = torch.tensor(action_integers, device=self._device, dtype=torch.long)
         return actions_tensor.reshape((len(actions), 1))

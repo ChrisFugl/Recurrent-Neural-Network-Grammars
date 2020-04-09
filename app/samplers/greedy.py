@@ -1,5 +1,3 @@
-from app.data.batch import Batch
-from app.data.batch_utils import sequences2lengths, sequences2tensor
 from app.samplers.sample import Sample
 from app.samplers.sampler import Sampler
 
@@ -8,18 +6,15 @@ class GreedySampler(Sampler):
     def __init__(self, device, model, iterator, action_converter, posterior_scaling, log=True):
         """
         :type device: torch.device
-        :type action_converter: app.data.converters.action.ActionConverter
         :type model: torch.model
         :type iterator: app.data.iterators.iterator.Iterator
         :type action_converter: app.data.converters.action.ActionConverter
         :type posterior_scaling: float
         :type log: bool
         """
-        super().__init__(log=log)
-        self.device = device
+        super().__init__(device, action_converter, log=log)
         self.model = model
         self.iterator = iterator
-        self.action_converter = action_converter
         self.posterior_scaling = posterior_scaling
 
     def evaluate_batch(self, batch):
@@ -28,77 +23,43 @@ class GreedySampler(Sampler):
         :rtype: list of app.samplers.sample.Sample
         """
         self.model.eval()
-        predicted_actions = self.sample(batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths)
-        predicted_tensor = sequences2tensor(self.device, self.action_converter.action2integer, predicted_actions)
-        predicted_lengths = sequences2lengths(self.device, predicted_actions)
-        predicted_batch = Batch(
-            predicted_tensor, predicted_lengths, predicted_actions,
-            batch.tokens.tensor, batch.tokens.lengths, batch.tokens.tokens,
-            batch.tags.tensor, batch.tags.lengths, batch.tags.tags,
-        )
+        predicted_batch = self.sample(batch)
         predicted_log_probs = self.model.batch_log_likelihood(predicted_batch)
-        predicted_log_prob, predicted_probs = self.stats(predicted_log_probs, predicted_lengths)
+        predicted_log_prob, predicted_probs = self.batch_stats(predicted_log_probs, predicted_batch.actions.lengths)
         gold_log_probs = self.model.batch_log_likelihood(batch)
-        gold_log_prob, gold_probs = self.stats(gold_log_probs, batch.actions.lengths)
+        gold_log_prob, gold_probs = self.batch_stats(gold_log_probs, batch.actions.lengths)
         samples = []
         for i in range(batch.size):
-            sample = Sample(
-                batch.actions.actions[i], batch.tokens.tokens[i], batch.tags.tags[i], gold_log_prob[i], gold_probs[i],
-                predicted_actions[i], predicted_log_prob[i], predicted_probs[i],
-                None
-            )
+            g_actions = batch.actions.actions[i]
+            g_tokens = batch.tokens.tokens[i]
+            g_tags = batch.tags.tags[i]
+            g_log_prob = gold_log_prob[i]
+            g_probs = gold_probs[i]
+            p_actions = predicted_batch.actions.actions[i]
+            p_log_prob = predicted_log_prob[i]
+            p_probs = predicted_probs[i]
+            sample = Sample(g_actions, g_tokens, g_tags, g_log_prob, g_probs, p_actions, p_log_prob, p_probs, None)
             samples.append(sample)
         return samples
 
     def get_iterator(self):
         return self.iterator, self.iterator.size()
 
-    def sample(self, tokens, tags, lengths):
-        """
-        :type tokens: torch.Tensor
-        :type tags: torch.Tensor
-        :type lengths: torch.Tensor
-        :rtype: list of list of app.samplers.sample.Sample
-        """
-        state = self.model.initial_state(tokens, tags, lengths)
-        lengths_list = [length.cpu().item() for length in lengths]
-        batch_size = lengths.size(0)
-        batch_samples = [[] for _ in range(batch_size)]
-        finished_sampling = [False] * batch_size
-        while not all(finished_sampling):
-            log_probs = self.model.next_action_log_probs(state, posterior_scaling=self.posterior_scaling)
-            samples = log_probs.argmax(dim=1)
-            actions = []
-            for i, finished in enumerate(finished_sampling):
-                if finished:
-                    # None represents padding
-                    actions.append(None)
-                else:
-                    sample = samples[i]
-                    action = self.action_converter.integer2action(sample)
-                    batch_samples[i].append(action)
-                    finished_sampling[i] = self.is_finished_sampling(batch_samples[i], lengths_list[i])
-                    actions.append(action)
-            state = self.model.next_state(state, actions)
-        return batch_samples
+    def get_initial_state(self, batch):
+        return self.model.initial_state(batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths)
 
-    def stats(self, batch_log_probs, lengths):
-        """
-        :param batch_log_probs: tensor, S x B x A
-        :type batch_log_probs: torch.Tensor
-        :type lengths: torch.Tensor
-        :rtype: list of float, list of list of float
-        """
-        summed = batch_log_probs.sum(dim=2)
-        log_probs = [self.get_log_prob(summed[:length, i]) for i, length in enumerate(lengths)]
-        probs = [self.get_probs(summed[:length, i]) for i, length in enumerate(lengths)]
-        return log_probs, probs
+    def get_next_log_probs(self, state):
+        return self.model.next_action_log_probs(state, posterior_scaling=self.posterior_scaling)
 
-    def get_log_prob(self, log_probs):
-        return log_probs.sum().cpu().item()
+    def get_next_state(self, state, actions):
+        return self.model.next_state(state, actions)
 
-    def get_probs(self, log_probs):
-        return [prob.cpu().item() for prob in log_probs.exp()]
+    def sample_actions(self, log_probs):
+        """
+        :type log_probs: torch.Tensor
+        :rtype: torch.Tensor
+        """
+        return log_probs.argmax(dim=1)
 
     def __str__(self):
         return f'Greedy(posterior_scaling={self.posterior_scaling})'
