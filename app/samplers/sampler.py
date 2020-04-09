@@ -2,7 +2,6 @@ from app.constants import ACTION_NON_TERMINAL_TYPE, ACTION_REDUCE_TYPE, ACTION_S
 from app.data.batch import Batch
 from app.data.batch_utils import sequences2lengths, sequences2tensor
 import logging
-import torch
 
 class Sampler:
 
@@ -12,10 +11,10 @@ class Sampler:
         :type action_converter: app.data.converters.action.ActionConverter
         :type log: bool
         """
-        self._device = device
-        self._action_converter = action_converter
-        self._log = log
-        self._logger = logging.getLogger('sampler')
+        self.device = device
+        self.action_converter = action_converter
+        self.log = log
+        self.logger = logging.getLogger('sampler')
 
     def evaluate(self):
         """
@@ -32,8 +31,8 @@ class Sampler:
             samples.extend(batch_samples)
             tree_counter += batch_size
             threshold_counter += batch_size
-            if self._log and threshold <= threshold_counter:
-                self._logger.info(f'Sampling: {tree_counter:,} / {count:,} ({tree_counter/count:0.2%})')
+            if self.log and threshold <= threshold_counter:
+                self.logger.info(f'Sampling: {tree_counter:,} / {count:,} ({tree_counter/count:0.2%})')
                 threshold_counter = 0
         return samples
 
@@ -79,14 +78,14 @@ class Sampler:
                     actions.append(None)
                 else:
                     sample = samples[i]
-                    action = self._action_converter.integer2action(sample)
+                    action = self.action_converter.integer2action(sample)
                     predicted_actions[i].append(action)
                     finished_sampling[i] = self.is_finished_sampling(predicted_actions[i], lengths_list[i])
                     actions.append(action)
             state = self.get_next_state(state, actions)
         # create batch from samples
-        predicted_tensor = sequences2tensor(self._device, self._action_converter.action2integer, predicted_actions)
-        predicted_lengths = sequences2lengths(self._device, predicted_actions)
+        predicted_tensor = sequences2tensor(self.device, self.action_converter.action2integer, predicted_actions)
+        predicted_lengths = sequences2lengths(self.device, predicted_actions)
         return Batch(
             predicted_tensor, predicted_lengths, predicted_actions,
             batch.tokens.tensor, batch.tokens.lengths, batch.tokens.tokens,
@@ -130,8 +129,3 @@ class Sampler:
     def count_actions(self, actions, type):
         filtered = filter(lambda action: action.type() == type, actions)
         return len(list(filtered))
-
-    def actions2tensor(self, actions):
-        action_integers = [self._action_converter.action2integer(action) for action in actions]
-        actions_tensor = torch.tensor(action_integers, device=self._device, dtype=torch.long)
-        return actions_tensor.reshape((len(actions), 1))

@@ -2,8 +2,11 @@ from app.constants import ACTION_REDUCE_TYPE, ACTION_NON_TERMINAL_TYPE
 from app.data.actions.generate import GenerateAction
 from app.data.actions.non_terminal import NonTerminalAction
 from app.data.actions.reduce import ReduceAction
+from app.data.batch import Batch
+from app.data.batch_utils import sequences2tensor
 from app.samplers.sample import Sample
 from app.samplers.sampler import Sampler
+from math import exp
 from torch.distributions import Categorical
 
 class ImportanceSampler(Sampler):
@@ -26,84 +29,88 @@ class ImportanceSampler(Sampler):
         :type action_converter_gen: app.data.converters.action.ActionConverter
         :type log: bool
         """
-        super().__init__(log=log)
-        self._device = device
-        self._posterior_scaling = posterior_scaling
-        self._samples = samples
-        self._model_dis = model_dis
-        self._model_gen = model_gen
-        self._iterator_dis = iterator_dis
-        self._iterator_gen = iterator_gen
-        self._action_converter_dis = action_converter_dis
-        self._action_converter_gen = action_converter_gen
+        super().__init__(device, action_converter_dis, log=log)
+        self.posterior_scaling = posterior_scaling
+        self.samples = samples
+        self.model_dis = model_dis
+        self.model_gen = model_gen
+        self.iterator_dis = iterator_dis
+        self.iterator_gen = iterator_gen
+        self.action_converter_dis = action_converter_dis
+        self.action_converter_gen = action_converter_gen
 
-    def evaluate_element(self, batch, batch_index):
+    def evaluate_batch(self, batch):
         """
         :type batch: app.data.batch.Batch, app.data.batch.Batch
-        :type batch_index: int
         :rtype: app.samplers.sample.Sample
         """
-        self._model_dis.eval()
-        self._model_gen.eval()
+        self.model_dis.eval()
+        self.model_gen.eval()
         batch_dis, batch_gen = batch
-        element_dis = batch_dis.get(batch_index)
-        element_gen = batch_gen.get(batch_index)
-        tokens_tensor_dis = element_dis.tokens.tensor[:element_dis.tokens.length, :]
-        tokens_tensor_gen = element_gen.tokens.tensor[:element_gen.tokens.length, :]
-        tags_tensor_dis = element_dis.tags.tensor[:element_dis.tags.length, :]
-        tags_tensor_gen = element_gen.tags.tensor[:element_gen.tags.length, :]
-        weights = []
-        best_tree = None
-        best_probs = None
-        best_log_prob = None
-        for _ in range(self._samples):
-            tree_dis = self._sample_from_tokens_tensor(tokens_tensor_dis, tags_tensor_dis)
-            tree_dis_tensor = self.actions2tensor(self._action_converter_dis, tree_dis)
-            tree_gen = self._discriminative2generative(tree_dis, element_gen.tokens.tokens)
-            tree_gen_tensor = self.actions2tensor(self._action_converter_gen, tree_gen)
-            _, log_prob_dis = self._get_tree_log_prob(self._model_dis, tokens_tensor_dis, tags_tensor_dis, tree_dis_tensor, tree_dis)
-            log_probs, log_prob_gen = self._get_tree_log_prob(self._model_gen, tokens_tensor_gen, tags_tensor_gen, tree_gen_tensor, tree_gen)
-            weight = (log_prob_gen - log_prob_dis).exp().cpu().item()
-            weights.append(weight)
-            if best_log_prob is None or best_log_prob < log_prob_gen:
-                best_tree = tree_gen
-                best_probs = [prob.cpu().item() for prob in log_probs.sum(dim=1).exp()]
-                best_log_prob = log_prob_gen
-        gold_tree = element_gen.actions.actions
-        gold_tree_tensor = element_gen.actions.tensor[:element_gen.actions.length, :]
-        gold_log_probs = self._model_gen.tree_log_probs(tokens_tensor_gen, tags_tensor_gen, gold_tree_tensor, gold_tree)
-        gold_probs = [prob.cpu().item() for prob in gold_log_probs.sum(dim=1).exp()]
-        gold_log_prob = gold_log_probs.sum()
-        best_log_prob = best_log_prob.cpu().item()
-        tokens_prob = sum(weights) / len(weights)
-        return Sample(
-            gold_tree, element_gen.tokens.tokens, element_gen.tags.tags, gold_log_prob, gold_probs,
-            best_tree, best_log_prob, best_probs,
-            tokens_prob
-        )
+        weights = [[] for _ in range(batch_dis.size)]
+        best_actions = [None] * batch_dis.size
+        best_probs = [None] * batch_dis.size
+        best_log_prob = [None] * batch_dis.size
+        for _ in range(self.samples):
+            pred_batch_dis = self.sample(batch_dis)
+            pred_actions_gen = [self.dis2gen(pred_batch_dis.actions.actions[i], batch_gen.tokens.tokens[i]) for i in range(batch_dis.size)]
+            pred_tensor_gen = sequences2tensor(self.device, self.action_converter_gen.action2integer, pred_actions_gen)
+            pred_batch_gen = Batch(
+                pred_tensor_gen, pred_batch_dis.actions.lengths, pred_actions_gen,
+                batch_gen.tokens.tensor, batch_gen.tokens.lengths, batch_gen.tokens.tokens,
+                batch_gen.tags.tensor, batch_gen.tags.lengths, batch_gen.tags.tags,
+            )
+            pred_log_probs_dis = self.model_dis.batch_log_likelihood(pred_batch_dis)
+            pred_log_prob_dis, pred_probs_dis = self.batch_stats(pred_log_probs_dis, pred_batch_dis.actions.lengths)
+            pred_log_probs_gen = self.model_gen.batch_log_likelihood(pred_batch_gen)
+            pred_log_prob_gen, pred_probs_gen = self.batch_stats(pred_log_probs_gen, pred_batch_gen.actions.lengths)
+            for i in range(batch_gen.size):
+                weight = exp(pred_log_prob_gen[i] - pred_log_prob_dis[i])
+                weights[i].append(weight)
+                if best_log_prob[i] is None or best_log_prob[i] < pred_log_prob_gen[i]:
+                    best_actions[i] = pred_actions_gen[i]
+                    best_probs[i] = pred_probs_gen[i]
+                    best_log_prob[i] = pred_log_prob_gen[i]
+        gold_log_probs = self.model_gen.batch_log_likelihood(batch_gen)
+        gold_log_prob, gold_probs = self.batch_stats(gold_log_probs, batch_gen.actions.lengths)
+        samples = []
+        for i in range(batch_gen.size):
+            g_actions = batch_gen.actions.actions[i]
+            g_tokens = batch_gen.tokens.tokens[i]
+            g_tags = batch_gen.tags.tags[i]
+            g_log_prob = gold_log_prob[i]
+            g_probs = gold_probs[i]
+            p_actions = best_actions[i]
+            p_log_prob = best_log_prob[i]
+            p_probs = best_probs[i]
+            tokens_prob = sum(weights[i]) / len(weights[i])
+            sample = Sample(g_actions, g_tokens, g_tags, g_log_prob, g_probs, p_actions, p_log_prob, p_probs, tokens_prob)
+            samples.append(sample)
+        return samples
 
     def get_iterator(self):
-        count = self._iterator_dis.size()
-        iterator = zip(self._iterator_dis, self._iterator_gen)
+        count = self.iterator_dis.size()
+        iterator = zip(self.iterator_dis, self.iterator_gen)
         return iterator, count
 
-    def _sample_from_tokens_tensor(self, tokens, tags):
-        self._model_dis.eval()
-        tokens_length = len(tokens)
-        actions = []
-        state = self._model_dis.initial_state(tokens, tags)
-        while not self.is_finished_sampling(actions, tokens_length):
-            log_probs, index2action_index = self._model_dis.next_action_log_probs(state, posterior_scaling=self._posterior_scaling)
-            distribution = Categorical(logits=log_probs)
-            sample = index2action_index[distribution.sample()]
-            action = self._action_converter_dis.integer2action(sample)
-            actions.append(action)
-            state = self._model_dis.next_state(state, action)
-        return actions
+    def get_initial_state(self, batch):
+        return self.model_dis.initial_state(batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths)
 
-    def _discriminative2generative(self, actions_dis, tokens):
-        non_terminal_offset = self._action_converter_gen.get_non_terminal_offset()
-        terminal_offset = self._action_converter_gen.get_terminal_offset()
+    def get_next_log_probs(self, state):
+        return self.model_dis.next_action_log_probs(state, posterior_scaling=self.posterior_scaling)
+
+    def get_next_state(self, state, actions):
+        return self.model_dis.next_state(state, actions)
+
+    def sample_actions(self, log_probs):
+        """
+        :type log_probs: torch.Tensor
+        :rtype: torch.Tensor
+        """
+        distribution = Categorical(logits=log_probs)
+        return distribution.sample()
+
+    def dis2gen(self, actions_dis, tokens):
         token_index = 0
         actions_gen = []
         for action_dis in actions_dis:
@@ -120,10 +127,5 @@ class ImportanceSampler(Sampler):
             actions_gen.append(action_gen)
         return actions_gen
 
-    def _get_tree_log_prob(self, model, tokens_tensor, tags_tensor, tree_tensor, tree):
-        log_probs = model.tree_log_probs(tokens_tensor, tags_tensor, tree_tensor, tree)
-        log_prob = log_probs.sum()
-        return logs_probs, log_prob
-
     def __str__(self):
-        return f'Importance(posterior_scaling={self._posterior_scaling}, samples={self._samples})'
+        return f'Importance(posterior_scaling={self.posterior_scaling}, samples={self.samples})'

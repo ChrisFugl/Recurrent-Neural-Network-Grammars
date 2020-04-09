@@ -47,9 +47,9 @@ class AncestralSampler(Sampler):
             g_tags = batch.tags.tags[i]
             g_log_prob = gold_log_prob[i]
             g_probs = gold_probs[i]
-            p_actions = predicted_batch.actions.actions[i]
-            p_log_prob = predicted_log_prob[i]
-            p_probs = predicted_probs[i]
+            p_actions = best_actions[i]
+            p_log_prob = best_log_prob[i]
+            p_probs = best_probs[i]
             sample = Sample(g_actions, g_tokens, g_tags, g_log_prob, g_probs, p_actions, p_log_prob, p_probs, None)
             samples.append(sample)
         return samples
