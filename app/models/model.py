@@ -14,18 +14,6 @@ class Model(nn.Module):
         """
         raise NotImplementedError('must be implemented by subclass')
 
-    def tree_log_probs(self, tokens_tensor, tags_tensor, actions_tensor, actions):
-        """
-        Compute log probs of each action in a tree.
-
-        :type tokens_tensor: torch.Tensor
-        :type tags_tensor: torch.Tensor
-        :type actions_tensor: torch.Tensor
-        :type actions: list of app.data.actions.action.Action
-        :rtype: torch.Tensor
-        """
-        raise NotImplementedError('must be implemented by subclass')
-
     def initial_state(self, tokens, tags, lengths):
         """
         Get initial state of model in a parse.
@@ -55,6 +43,13 @@ class Model(nn.Module):
         :type include_gen: bool
         :type include_nt: bool
         :rtype: torch.Tensor
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
+    def valid_actions(self, state):
+        """
+        :param state: model specific state
+        :rtype: list of list of int
         """
         raise NotImplementedError('must be implemented by subclass')
 

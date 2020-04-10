@@ -3,13 +3,13 @@ class Batch:
     def __init__(self, actions_tensor, actions_lengths, actions, tokens_tensor, tokens_lengths, tokens, tags_tensor, tags_lengths, tags):
         """
         :type actions_tensor: torch.Tensor
-        :type actions_lengths: list of int
+        :type actions_lengths: torch.Tensor
         :type actions: list of list of app.data.actions.action.Action
         :type tokens_tensor: torch.Tensor
-        :type tokens_lengths: list of int
+        :type tokens_lengths: torch.Tensor
         :type tokens: list of list of str
         :type tags_tensor: torch.Tensor
-        :type tags_lengths: list of int
+        :type tags_lengths: torch.Tensor
         :type tags: list of list of str
         """
         self.actions = BatchActions(actions_tensor, actions_lengths, actions)
@@ -46,7 +46,7 @@ class BatchActions:
     def __init__(self, tensor, lengths, actions):
         """
         :type tensor: torch.Tensor
-        :type lengths: list of int
+        :type lengths: torch.Tensor
         :type actions: list of list of app.data.actions.action.Action
         """
         self.tensor = tensor
@@ -58,7 +58,7 @@ class BatchTokens:
     def __init__(self, tensor, lengths, tokens):
         """
         :type tensor: torch.Tensor
-        :type lengths: list of int
+        :type lengths: torch.Tensor
         :type tokens: list of list of str
         """
         self.tensor = tensor
@@ -70,7 +70,7 @@ class BatchTags:
     def __init__(self, tensor, lengths, tags):
         """
         :type tensor: torch.Tensor
-        :type lengths: list of int
+        :type lengths: torch.Tensor
         :type tags: list of list of str
         """
         self.tensor = tensor
@@ -88,15 +88,15 @@ class BatchElement:
         """
         :type index: int
         :type actions_tensor: torch.Tensor
-        :type actions_length: int
+        :type actions_length: torch.Tensor
         :type actions: list of app.data.actions.action.Action
         :type max_actions_length: int
         :type tokens_tensor: torch.Tensor
-        :type tokens_length: int
+        :type tokens_length: torch.Tensor
         :type tokens: list of str
         :type max_tokens_length: int
         :type tags_tensor: torch.Tensor
-        :type tags_length: int
+        :type tags_length: torch.Tensor
         :type tags: list of str
         :type max_tags_length: int
         """
@@ -110,7 +110,7 @@ class BatchElementActions:
     def __init__(self, tensor, length, actions, max_length):
         """
         :type tensor: torch.Tensor
-        :type length: int
+        :type length: torch.Tensor
         :type actions: list of app.data.actions.action.Action
         :type max_length: int
         """
@@ -124,7 +124,7 @@ class BatchElementTokens:
     def __init__(self, tensor, length, tokens, max_length):
         """
         :type tensor: torch.Tensor
-        :type length: int
+        :type length: torch.Tensor
         :type tokens: list of str
         :type max_length: int
         """
@@ -138,7 +138,7 @@ class BatchElementTags:
     def __init__(self, tensor, length, tags, max_length):
         """
         :type tensor: torch.Tensor
-        :type length: int
+        :type length: torch.Tensor
         :type tags: list of str
         :type max_length: int
         """

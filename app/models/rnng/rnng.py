@@ -182,13 +182,9 @@ class RNNG(AbstractRNNG):
         batch_size = len(states)
         batch_log_probs = torch.empty((batch_size, self.action_count), device=self.device, dtype=torch.float)
         batch_log_probs.fill_(INVALID_ACTION_LOG_PROB)
-        for i, state in enumerate(states):
-            tokens_length = state.tokens_length
-            token_counter = state.token_counter
-            last_action = state.stack_top.data
-            open_non_terminals_count = state.open_non_terminals_count
+        batch_valid_actions = self.valid_actions(states)
+        for i, (state, valid_actions) in enumerate(zip(states, batch_valid_actions)):
             representation = self.get_representation(state.action_top, state.stack_top, state.token_top)
-            valid_actions = self.action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
             valid_indices, action2index = self.get_valid_indices(valid_actions)
             # base log probabilities
             logits = self.representation2logits(representation)
@@ -215,6 +211,21 @@ class RNNG(AbstractRNNG):
                 nt_valid_indices = [action2index[nt_index] for nt_index in self.nt_indices]
                 batch_log_probs[i, self.nt_action_indices] = valid_log_probs[nt_valid_indices].view(-1)
         return batch_log_probs
+
+    def valid_actions(self, states):
+        """
+        :type states: list of app.models.rnng.state.RNNGState
+        :rtype: list of list of int
+        """
+        batch_valid_actions = []
+        for state in states:
+            tokens_length = state.tokens_length
+            token_counter = state.token_counter
+            last_action = state.stack_top.data
+            open_non_terminals_count = state.open_non_terminals_count
+            valid_actions = self.action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
+            batch_valid_actions.append(valid_actions)
+        return batch_valid_actions
 
     def reduce(self, log_probs, outputs, action):
         stack_top = outputs.stack_top

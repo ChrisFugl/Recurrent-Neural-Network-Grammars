@@ -80,59 +80,6 @@ class ParallelRNNG(AbstractRNNG):
             self.action_history.push(action_embedding)
         return output_log_probs
 
-    def tree_log_probs(self, tokens_tensor, tags_tensor, actions_tensor, actions, actions_max_length=None):
-        """
-        Compute log probs of each action in a tree.
-
-        :type tokens_tensor: torch.Tensor
-        :type tags_tensor: torch.Tensor
-        :type actions_tensor: torch.Tensor
-        :type actions: list of app.data.actions.action.Action
-        :type actions_max_length: int
-        :rtype: torch.Tensor
-        """
-        batch_size = 1
-        if actions_max_length is None:
-            actions_max_length = len(actions)
-        tokens_length = torch.tensor([tokens_tensor.size(0)], device=self.device, dtype=torch.long)
-        actions_length = torch.tensor([len(actions)], device=self.device, dtype=torch.long)
-        preprocessed, stack_size = preprocess_batch(
-            self.device,
-            self.valid_args,
-            self.non_terminal_converter,
-            self.token_converter,
-            batch_size,
-            actions_max_length,
-            [actions],
-            tokens_length,
-            tokens_tensor,
-            tags_tensor
-        )
-        self.initialize_structures(
-            actions_tensor,
-            tokens_tensor,
-            tags_tensor,
-            # plus one to account for start embeddings
-            actions_length + 1,
-            tokens_length + 1,
-            stack_size + 1,
-        )
-        output_shape = (actions_max_length, self.action_count)
-        output_log_probs = torch.zeros(output_shape, device=self.device, dtype=torch.float)
-        for sequence_index in range(actions_max_length):
-            preprocessed_batch = preprocessed[sequence_index]
-            representation = self.get_representation()
-            action = actions[sequence_index]
-            action_index = self.action_converter.action2integer(action)
-            log_probs = self.get_log_probs(representation, preprocessed_batch.invalid_mask)
-            action_log_prob = log_probs[:, :, action_index]
-            output_log_probs[sequence_index, action_index] = action_log_prob
-            self.do_actions(batch_size, preprocessed_batch)
-            action_tensor = actions_tensor[sequence_index].unsqueeze(dim=0)
-            action_embedding = self.action_embedding(action_tensor)
-            self.action_history.push(action_embedding)
-        return output_log_probs
-
     def initial_state(self, tokens, tags):
         """
         Get initial state of model in a parse.
@@ -237,6 +184,14 @@ class ParallelRNNG(AbstractRNNG):
         valid_logits = logits[:, :, valid_indices]
         log_probs = self.logits2log_prob(posterior_scaling * valid_logits).view(-1)
         return log_probs, valid_indices
+
+    def valid_actions(self, state):
+        """
+        :type state: app.models.parallel_rnng.state.State
+        :rtype: list of list of int
+        """
+        # TODO
+        raise NotImplementedError('not yet implemented')
 
     def initialize_structures(self, actions, tokens, tags, action_lengths, token_lengths, stack_size):
         batch_size = tokens.size(1)

@@ -1,3 +1,5 @@
+from app.constants import PAD_INDEX
+
 class Hypothesis:
 
     def __init__(self, device, state, action, log_prob, parent=None):
@@ -37,12 +39,14 @@ class Hypothesis:
         :rtype: list of Hypothesis
         """
         successors = []
-        log_probs, index2action_index = model.next_action_log_probs(self.state, token=token, include_gen=False, include_nt=include_nt)
-        for index, log_prob in enumerate(log_probs):
-            action_index = index2action_index[index]
-            action = action_converter.integer2action(action_index)
-            next_state = model.next_state(self.state, action)
-            next_log_prob = self.log_prob + float(log_prob)
-            successor = Hypothesis(self._device, next_state, action, next_log_prob, parent=self)
-            successors.append(successor)
+        log_probs = model.next_action_log_probs(self.state, token=token, include_gen=False, include_nt=include_nt)
+        valid_actions = model.valid_actions(self.state)[0]
+        for action_index, log_prob in enumerate(log_probs[0]):
+            if action_index != PAD_INDEX:
+                action = action_converter.integer2action(action_index)
+                if action.type() in valid_actions:
+                    next_state = model.next_state(self.state, [action])
+                    next_log_prob = self.log_prob + float(log_prob)
+                    successor = Hypothesis(self._device, next_state, action, next_log_prob, parent=self)
+                    successors.append(successor)
         return successors
