@@ -55,14 +55,14 @@ def get_model(device, generative, action_converter, token_converter, tag_convert
                 from app.models.parallel_rnng.output_buffer_lstm import OutputBufferLSTM
                 token_buffer = OutputBufferLSTM(device, config.size.rnn, *rnn_args)
                 structures[1] = token_buffer
-                model = GenerativeParallelRNNG(*base_args)
+                model = GenerativeParallelRNNG(*base_args, config.sample_stack_size)
             else:
                 from app.models.parallel_rnng.discriminative import DiscriminativeParallelRNNG
                 from app.models.parallel_rnng.input_buffer_lstm import InputBufferLSTM
                 pos_embedding = get_embedding(token_converter.count(), config.size.pos, config.embedding)
                 token_buffer = InputBufferLSTM(device, config.size.rnn, *rnn_args)
                 structures[1] = token_buffer
-                model = DiscriminativeParallelRNNG(*base_args, config.size.pos, pos_embedding)
+                model = DiscriminativeParallelRNNG(*base_args, config.sample_stack_size, config.size.pos, pos_embedding)
     else:
         raise Exception(f'Unknown model: {config.type}')
     return model.to(device)

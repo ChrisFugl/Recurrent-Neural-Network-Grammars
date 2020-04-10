@@ -1,4 +1,4 @@
-from app.models.parallel_rnng.buffer_lstm import BufferLSTM, BufferState
+from app.models.parallel_rnng.buffer_lstm import BufferLSTM
 from app.utils import batched_index_select
 import torch
 
@@ -29,33 +29,6 @@ class OutputBufferLSTM(BufferLSTM):
         :type op: torch.Tensor
         """
         self.pos = self.pos + op
-
-    def inference_initialize(self, inputs):
-        """
-        :type inputs: torch.Tensor
-        :rtype: app.models.parallel_rnng.buffer_lstm.BufferState
-        """
-        batch_size = inputs.size(1)
-        buffer, _ = self.lstm(inputs)
-        lengths = torch.zeros((batch_size,), device=self.device, dtype=torch.long)
-        return BufferState(buffer, inputs, lengths)
-
-    def inference_hold_or_push(self, state, op):
-        """
-        :type state: app.models.parallel_rnng.buffer_lstm.BufferState
-        :type op: torch.Tensor
-        :rtype: app.models.parallel_rnng.buffer_lstm.BufferState
-        """
-        next_lengths = state.lengths + op
-        return BufferState(state.buffer, state.inputs, next_lengths)
-
-    def inference_top_embeddings(self, state):
-        """
-        :type state: app.models.parallel_rnng.buffer_lstm.BufferState
-        :rtype: torch.Tensor
-        """
-        batch_size = state.inputs.size(1)
-        return batched_index_select(state.inputs, state.lengths - 1).view(batch_size, self.input_size)
 
     def __str__(self):
         return f'OutputBufferLSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers})'

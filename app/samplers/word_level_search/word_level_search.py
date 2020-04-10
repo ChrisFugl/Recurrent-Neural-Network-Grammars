@@ -22,7 +22,7 @@ class WordLevelSearchSampler(Sampler):
         :type fast_track: int
         :type log: bool
         """
-        super().__init__(device, action_converter, log=log)
+        super().__init__(device, action_converter, True, log=log)
         self.model = model
         self.iterator = iterator
         self.beam_size = beam_size
@@ -73,7 +73,7 @@ class WordLevelSearchSampler(Sampler):
             element.tags.tensor, element.tags.length.unsqueeze(dim=0), [tags],
         )
         p_log_probs = self.model.batch_log_likelihood(p_batch)
-        p_log_prob, p_probs = self.batch_stats(p_log_probs, p_batch.actions.lengths)
+        p_log_prob, p_probs = self.batch_stats(p_log_probs, p_batch.actions.tensor, p_batch.actions.lengths)
         g_actions = element.actions.actions
         g_batch = Batch(
             element.actions.tensor, element.actions.length.unsqueeze(dim=0), [g_actions],
@@ -81,7 +81,7 @@ class WordLevelSearchSampler(Sampler):
             element.tags.tensor, element.tags.length.unsqueeze(dim=0), [tags],
         )
         g_log_probs = self.model.batch_log_likelihood(g_batch)
-        g_log_prob, g_probs = self.batch_stats(g_log_probs, g_batch.actions.lengths)
+        g_log_prob, g_probs = self.batch_stats(g_log_probs, g_batch.actions.tensor, g_batch.actions.lengths)
         tokens_prob = sum(sample_probs)
         return Sample(g_actions, tokens, tags, g_log_prob, g_probs, best_actions, p_log_prob, p_probs, tokens_prob)
 

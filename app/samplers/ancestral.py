@@ -14,7 +14,7 @@ class AncestralSampler(Sampler):
         :type samples: int
         :type log: bool
         """
-        super().__init__(device, action_converter, log=log)
+        super().__init__(device, action_converter, False, log=log)
         self.model = model
         self.iterator = iterator
         self.posterior_scaling = posterior_scaling
@@ -30,16 +30,16 @@ class AncestralSampler(Sampler):
         best_probs = [None] * batch.size
         best_log_prob = [None] * batch.size
         for _ in range(self.samples):
-            predicted_batch = self.sample(batch)
-            predicted_log_probs = self.model.batch_log_likelihood(predicted_batch)
-            predicted_log_prob, predicted_probs = self.batch_stats(predicted_log_probs, predicted_batch.actions.lengths)
+            pred_batch = self.sample(batch)
+            pred_log_probs = self.model.batch_log_likelihood(pred_batch)
+            pred_log_prob, pred_probs = self.batch_stats(pred_log_probs, pred_batch.actions.tensor, pred_batch.actions.lengths)
             for i in range(batch.size):
-                if best_log_prob[i] is None or best_log_prob[i] < predicted_log_prob[i]:
-                    best_actions[i] = predicted_batch.actions.actions[i]
-                    best_probs[i] = predicted_probs[i]
-                    best_log_prob[i] = predicted_log_prob[i]
+                if best_log_prob[i] is None or best_log_prob[i] < pred_log_prob[i]:
+                    best_actions[i] = pred_batch.actions.actions[i]
+                    best_probs[i] = pred_probs[i]
+                    best_log_prob[i] = pred_log_prob[i]
         gold_log_probs = self.model.batch_log_likelihood(batch)
-        gold_log_prob, gold_probs = self.batch_stats(gold_log_probs, batch.actions.lengths)
+        gold_log_prob, gold_probs = self.batch_stats(gold_log_probs, batch.actions.tensor, batch.actions.lengths)
         samples = []
         for i in range(batch.size):
             g_actions = batch.actions.actions[i]
@@ -66,10 +66,13 @@ class AncestralSampler(Sampler):
     def get_next_state(self, state, actions):
         return self.model.next_state(state, actions)
 
-    def sample_actions(self, log_probs):
+    def get_valid_actions(self, state):
+        return self.model.valid_actions(state)
+
+    def sample_action(self, log_probs):
         """
         :type log_probs: torch.Tensor
-        :rtype: torch.Tensor
+        :rtype: int
         """
         distribution = Categorical(logits=log_probs)
         return distribution.sample()

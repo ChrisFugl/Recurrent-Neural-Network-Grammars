@@ -6,7 +6,7 @@ from torch import nn
 
 class DiscriminativeParallelRNNG(ParallelRNNG):
 
-    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, pos_size, pos_embedding):
+    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes,sanple_stack_size, pos_size, pos_embedding):
         """
         :type device: torch.device
         :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
@@ -15,12 +15,13 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         :type representation: app.representations.representation.Representation
         :type composer: app.composers.composer.Composer
         :type sizes: int, int, int, int
+        :type sanple_stack_size: int
         :type pos_size: int
         :type pos_embedding: torch.nn.Embedding
         """
         action_set = DiscriminativeActionSet()
         generative = False
-        super().__init__(device, embeddings, structures, converters, representation, composer, sizes, action_set, generative)
+        super().__init__(device, embeddings, structures, converters, representation, composer, sizes, sanple_stack_size, action_set, generative)
         self.pos_embedding = pos_embedding
         self.activation = nn.ReLU()
         token_size = sizes[1]
@@ -47,14 +48,12 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         word_embeddings = torch.cat((start_word_embedding, word_embeddings), dim=0)
         self.token_buffer.initialize(word_embeddings, token_lengths)
 
-    def get_word_embedding(self, preprocessed):
+    def get_word_embedding(self, state):
         """
-        :type preprocessed: app.models.parallel_rnng.preprocessed_batch.Preprocessed
+        :type state: app.models.parallel_rnng.state.State
         :rtype: torch.Tensor, torch.Tensor
         """
-        token_indices = preprocessed.token_index
-        tag_indices = preprocessed.tag_index
-        word_embeddings = self.token_tag2embedding(token_indices, tag_indices, dim=1)
+        word_embeddings = self.token_tag2embedding(state.token_index, state.tag_index, dim=1)
         return word_embeddings
 
     def update_token_buffer(self, batch_size, token_action_indices, word_embeddings):
@@ -76,37 +75,6 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         words = torch.cat((tokens, tags), dim=dim)
         words = self.activation(self.word2buffer(words))
         return words
-
-    def inference_initialize_token_buffer(self, tokens_tensor, tags_tensor):
-        """
-        :type tokens_tensor: torch.Tensor
-        :type tags_tensor: torch.Tensor
-        :rtype: app.models.parallel_rnng.buffer_lstm.BufferState
-        """
-        batch_size = tokens_tensor.size(1)
-        start_token_embedding = self.start_token_embedding.view(1, 1, -1).expand(1, batch_size, -1)
-        start_tag_embedding = self.start_tag_embedding.view(1, 1, -1).expand(1, batch_size, -1)
-        start_word_embedding = self.token_tag2word(start_token_embedding, start_tag_embedding)
-        # add tokens in reverse order
-        max_length = tokens_tensor.size(0)
-        token_lengths = torch.tensor([max_length] * batch_size, device=self.device, dtype=torch.long)
-        tokens_tensor_reversed = padded_reverse(tokens_tensor, token_lengths)
-        tags_tensor_reversed = padded_reverse(tags_tensor, token_lengths)
-        word_embeddings = self.token_tag2embedding(tokens_tensor_reversed, tags_tensor_reversed)
-        word_embeddings = torch.cat((start_word_embedding, word_embeddings), dim=0)
-        token_lengths = token_lengths + 1
-        state = self.token_buffer.inference_initialize(word_embeddings, token_lengths)
-        return state
-
-    def inference_update_token_buffer(self, state):
-        """
-        :type state: app.models.parallel_rnng.buffer_lstm.BufferState
-        :rtype: app.models.parallel_rnng.buffer_lstm.BufferState
-        """
-        batch_size = state.inputs.size(1)
-        pop_op = self.pop_op(batch_size)
-        state = self.token_buffer.inference_hold_or_pop(state, pop_op)
-        return state
 
     def __str__(self):
         return (

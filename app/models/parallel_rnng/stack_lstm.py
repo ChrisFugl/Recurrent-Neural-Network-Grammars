@@ -67,8 +67,10 @@ class StackLSTM(nn.Module):
         hidden_state = batched_index_select(self.hidden_stack, self.pos).view(batch_size, self.hidden_size, self.num_layers)
         cell_state = batched_index_select(self.cell_stack, self.pos).view(batch_size, self.hidden_size, self.num_layers)
         next_hidden, next_cell = self.lstm(input, (hidden_state, cell_state))
-        self.hidden_stack = self.hidden_stack.clone()
-        self.cell_stack = self.cell_stack.clone()
+        # only needs to clone stack state when training, as training requires gradient computations
+        if self.training:
+            self.hidden_stack = self.hidden_stack.clone()
+            self.cell_stack = self.cell_stack.clone()
         self.hidden_stack[self.pos + 1, self.batch_indices, :, :] = next_hidden
         self.cell_stack[self.pos + 1, self.batch_indices, :, :] = next_cell
         self.pos = self.pos + op
@@ -82,107 +84,5 @@ class StackLSTM(nn.Module):
         output = output[:, :, self.num_layers - 1]
         return output
 
-    def inference_initialize(self, batch_size):
-        """
-        :type batch_size: int
-        :rtype: app.models.parallel_rnng.stack_lstm.StackState
-        """
-        state_shape = (batch_size, self.hidden_size, self.num_layers)
-        hidden = torch.zeros(state_shape, device=self.device, dtype=torch.float)
-        cell = torch.zeros(state_shape, device=self.device, dtype=torch.float)
-        previous = None
-        lengths = [1] * batch_size
-        actions = None
-        return StackState(batch_size, hidden, cell, previous, lengths, actions)
-
-    def inference_hold_or_pop(self, state, ops):
-        """
-        :type state: app.models.parallel_rnng.stack_lstm.StackState
-        :type ops: torch.Tensor
-        :rtype: app.models.parallel_rnng.stack_lstm.StackState, torch.Tensor
-        """
-        output = self.inference_top(state)
-        state_shape = (state.batch_size, self.hidden_size, self.num_layers)
-        next_hidden = torch.zeros(state_shape, device=self.device, dtype=torch.float)
-        next_cell = torch.zeros(state_shape, device=self.device, dtype=torch.float)
-        next_previous = []
-        next_lengths = [length if op == 0 else length - 1 for length, op in zip(state.lengths, ops)]
-        next_actions = [state.actions[i] if op == 0 else state.previous[i].actions[i] for i, op in enumerate(ops)]
-        for batch_index, op in enumerate(ops):
-            prev_state = state.previous[batch_index]
-            if op == 0:
-                next_hidden[batch_index] = state.hidden[batch_index]
-                next_cell[batch_index] = state.cell[batch_index]
-                next_previous.append(prev_state)
-            else:
-                next_hidden[batch_index] = prev_state.hidden[batch_index]
-                next_cell[batch_index] = prev_state.cell[batch_index]
-                next_previous.append(prev_state.previous[batch_index])
-        next_state = StackState(state.batch_size, next_hidden, next_cell, next_previous, next_lengths, next_actions)
-        return next_state, output
-
-    def inference_hold_or_push(self, state, actions, input, ops):
-        """
-        :type state: app.models.parallel_rnng.stack_lstm.StackState
-        :type actions: list of app.data.actions.action.Action
-        :type inputs: torch.Tensor
-        :type ops: torch.Tensor
-        :rtype: app.models.parallel_rnng.stack_lstm.StackState, torch.Tensor
-        """
-        next_hidden, next_cell = self.lstm(input, (state.hidden, state.cell))
-        next_previous = [state.previous[index] if op == 0 else state for index, op in enumerate(ops)]
-        next_lengths = [length if op == 0 else length + 1 for length, op in zip(state.lengths, ops)]
-        next_actions = [state.actions[index] if op == 0 else actions[index] for index, op in enumerate(ops)]
-        next_state = StackState(state.batch_size, next_hidden, next_cell, next_previous, next_lengths, next_actions)
-        return next_state
-
-    def inference_top(self, state):
-        """
-        :type state: app.models.parallel_rnng.stack_lstm.StackState
-        :rtype: torch.Tensor
-        """
-        output = state.hidden[:, :, self.num_layers - 1]
-        return output
-
-    def inference_contents(self, state):
-        """
-        :type state: app.models.parallel_rnng.stack_lstm.StackState
-        :returns: stack contents and batch lengths
-        :rtype: torch.Tensor, torch.Tensor
-        """
-        max_length = max(state.lengths)
-        contents = torch.zeros((max_length, state.batch_size, self.hidden_size), device=self.device, dtype=torch.float)
-        for batch_index in range(state.batch_size):
-            node = state
-            length = state.lengths[batch_index]
-            while True:
-                output = node.hidden[batch_index, :, self.num_layers - 1]
-                contents[length - 1, batch_index] = output
-                length -= 1
-                if length == 0:
-                    assert node.previous is None
-                    break
-                node = node.previous[batch_index]
-        lengths = torch.tensor(state.lengths, device=self.device, dtype=torch.long)
-        return contents, lengths
-
     def __str__(self):
         return f'StackLSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers})'
-
-class StackState:
-
-    def __init__(self, batch_size, hidden, cell, previous, lengths, actions):
-        """
-        :type batch_size: int
-        :type hidden: torch.Tensor
-        :type cell: torch.Tensor
-        :type previous: list of app.models.parallel_rnng.stack_lstm.StackState
-        :type lengths: list of int
-        :type actions: list of app.data.actions.action.Action
-        """
-        self.batch_size = batch_size
-        self.hidden = hidden
-        self.cell = cell
-        self.previous = previous
-        self.lengths = lengths
-        self.actions = actions

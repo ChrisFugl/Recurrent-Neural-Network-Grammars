@@ -12,7 +12,7 @@ class GreedySampler(Sampler):
         :type posterior_scaling: float
         :type log: bool
         """
-        super().__init__(device, action_converter, log=log)
+        super().__init__(device, action_converter, False, log=log)
         self.model = model
         self.iterator = iterator
         self.posterior_scaling = posterior_scaling
@@ -25,9 +25,9 @@ class GreedySampler(Sampler):
         self.model.eval()
         predicted_batch = self.sample(batch)
         predicted_log_probs = self.model.batch_log_likelihood(predicted_batch)
-        predicted_log_prob, predicted_probs = self.batch_stats(predicted_log_probs, predicted_batch.actions.lengths)
+        predicted_log_prob, predicted_probs = self.batch_stats(predicted_log_probs, predicted_batch.actions.tensor, predicted_batch.actions.lengths)
         gold_log_probs = self.model.batch_log_likelihood(batch)
-        gold_log_prob, gold_probs = self.batch_stats(gold_log_probs, batch.actions.lengths)
+        gold_log_prob, gold_probs = self.batch_stats(gold_log_probs, batch.actions.tensor, batch.actions.lengths)
         samples = []
         for i in range(batch.size):
             g_actions = batch.actions.actions[i]
@@ -54,12 +54,15 @@ class GreedySampler(Sampler):
     def get_next_state(self, state, actions):
         return self.model.next_state(state, actions)
 
-    def sample_actions(self, log_probs):
+    def get_valid_actions(self, state):
+        return self.model.valid_actions(state)
+
+    def sample_action(self, log_probs):
         """
         :type log_probs: torch.Tensor
-        :rtype: torch.Tensor
+        :rtype: int
         """
-        return log_probs.argmax(dim=1)
+        return log_probs.argmax().cpu().item()
 
     def __str__(self):
         return f'Greedy(posterior_scaling={self.posterior_scaling})'

@@ -32,11 +32,10 @@ class VanillaRepresentation(Representation):
         :type token_buffer_lengths: torch.Tensor
         :rtype: torch.Tensor
         """
-        embeddings = [
-            self.dropout(batched_index_select(action_history, action_history_lengths - 1)),
-            self.dropout(batched_index_select(stack, stack_lengths - 1)),
-            self.dropout(batched_index_select(token_buffer, token_buffer_lengths - 1)),
-        ]
+        history_embedding = self.dropout(batched_index_select(action_history, action_history_lengths - 1))
+        stack_embedding = self.dropout(batched_index_select(stack, stack_lengths - 1))
+        buffer_embedding = self.dropout(batched_index_select(token_buffer, token_buffer_lengths - 1))
+        embeddings = [history_embedding, stack_embedding, buffer_embedding]
         # concatenate along last dimension, as inputs have shape S, B, H (sequence length, batch size, hidden size)
         feedforward_input = torch.cat(embeddings, dim=2)
         output = self.feedforward(feedforward_input)

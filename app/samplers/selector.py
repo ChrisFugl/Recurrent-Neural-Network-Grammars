@@ -5,6 +5,8 @@ from app.data.converters.token import TokenConverter
 from app.data.iterators import get_iterator
 from app.data.loaders import get_loader
 from app.models import get_model
+from app.models.parallel_rnng.discriminative import DiscriminativeParallelRNNG
+from app.models.parallel_rnng.generative import GenerativeParallelRNNG
 from app.models.load import load_model_params
 from app.utils import get_training_config, is_generative
 
@@ -38,6 +40,7 @@ def get_sampler(device, data, iterator_config, config):
         from app.samplers.word_level_search.word_level_search import WordLevelSearchSampler
         assert config.load_dir is not None, 'Word level search requires a generative model.'
         model, iterator, action_converter = _load_from_dir(device, data, iterator_config, config.load_dir)
+        assert not (instanceof(model, DiscriminativeParallelRNNG) or instanceof(model, GenerativeParallelRNNG)), 'Parallel RNNG does not support word-level search.'
         return WordLevelSearchSampler(device, model, iterator, action_converter, config.beam_size, config.samples, config.fast_track)
     else:
         raise Exception(f'Unknown sampler: {config.type}')

@@ -2,19 +2,33 @@ from app.constants import ACTION_NON_TERMINAL_TYPE, ACTION_REDUCE_TYPE, ACTION_S
 from app.data.batch import Batch
 from app.data.batch_utils import sequences2lengths, sequences2tensor
 import logging
+import torch
 
 class Sampler:
 
-    def __init__(self, device, action_converter, log=True):
+    def __init__(self, device, action_converter, generative, log=True):
         """
         :type device: torch.device
         :type action_converter: app.data.converters.action.ActionConverter
+        :type generative: bool
         :type log: bool
         """
         self.device = device
         self.action_converter = action_converter
+        self.generative = generative
         self.log = log
         self.logger = logging.getLogger('sampler')
+        self.action_count = action_converter.count()
+        self.reduce_index = action_converter.string2integer('REDUCE')
+        if generative:
+            gen_start = action_converter.get_terminal_offset()
+            gen_count = action_converter.count_terminals()
+            self.gen_indices = list(range(gen_start, gen_start + gen_count))
+        else:
+            self.shift_index = action_converter.string2integer('SHIFT')
+        nt_start = action_converter.get_non_terminal_offset()
+        nt_count = action_converter.count_non_terminals()
+        self.nt_indices = list(range(nt_start, nt_start + nt_count))
 
     def evaluate(self):
         """
@@ -70,7 +84,7 @@ class Sampler:
         finished_sampling = [False] * batch.size
         while not all(finished_sampling):
             log_probs = self.get_next_log_probs(state)
-            samples = self.sample_actions(log_probs)
+            samples = self.sample_actions(state, log_probs)
             actions = []
             for i, finished in enumerate(finished_sampling):
                 if finished:
@@ -101,23 +115,46 @@ class Sampler:
     def get_next_state(self, state, actions):
         raise NotImplementedError('must be implemented by subclass')
 
-    def sample_actions(self, log_probs):
+    def get_valid_actions(self, state, actions):
+        raise NotImplementedError('must be implemented by subclass')
+
+    def sample_action(self, log_probs):
+        """
+        :type log_probs: torch.Tensor
+        :rtype: int
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
+    def sample_actions(self, state, log_probs):
         """
         :type log_probs: torch.Tensor
         :rtype: torch.Tensor
         """
-        raise NotImplementedError('must be implemented by subclass')
+        batch_size = log_probs.size(0)
+        samples = torch.empty((batch_size,), device=log_probs.device, dtype=torch.long)
+        batch_valid_actions = self.get_valid_actions(state)
+        for i, valid_actions in enumerate(batch_valid_actions):
+            valid_indices, index2action = self.get_valid_indices(valid_actions)
+            valid_log_probs = log_probs[i, valid_indices]
+            sample = valid_log_probs.argmax().cpu().item()
+            action_index = index2action[sample]
+            samples[i] = action_index
+        return samples
 
-    def batch_stats(self, batch_log_probs, lengths):
+    def batch_stats(self, batch_log_probs, actions, lengths):
         """
         :param batch_log_probs: tensor, S x B x A
         :type batch_log_probs: torch.Tensor
+        :param actions: tensor, S x B
+        :type actions: torch.Tensor
         :type lengths: torch.Tensor
         :rtype: list of float, list of list of float
         """
-        summed = batch_log_probs.sum(dim=2)
-        log_probs = [self.get_log_prob(summed[:length, i]) for i, length in enumerate(lengths)]
-        probs = [self.get_probs(summed[:length, i]) for i, length in enumerate(lengths)]
+        max_length, batch_size = actions.shape
+        indices = actions.unsqueeze(dim=2)
+        selected_log_probs = torch.gather(batch_log_probs, 2, indices).view(max_length, batch_size)
+        log_probs = [self.get_log_prob(selected_log_probs[:length, i]) for i, length in enumerate(lengths)]
+        probs = [self.get_probs(selected_log_probs[:length, i]) for i, length in enumerate(lengths)]
         return log_probs, probs
 
     def get_log_prob(self, log_probs):
@@ -129,3 +166,28 @@ class Sampler:
     def count_actions(self, actions, type):
         filtered = filter(lambda action: action.type() == type, actions)
         return len(list(filtered))
+
+    def get_valid_indices(self, valid_actions):
+        valid_indices = []
+        index2action = {}
+        counter = 0
+        if ACTION_REDUCE_TYPE in valid_actions:
+            valid_indices.append(self.reduce_index)
+            index2action[counter] = self.reduce_index
+            counter += 1
+        if not self.generative and ACTION_SHIFT_TYPE in valid_actions:
+            valid_indices.append(self.shift_index)
+            index2action[counter] = self.shift_index
+            counter += 1
+        if self.generative and ACTION_GENERATE_TYPE in valid_actions:
+            gen_indices = self.gen_indices
+            valid_indices.extend(gen_indices)
+            for gen_index in self.gen_indices:
+                index2action[counter] = gen_index
+                counter += 1
+        if ACTION_NON_TERMINAL_TYPE in valid_actions:
+            valid_indices.extend(self.nt_indices)
+            for nt_index in self.nt_indices:
+                index2action[counter] = nt_index
+                counter += 1
+        return valid_indices, index2action

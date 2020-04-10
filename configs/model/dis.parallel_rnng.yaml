@@ -24,3 +24,4 @@ model:
     pos: 12
     token: 32
     rnn: 128
+  sample_stack_size: 150

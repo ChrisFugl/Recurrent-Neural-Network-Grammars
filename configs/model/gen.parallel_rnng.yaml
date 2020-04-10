@@ -22,3 +22,4 @@ model:
   size:
     action: 16
     rnn: 256
+  sample_stack_size: 150

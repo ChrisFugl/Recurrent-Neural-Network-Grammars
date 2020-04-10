@@ -18,24 +18,3 @@ class BufferLSTM(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, bias=bias, dropout=dropout)
-
-    def inference_contents(self, state):
-        """
-        :type state: app.models.parallel_rnng.buffer_lstm.BufferState
-        :rtype: torch.Tensor, torch.Tensor
-        """
-        max_length = torch.max(state.lengths)
-        contents = state.buffer[:max_length]
-        return contents, state.lengths
-
-class BufferState:
-
-    def __init__(self, buffer, inputs, lengths):
-        """
-        :type buffer: torch.Tensor
-        :type inputs: torch.Tensor
-        :type lengths: torch.Tensor
-        """
-        self.buffer = buffer
-        self.inputs = inputs
-        self.lengths = lengths

@@ -29,7 +29,7 @@ class ImportanceSampler(Sampler):
         :type action_converter_gen: app.data.converters.action.ActionConverter
         :type log: bool
         """
-        super().__init__(device, action_converter_dis, log=log)
+        super().__init__(device, action_converter_dis, False, log=log)
         self.posterior_scaling = posterior_scaling
         self.samples = samples
         self.model_dis = model_dis
@@ -61,9 +61,9 @@ class ImportanceSampler(Sampler):
                 batch_gen.tags.tensor, batch_gen.tags.lengths, batch_gen.tags.tags,
             )
             pred_log_probs_dis = self.model_dis.batch_log_likelihood(pred_batch_dis)
-            pred_log_prob_dis, pred_probs_dis = self.batch_stats(pred_log_probs_dis, pred_batch_dis.actions.lengths)
+            pred_log_prob_dis, pred_probs_dis = self.batch_stats(pred_log_probs_dis, pred_batch_dis.actions.tensor, pred_batch_dis.actions.lengths)
             pred_log_probs_gen = self.model_gen.batch_log_likelihood(pred_batch_gen)
-            pred_log_prob_gen, pred_probs_gen = self.batch_stats(pred_log_probs_gen, pred_batch_gen.actions.lengths)
+            pred_log_prob_gen, pred_probs_gen = self.batch_stats(pred_log_probs_gen, pred_batch_gen.actions.tensor, pred_batch_gen.actions.lengths)
             for i in range(batch_gen.size):
                 weight = exp(pred_log_prob_gen[i] - pred_log_prob_dis[i])
                 weights[i].append(weight)
@@ -72,7 +72,7 @@ class ImportanceSampler(Sampler):
                     best_probs[i] = pred_probs_gen[i]
                     best_log_prob[i] = pred_log_prob_gen[i]
         gold_log_probs = self.model_gen.batch_log_likelihood(batch_gen)
-        gold_log_prob, gold_probs = self.batch_stats(gold_log_probs, batch_gen.actions.lengths)
+        gold_log_prob, gold_probs = self.batch_stats(gold_log_probs, batch_gen.actions.tensor, batch_gen.actions.lengths)
         samples = []
         for i in range(batch_gen.size):
             g_actions = batch_gen.actions.actions[i]
@@ -102,10 +102,13 @@ class ImportanceSampler(Sampler):
     def get_next_state(self, state, actions):
         return self.model_dis.next_state(state, actions)
 
-    def sample_actions(self, log_probs):
+    def get_valid_actions(self, state):
+        return self.model_dis.valid_actions(state)
+
+    def sample_action(self, log_probs):
         """
         :type log_probs: torch.Tensor
-        :rtype: torch.Tensor
+        :rtype: int
         """
         distribution = Categorical(logits=log_probs)
         return distribution.sample()
