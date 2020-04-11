@@ -6,7 +6,7 @@ from torch import nn
 
 class DiscriminativeParallelRNNG(ParallelRNNG):
 
-    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes,sanple_stack_size, pos_size, pos_embedding):
+    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes,sample_stack_size, pos_size, pos_embedding):
         """
         :type device: torch.device
         :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
@@ -15,13 +15,13 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         :type representation: app.representations.representation.Representation
         :type composer: app.composers.composer.Composer
         :type sizes: int, int, int, int
-        :type sanple_stack_size: int
+        :type sample_stack_size: int
         :type pos_size: int
         :type pos_embedding: torch.nn.Embedding
         """
         action_set = DiscriminativeActionSet()
         generative = False
-        super().__init__(device, embeddings, structures, converters, representation, composer, sizes, sanple_stack_size, action_set, generative)
+        super().__init__(device, embeddings, structures, converters, representation, composer, sizes, sample_stack_size, action_set, generative)
         self.pos_embedding = pos_embedding
         self.activation = nn.ReLU()
         token_size = sizes[1]

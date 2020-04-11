@@ -1,4 +1,5 @@
 from app.constants import ACTION_REDUCE_TYPE, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_NON_TERMINAL_TYPE, PAD_INDEX
+from app.data.actions.non_terminal import NonTerminalAction
 import torch
 
 class StateFactory:
@@ -68,7 +69,6 @@ class StateFactory:
         token_index = [PAD_INDEX for _ in range(batch_size)]
         tag_index = [PAD_INDEX for _ in range(batch_size)]
         number_of_children = [0 for _ in range(batch_size)]
-        invalid_mask = self.get_invalid_mask(state.tokens_lengths, state.token_counter, state.last_action, state.open_nt_count)
         nt_actions = []
         shift_actions = []
         gen_actions = []
@@ -88,6 +88,7 @@ class StateFactory:
                     state.shift_index[i] = shift_index + 1
                     state.token_counter[i] = state.token_counter[i] + 1
                     state.stack_size[i] = state.stack_size[i] + 1
+                    state.last_action[i] = action
                     parent.add_child(node)
                     shift_actions.append(i)
                 elif type == ACTION_GENERATE_TYPE:
@@ -95,6 +96,7 @@ class StateFactory:
                     state.token_counter[i] = state.token_counter[i] + 1
                     state.stack_size[i] = state.stack_size[i] + 1
                     parent.add_child(node)
+                    state.last_action[i] = action
                     gen_actions.append(i)
                 elif type == ACTION_NON_TERMINAL_TYPE:
                     if parent is not None:
@@ -103,6 +105,7 @@ class StateFactory:
                     state.open_nt_count[i] = state.open_nt_count[i] + 1
                     state.stack_size[i] = state.stack_size[i] + 1
                     state.parent_node[i] = node
+                    state.last_action[i] = NonTerminalAction(action.argument, open=True)
                     nt_actions.append(i)
                 else:
                     compose_nt_index[i] = self.nt_converter.non_terminal2integer(parent.action.argument)
@@ -110,14 +113,15 @@ class StateFactory:
                     state.open_nt_count[i] = state.open_nt_count[i] - 1
                     state.stack_size[i] = state.stack_size[i] - len(parent.children)
                     state.parent_node[i] = parent.parent
+                    state.last_action[i] = NonTerminalAction(parent.action.argument, open=False)
                     reduce_actions.append(i)
                 max_stack_size = max(max_stack_size, state.stack_size[i])
-                state.last_action[i] = action
         nt_index_tensor = torch.tensor(nt_index, device=self.device, dtype=torch.long)
         compose_nt_index_tensor = torch.tensor(compose_nt_index, device=self.device, dtype=torch.long)
         token_index_tensor = torch.tensor(token_index, device=self.device, dtype=torch.long)
         tag_index_tensor = torch.tensor(tag_index, device=self.device, dtype=torch.long)
         number_of_children_tensor = torch.tensor(number_of_children, device=self.device, dtype=torch.long)
+        invalid_mask = self.get_invalid_mask(state.tokens_lengths, state.token_counter, state.last_action, state.open_nt_count)
         next_state = State(
             state.tokens_tensor, state.tags_tensor,
             state.parent_node, state.stack_size, max_stack_size, state.shift_index,
@@ -140,7 +144,7 @@ class StateFactory:
                 mask[i, self.shift_index] = 0
             if ACTION_NON_TERMINAL_TYPE in valid_actions:
                 mask[i, self.nt_indices] = 0
-        return mask
+        return mask.unsqueeze(dim=0)
 
 class State:
 

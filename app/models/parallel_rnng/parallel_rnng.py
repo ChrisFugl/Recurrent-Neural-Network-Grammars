@@ -4,7 +4,7 @@ from app.models.abstract_rnng import AbstractRNNG
 from app.models.parallel_rnng.state import State, StateFactory
 import torch
 
-INVALID_ACTION_FILL = -9999999999.999999
+INVALID_ACTION_FILL = - 10e10
 
 class ParallelRNNG(AbstractRNNG):
     """
@@ -32,14 +32,15 @@ class ParallelRNNG(AbstractRNNG):
         self.reduce_index = self.action_converter.string2integer('REDUCE')
         if not self.generative:
             self.shift_index = self.action_converter.string2integer('SHIFT')
+            self.gen_indices = None
         else:
             self.shift_index = None
+            gen_start = self.action_converter.get_terminal_offset()
+            gen_count = self.action_converter.count_terminals()
+            self.gen_indices = list(range(gen_start, gen_start + gen_count))
         nt_start = self.action_converter.get_non_terminal_offset()
         nt_count = self.action_converter.count_non_terminals()
         self.nt_indices = list(range(nt_start, nt_start + nt_count))
-        gen_start = self.action_converter.get_terminal_offset()
-        gen_count = self.action_converter.count_terminals()
-        self.gen_indices = list(range(gen_start, gen_start + gen_count))
         self.state_factory = StateFactory(
             self.device, self.non_terminal_converter, self.token_converter,
             self.action_set, self.generative, self.action_count,
@@ -54,7 +55,7 @@ class ParallelRNNG(AbstractRNNG):
         :type batch: app.data.batch.Batch
         :rtype: torch.Tensor
         """
-        states, stack_size = self.preprocess_batch(batch)
+        states, invalid_masks, stack_size = self.preprocess_batch(batch)
         # plus one to account for start embeddings
         self.initialize_structures(batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths + 1, stack_size + 1)
         output_shape = (batch.max_actions_length, batch.size, self.action_count)
@@ -62,7 +63,7 @@ class ParallelRNNG(AbstractRNNG):
         for sequence_index in range(batch.max_actions_length):
             state = states[sequence_index]
             representation = self.get_representation()
-            output_log_probs[sequence_index] = self.get_log_probs(representation, state.invalid_mask)
+            output_log_probs[sequence_index] = self.get_log_probs(representation, invalid_masks[sequence_index])
             self.do_actions(batch.size, state)
             action_tensor = batch.actions.tensor[sequence_index].unsqueeze(dim=0)
             action_embedding = self.action_embedding(action_tensor)
@@ -118,11 +119,12 @@ class ParallelRNNG(AbstractRNNG):
         :type token: str
         :type include_gen: bool
         :type include_nt: bool
-        :rtype: torch.Tensor,
+        :rtype: torch.Tensor
         """
+        batch_size = len(state.token_counter)
         representation = self.get_representation()
-        log_probs = self.get_log_probs(representation, state.invalid_mask, posterior_scaling=posterior_scaling).view(-1, self.action_count)
-        return log_probs
+        log_probs = self.get_log_probs(representation, state.invalid_mask, posterior_scaling=posterior_scaling)
+        return log_probs.view(batch_size, self.action_count)
 
     def valid_actions(self, state):
         """
@@ -139,11 +141,13 @@ class ParallelRNNG(AbstractRNNG):
     def preprocess_batch(self, batch):
         """
         :type batch: app.data.batch.Batch
-        :rtype: list of app.models.parallel_rnng.state.State, int
+        :rtype: list of app.models.parallel_rnng.state.State, list of torch.Tensor, int
         """
         states = []
+        invalid_masks = []
         state = self.state_factory.initialize(batch.size, batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths)
         for action_index in range(batch.max_actions_length):
+            invalid_masks.append(state.invalid_mask)
             next_actions = []
             for actions in batch.actions.actions:
                 if action_index < len(actions):
@@ -152,7 +156,7 @@ class ParallelRNNG(AbstractRNNG):
                     next_actions.append(None)
             state = self.state_factory.next(state, next_actions)
             states.append(state)
-        return states, state.max_stack_size
+        return states, invalid_masks, state.max_stack_size
 
     def initialize_structures(self, tokens, tags, token_lengths, stack_size):
         batch_size = tokens.size(1)
@@ -223,8 +227,9 @@ class ParallelRNNG(AbstractRNNG):
         :rtype: torch.Tensor
         """
         logits = self.representation2logits(representation)
-        valid_logits = logits.masked_fill(invalid_mask, INVALID_ACTION_FILL)
-        log_probs = self.logits2log_prob(posterior_scaling * valid_logits)
+        logits = posterior_scaling * logits
+        logits = logits.masked_fill(invalid_mask, INVALID_ACTION_FILL)
+        log_probs = self.logits2log_prob(logits)
         return log_probs
 
     def do_actions(self, batch_size, state):

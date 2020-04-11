@@ -5,7 +5,7 @@ from torch import nn
 
 class GenerativeParallelRNNG(ParallelRNNG):
 
-    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, sanple_stack_size):
+    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, sample_stack_size):
         """
         :type device: torch.device
         :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
@@ -14,11 +14,11 @@ class GenerativeParallelRNNG(ParallelRNNG):
         :type representation: app.representations.representation.Representation
         :type composer: app.composers.composer.Composer
         :type sizes: int, int, int, int
-        :type sanple_stack_size: int
+        :type sample_stack_size: int
         """
         action_set = GenerativeActionSet()
         generative = True
-        super().__init__(device, embeddings, structures, converters, representation, composer, sizes, sanple_stack_size, action_set, generative)
+        super().__init__(device, embeddings, structures, converters, representation, composer, sizes, sample_stack_size, action_set, generative)
         token_size = sizes[1]
         start_token_embedding = torch.FloatTensor(token_size).uniform_(-1, 1)
         self.start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)

@@ -128,17 +128,16 @@ class Sampler:
     def sample_actions(self, state, log_probs):
         """
         :type log_probs: torch.Tensor
-        :rtype: torch.Tensor
+        :rtype: list of int
         """
-        batch_size = log_probs.size(0)
-        samples = torch.empty((batch_size,), device=log_probs.device, dtype=torch.long)
+        samples = []
         batch_valid_actions = self.get_valid_actions(state)
         for i, valid_actions in enumerate(batch_valid_actions):
             valid_indices, index2action = self.get_valid_indices(valid_actions)
             valid_log_probs = log_probs[i, valid_indices]
-            sample = valid_log_probs.argmax().cpu().item()
+            sample = self.sample_action(valid_log_probs)
             action_index = index2action[sample]
-            samples[i] = action_index
+            samples.append(action_index)
         return samples
 
     def batch_stats(self, batch_log_probs, actions, lengths):

@@ -6,7 +6,7 @@ from app.models.rnng.state import RNNGState
 from joblib import Parallel, delayed
 import torch
 
-INVALID_ACTION_LOG_PROB = -9999999999.999999
+INVALID_ACTION_LOG_PROB = - 10e10
 
 class RNNG(AbstractRNNG):
 
