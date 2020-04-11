@@ -4,7 +4,10 @@ def get_representation(rnn_input_size, rnn_hidden_size, config):
     :type rnn_hidden_size: int
     :type config: object
     """
-    if config.type == 'buffer_only':
+    if config.type == 'attentive':
+        from app.representations.attentive import AttentiveRepresentation
+        return AttentiveRepresentation(rnn_hidden_size, rnn_input_size, config.dropout)
+    elif config.type == 'buffer_only':
         from app.representations.buffer_only import BufferOnlyRepresentation
         return BufferOnlyRepresentation(rnn_hidden_size, rnn_input_size, config.dropout)
     elif config.type == 'history_only':
