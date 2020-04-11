@@ -1,0 +1,9 @@
+defaults:
+  - type: gen
+  - model: ${defaults.0.type}.parallel_rnng
+  - iterator: unordered
+  - loader: wsj.${defaults.0.type}.oracle
+gpu: null
+hydra:
+  run:
+    dir: ./outputs/time_stats/${now:%Y-%m-%d}_${now:%H-%M-%S}

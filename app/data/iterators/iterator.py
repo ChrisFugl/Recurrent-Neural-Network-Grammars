@@ -10,6 +10,12 @@ class Iterator:
     def __iter__(self):
         raise NotImplementedError('must be implemented by subclass')
 
+    def get_batch_size(self):
+        """
+        :rtype: int
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
     def size(self):
         """
         :rtype: int

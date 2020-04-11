@@ -60,6 +60,12 @@ class OrderedIterator(Iterator):
             tags_integers, tags_strings = flattened[4], flattened[5]
         return Iterable(tokens_integers, tokens_strings, actions_integers, actions, tags_integers, tags_strings, self._device, self._batch_size)
 
+    def get_batch_size(self):
+        """
+        :rtype: int
+        """
+        return self._batch_size
+
     def size(self):
         """
         :rtype: int
