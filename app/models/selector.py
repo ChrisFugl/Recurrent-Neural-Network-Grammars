@@ -40,7 +40,7 @@ def get_model(device, generative, action_converter, token_converter, tag_convert
                 model = GenerativeRNNG(*base_args, token_distribution)
             else:
                 from app.models.rnng.discriminative import DiscriminativeRNNG
-                pos_embedding = get_embedding(token_converter.count(), config.size.pos, config.embedding)
+                pos_embedding = get_embedding(tag_converter.count(), config.size.pos, config.embedding)
                 model = DiscriminativeRNNG(*base_args, config.size.pos, pos_embedding)
         else:
             from app.models.parallel_rnng.history_lstm import HistoryLSTM
@@ -59,7 +59,7 @@ def get_model(device, generative, action_converter, token_converter, tag_convert
             else:
                 from app.models.parallel_rnng.discriminative import DiscriminativeParallelRNNG
                 from app.models.parallel_rnng.input_buffer_lstm import InputBufferLSTM
-                pos_embedding = get_embedding(token_converter.count(), config.size.pos, config.embedding)
+                pos_embedding = get_embedding(tag_converter.count(), config.size.pos, config.embedding)
                 token_buffer = InputBufferLSTM(device, config.size.rnn, *rnn_args)
                 structures[1] = token_buffer
                 model = DiscriminativeParallelRNNG(*base_args, config.sample_stack_size, config.size.pos, pos_embedding)
