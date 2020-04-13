@@ -2,7 +2,7 @@ model:
   type: rnng
   composer:
     type: birnn
-    dropout: 0.0
+    dropout: 0.3
     num_layers: 1
   distribution:
     type: class_based_softmax

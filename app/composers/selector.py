@@ -13,9 +13,11 @@ def get_composer(device, config):
         rnn_config = deepcopy(config.rnn)
         rnn_config['bidirectional'] = False
         rnn_config['dropout'] = config.composer.dropout
+        if config.composer.num_layers == 1:
+            rnn_config['dropout'] = 0.0
         rnn_config['num_layers'] = config.composer.num_layers
         rnn_forward = get_rnn(device, config.rnn.hidden_size, rnn_config)
         rnn_backward = get_rnn(device, config.rnn.hidden_size, rnn_config)
-        return BiRNNComposer(rnn_forward, rnn_backward, config.rnn.hidden_size, config.size.rnn)
+        return BiRNNComposer(rnn_forward, rnn_backward, config.rnn.hidden_size, config.size.rnn, config.composer.dropout)
     else:
         raise Exception(f'Unknown composer: {type}')
