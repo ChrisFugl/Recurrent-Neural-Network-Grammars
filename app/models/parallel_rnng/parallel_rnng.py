@@ -1,7 +1,6 @@
-from app.constants import ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_REDUCE_TYPE, ACTION_NON_TERMINAL_TYPE, PAD_INDEX
-from app.data.actions.non_terminal import NonTerminalAction
+from app.constants import PAD_INDEX
 from app.models.abstract_rnng import AbstractRNNG
-from app.models.parallel_rnng.state import State, StateFactory
+from app.models.parallel_rnng.state import StateFactory
 import torch
 
 INVALID_ACTION_FILL = - 10e10
@@ -55,15 +54,15 @@ class ParallelRNNG(AbstractRNNG):
         :type batch: app.data.batch.Batch
         :rtype: torch.Tensor
         """
-        states, invalid_masks, stack_size = self.preprocess_batch(batch)
+        states, stack_size = self.preprocess_batch(batch)
         # plus one to account for start embeddings
         self.initialize_structures(batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths + 1, stack_size + 1)
         output_shape = (batch.max_actions_length, batch.size, self.action_count)
-        output_log_probs = torch.zeros(output_shape, device=self.device, dtype=torch.float, requires_grad=False)
+        output_log_probs = torch.zeros(output_shape, device=self.device, dtype=torch.float)
         for sequence_index in range(batch.max_actions_length):
             state = states[sequence_index]
             representation = self.get_representation()
-            output_log_probs[sequence_index] = self.get_log_probs(representation, invalid_masks[sequence_index])
+            output_log_probs[sequence_index] = self.get_log_probs(representation)
             self.do_actions(batch.size, state)
             action_tensor = batch.actions.tensor[sequence_index].unsqueeze(dim=0)
             action_embedding = self.action_embedding(action_tensor)
@@ -123,7 +122,7 @@ class ParallelRNNG(AbstractRNNG):
         """
         batch_size = len(state.token_counter)
         representation = self.get_representation()
-        log_probs = self.get_log_probs(representation, state.invalid_mask, posterior_scaling=posterior_scaling)
+        log_probs = self.get_log_probs(representation, invalid_mask=state.invalid_mask, posterior_scaling=posterior_scaling)
         return log_probs.view(batch_size, self.action_count)
 
     def valid_actions(self, state):
@@ -144,19 +143,17 @@ class ParallelRNNG(AbstractRNNG):
         :rtype: list of app.models.parallel_rnng.state.State, list of torch.Tensor, int
         """
         states = []
-        invalid_masks = []
-        state = self.state_factory.initialize(batch.size, batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths)
+        state = self.state_factory.initialize(batch.size, batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths, make_invalid_mask=False)
         for action_index in range(batch.max_actions_length):
-            invalid_masks.append(state.invalid_mask)
             next_actions = []
             for actions in batch.actions.actions:
                 if action_index < len(actions):
                     next_actions.append(actions[action_index])
                 else:
                     next_actions.append(None)
-            state = self.state_factory.next(state, next_actions)
+            state = self.state_factory.next(state, next_actions, make_invalid_mask=False)
             states.append(state)
-        return states, invalid_masks, state.max_stack_size
+        return states, state.max_stack_size
 
     def initialize_structures(self, tokens, tags, token_lengths, stack_size):
         batch_size = tokens.size(1)
@@ -220,7 +217,7 @@ class ParallelRNNG(AbstractRNNG):
             token_buffer_embedding, token_buffer_lengths
         )
 
-    def get_log_probs(self, representation, invalid_mask, posterior_scaling=1.0):
+    def get_log_probs(self, representation, invalid_mask=None, posterior_scaling=1.0):
         """
         :type representation: torch.Tensor
         :type invalid_mask: torch.Tensor
@@ -228,7 +225,8 @@ class ParallelRNNG(AbstractRNNG):
         """
         logits = self.representation2logits(representation)
         logits = posterior_scaling * logits
-        logits = logits.masked_fill(invalid_mask, INVALID_ACTION_FILL)
+        if invalid_mask is not None:
+            logits = logits.masked_fill(invalid_mask, INVALID_ACTION_FILL)
         log_probs = self.logits2log_prob(logits)
         return log_probs
 

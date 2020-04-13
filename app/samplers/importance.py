@@ -111,7 +111,7 @@ class ImportanceSampler(Sampler):
         :rtype: int
         """
         distribution = Categorical(logits=log_probs)
-        return distribution.sample()
+        return distribution.sample().cpu().item()
 
     def dis2gen(self, actions_dis, tokens):
         token_index = 0

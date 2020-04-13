@@ -60,7 +60,8 @@ class DiscriminativeRNNG(RNNG):
 
     def token_tag2word(self, token, tag):
         word = torch.cat((token, tag), dim=2)
-        word = self.activation(self.word2buffer(word))
+        word = self.word2buffer(word)
+        word = self.activation(word)
         return word
 
     def __str__(self):

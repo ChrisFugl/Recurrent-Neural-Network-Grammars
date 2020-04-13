@@ -31,12 +31,13 @@ class StateFactory:
         self.gen_indices = gen_indices
         self.nt_indices = nt_indices
 
-    def initialize(self, batch_size, tokens_tensor, tags_tensor, tokens_lengths):
+    def initialize(self, batch_size, tokens_tensor, tags_tensor, tokens_lengths, make_invalid_mask=True):
         """
         :type batch_size: int
         :type tokens_tensor: torch.Tensor
         :type tags_tensor: torch.Tensor
         :type tokens_tensor_lengths: torch.Tensor
+        :type make_invalid_mask: bool
         :rtype: app.models.parallel_rnng.state.State
         """
         parent_node = [None for _ in range(batch_size)]
@@ -46,7 +47,9 @@ class StateFactory:
         token_counter = [0 for _ in range(batch_size)]
         last_action = [None for _ in range(batch_size)]
         open_nt_count = [0 for _ in range(batch_size)]
-        invalid_mask = self.get_invalid_mask(tokens_lengths, token_counter, last_action, open_nt_count)
+        invalid_mask = None
+        if make_invalid_mask:
+            invalid_mask = self.get_invalid_mask(tokens_lengths, token_counter, last_action, open_nt_count)
         state = State(
             tokens_tensor, tags_tensor,
             parent_node, stack_size, max_stack_size, shift_index,
@@ -56,10 +59,11 @@ class StateFactory:
         )
         return state
 
-    def next(self, state, actions):
+    def next(self, state, actions, make_invalid_mask=True):
         """
         :type state: app.models.parallel_rnng.state.State
         :type actions: list of app.data.actions.action.Action
+        :type make_invalid_mask: bool
         :rtype: app.models.parallel_rnng.state.State
         """
         batch_size = len(actions)
@@ -121,7 +125,9 @@ class StateFactory:
         token_index_tensor = torch.tensor(token_index, device=self.device, dtype=torch.long)
         tag_index_tensor = torch.tensor(tag_index, device=self.device, dtype=torch.long)
         number_of_children_tensor = torch.tensor(number_of_children, device=self.device, dtype=torch.long)
-        invalid_mask = self.get_invalid_mask(state.tokens_lengths, state.token_counter, state.last_action, state.open_nt_count)
+        invalid_mask = None
+        if make_invalid_mask:
+            invalid_mask = self.get_invalid_mask(state.tokens_lengths, state.token_counter, state.last_action, state.open_nt_count)
         next_state = State(
             state.tokens_tensor, state.tags_tensor,
             state.parent_node, state.stack_size, max_stack_size, state.shift_index,
@@ -200,7 +206,6 @@ class State:
         if nt_actions is None:
             self.non_pad_actions = None
         else:
-            batch_size = len(tokens_lengths)
             non_pad_actions = []
             non_pad_actions.extend(nt_actions)
             non_pad_actions.extend(shift_actions)

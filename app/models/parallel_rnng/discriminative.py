@@ -73,7 +73,8 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
 
     def token_tag2word(self, tokens, tags, dim=2):
         words = torch.cat((tokens, tags), dim=dim)
-        words = self.activation(self.word2buffer(words))
+        words = self.word2buffer(words)
+        words = self.activation(words)
         return words
 
     def __str__(self):

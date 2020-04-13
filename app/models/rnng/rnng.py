@@ -39,12 +39,17 @@ class RNNG(AbstractRNNG):
 
         # start at 1 since index 0 is reserved for padding
         self.reduce_index = 1
+        self.index2action = {self.reduce_index: 1}
         if self.generative:
             self.gen_index = 2
+            self.index2action[self.gen_index] =2
         else:
             self.shift_index = 2
+            self.index2action[self.shift_index] = 2
         self.nt_start = 3
         self.nt_indices = list(range(self.nt_start, self.nt_start + self.nt_count))
+        for nt_index in self.nt_indices:
+            self.index2action[nt_index] = nt_index
         self.type2action = {
             ACTION_REDUCE_TYPE: self.reduce,
             ACTION_NON_TERMINAL_TYPE: self.non_terminal,
@@ -95,28 +100,23 @@ class RNNG(AbstractRNNG):
         token_counter = 0
         open_non_terminals_count = 0
         action_top, stack_top, token_top = self.initialize_structures(tokens_tensor, tags_tensor, tokens_length)
-        log_probs = torch.zeros((actions_max_length, self.action_count), dtype=torch.float, device=self.device, requires_grad=False)
+        output_log_probs = torch.zeros((actions_max_length, self.action_count), dtype=torch.float, device=self.device)
         for sequence_index in range(actions_length):
             action = actions[sequence_index]
-            last_action = stack_top.data
             representation = self.get_representation(action_top, stack_top, token_top)
-            valid_actions = self.action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
-            assert action.type() in valid_actions, f'{action} is not a valid action. (valid_actions = {valid_actions})'
-            valid_indices, action2index = self.get_valid_indices(valid_actions)
             logits = self.representation2logits(representation)
-            valid_logits = logits[:, :, valid_indices]
-            valid_log_probs = self.logits2log_prob(valid_logits)
-            action_args_log_probs = ActionLogProbs(representation, valid_log_probs, action2index)
+            log_probs = self.logits2log_prob(logits)
+            action_args_log_probs = ActionLogProbs(representation, log_probs, self.index2action)
             action_args_outputs = ActionOutputs(stack_top, token_top, open_non_terminals_count, token_counter)
             action_fn = self.type2action[action.type()]
             action_outputs = action_fn(action_args_log_probs, action_args_outputs, action)
             action_log_prob, stack_top, token_top, open_non_terminals_count, token_counter = action_outputs
             action_index = self.action_converter.action2integer(action)
-            log_probs[sequence_index, action_index] = action_log_prob
+            output_log_probs[sequence_index, action_index] = action_log_prob
             action_tensor = actions_tensor[sequence_index].unsqueeze(dim=0)
             action_embedding = self.action_embedding(action_tensor)
             action_top = self.action_history.push(action_embedding, data=action, top=action_top)
-        return log_probs
+        return output_log_probs
 
     def initial_state(self, tokens, tags, lengths):
         """

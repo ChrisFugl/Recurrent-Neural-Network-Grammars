@@ -75,7 +75,7 @@ class AncestralSampler(Sampler):
         :rtype: int
         """
         distribution = Categorical(logits=log_probs)
-        return distribution.sample()
+        return distribution.sample().cpu().item()
 
     def __str__(self):
         return f'Ancestral(posterior_scaling={self.posterior_scaling}, samples={self.samples})'

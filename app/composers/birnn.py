@@ -28,21 +28,20 @@ class BiRNNComposer(Composer):
         :type popped_lengths: torch.Tensor
         :rtype: torch.Tensor
         """
-        # plus 1 to account for non-terminal embedding
-        lengths = popped_lengths + 1
         backward_popped_items = padded_reverse(popped_items, popped_lengths)
-        forward_output = self.input2output(self.rnn_forward, nt_embedding, popped_items, lengths)
-        backward_output = self.input2output(self.rnn_backward, nt_embedding, backward_popped_items, lengths)
+        forward_output = self.input2output(self.rnn_forward, nt_embedding, popped_items, popped_lengths)
+        backward_output = self.input2output(self.rnn_backward, nt_embedding, backward_popped_items, popped_lengths)
         affine_input = torch.cat((forward_output, backward_output), dim=2)
-        output = self.activation(self.affine(affine_input))
+        output = self.affine(affine_input)
+        output = self.activation(output)
         return output
 
     def input2output(self, rnn, nt_embedding, items, lengths):
         batch_size = items.size(1)
-        rnn_input = torch.cat((nt_embedding, items), dim=0)
-        packed_input = pack_padded_sequence(rnn_input, lengths, enforce_sorted=False)
         initial_state = rnn.initial_state(batch_size)
-        _, (hidden_state, _) = rnn(packed_input, initial_state) # num layers, batch size, hidden size
+        _, state = rnn(nt_embedding, initial_state)
+        packed_input = pack_padded_sequence(items, lengths, enforce_sorted=False)
+        _, (hidden_state, _) = rnn(packed_input, state) # num layers, batch size, hidden size
         last_layer_state = hidden_state[-1]
         output = last_layer_state.unsqueeze(dim=0)
         output = self.dropout(output)

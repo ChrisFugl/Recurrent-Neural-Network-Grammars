@@ -18,7 +18,7 @@ class VanillaRepresentation(Representation):
         self.representation_size = representation_size
         # token, stack, action
         input_size = 3 * embedding_size
-        self.feedforward = nn.Linear(in_features=input_size, out_features=representation_size, bias=True)
+        self.affine = nn.Linear(in_features=input_size, out_features=representation_size, bias=True)
         self.activation = nn.ReLU()
         self.dropout = nn.Dropout(p=dropout)
 
@@ -37,8 +37,8 @@ class VanillaRepresentation(Representation):
         buffer_embedding = self.dropout(batched_index_select(token_buffer, token_buffer_lengths - 1))
         embeddings = [history_embedding, stack_embedding, buffer_embedding]
         # concatenate along last dimension, as inputs have shape S, B, H (sequence length, batch size, hidden size)
-        feedforward_input = torch.cat(embeddings, dim=2)
-        output = self.feedforward(feedforward_input)
+        affine_input = torch.cat(embeddings, dim=2)
+        output = self.affine(affine_input)
         output = self.activation(output)
         return output
 
