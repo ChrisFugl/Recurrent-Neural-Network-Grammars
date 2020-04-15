@@ -4,14 +4,16 @@ from math import ceil
 import os
 import pandas as pd
 import time
+import torch
 
 RESULTS_FILENAME = 'time_stats.csv'
-RESULTS_HEADERS = ['sentences', 'tokens', 'actions', 'time_s']
+RESULTS_HEADERS = ['sentences', 'tokens', 'actions', 'memory_allocated_gb', 'memory_reserved_gb', 'time_s']
 
 class TimeStatsTask(Task):
 
-    def __init__(self, model, iterator):
+    def __init__(self, device, model, iterator):
         """
+        :type device: torch.device
         :type model: app.models.model.Model
         :type iterator: app.data.iterators.iterator.Iterator
         """
@@ -19,8 +21,12 @@ class TimeStatsTask(Task):
         self.model = model
         self.iterator = iterator
         self.logger = logging.getLogger('time_stats')
+        self.device = device
+        self.uses_gpu = self.device.type == 'cuda'
 
     def run(self):
+        self.logger.info(f'Using device: {self.device}')
+        self.logger.info(f'Batch size: {self.iterator.get_batch_size()}')
         self.logger.info(f'Model:\n{self.model}')
         self.logger.info('Started measuring')
         time_start = time.time()
@@ -40,14 +46,23 @@ class TimeStatsTask(Task):
         log_threshold = batch_total / 10 # log progress approximately every 10th batch
         self.model.eval()
         for i, batch in enumerate(self.iterator):
+            self.start_measure_memory()
             time_start = time.time()
-            self.model.batch_log_likelihood(batch)
+            output = self.model.batch_log_likelihood(batch)
             time_stop = time.time()
+            memory = self.stop_measure_memory()
+            if self.uses_gpu:
+                del output
+                torch.cuda.empty_cache()
+            if memory is None:
+                allocated_gb, reserved_gb = None, None
+            else:
+                allocated_gb, reserved_gb = memory
             sentences = batch.size
             tokens = self.count_tokens(batch)
             actions = self.count_actions(batch)
             time_s = time_stop - time_start
-            result = [sentences, tokens, actions, time_s]
+            result = [sentences, tokens, actions, allocated_gb, reserved_gb, time_s]
             results.append(result)
             if log_threshold <= counter:
                 self.logger.info(f'Batch {i + 1} / {batch_total} ({(i + 1)/batch_total:0.2%})')
@@ -79,3 +94,17 @@ class TimeStatsTask(Task):
         path = os.path.join(os.getcwd(), RESULTS_FILENAME)
         self.logger.info(f'Saving output to {path}')
         timings.to_csv(path, index=False)
+
+    def byte2gb(self, byte_amount):
+        return byte_amount / (1024 ** 3)
+
+    def start_measure_memory(self):
+        if self.uses_gpu:
+            torch.cuda.reset_peak_memory_stats(self.device)
+
+    def stop_measure_memory(self):
+        if self.uses_gpu:
+            allocated_gb = self.byte2gb(torch.cuda.max_memory_allocated(self.device))
+            reserved_gb = self.byte2gb(torch.cuda.max_memory_reserved(self.device))
+            return allocated_gb, reserved_gb
+        return None

@@ -4,6 +4,7 @@ defaults:
   - iterator: unordered
   - loader: wsj.${defaults.0.type}.oracle
 gpu: null
+name: tmp
 hydra:
   run:
-    dir: ./outputs/time_stats/${now:%Y-%m-%d}_${now:%H-%M-%S}
+    dir: ./outputs/time_stats/${name}
