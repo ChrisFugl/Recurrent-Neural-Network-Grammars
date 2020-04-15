@@ -56,6 +56,16 @@ class HistoryLSTM(nn.Module):
         self.state = next_state
         self.history.append(output)
 
+    def top(self):
+        """
+        :rtype: torch.Tensor
+        """
+        top = []
+        for i, length in enumerate(self.lengths):
+            output = self.history[length - 1][:, i, :]
+            top.append(output)
+        return torch.stack(top, dim=1)
+
     def __str__(self):
         return f'HistoryLSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers})'
 

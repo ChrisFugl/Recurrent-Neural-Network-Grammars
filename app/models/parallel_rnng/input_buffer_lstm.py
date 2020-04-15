@@ -30,5 +30,11 @@ class InputBufferLSTM(BufferLSTM):
         """
         self.lengths = self.lengths + op
 
+    def top(self):
+        """
+        :rtype: torch.Tensor
+        """
+        return batched_index_select(self.buffer, self.lengths - 1)
+
     def __str__(self):
         return f'InputBufferLSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers})'

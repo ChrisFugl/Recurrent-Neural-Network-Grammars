@@ -297,14 +297,20 @@ class RNNG(AbstractRNNG):
         :type stack_top: app.models.rnng.stack.StackNode
         :type token_top: app.models.rnng.stack.StackNode
         """
-        action_history_embedding = self.action_history.contents(action_top)
-        stack_embedding = self.stack.contents(stack_top)
-        token_buffer_embedding = self.token_buffer.contents(token_top)
-        return self.representation(
-            action_history_embedding, action_top.length_as_tensor(self.device),
-            stack_embedding, stack_top.length_as_tensor(self.device),
-            token_buffer_embedding, token_top.length_as_tensor(self.device),
-        )
+        if self.representation.top_only():
+            history_embedding = self.action_history.top(action_top)
+            stack_embedding = self.stack.top(stack_top)
+            buffer_embedding = self.token_buffer.top(token_top)
+            return self.representation(history_embedding, None, stack_embedding, None, buffer_embedding, None)
+        else:
+            history_embedding = self.action_history.contents(action_top)
+            stack_embedding = self.stack.contents(stack_top)
+            buffer_embedding = self.token_buffer.contents(token_top)
+            return self.representation(
+                history_embedding, action_top.length_as_tensor(self.device),
+                stack_embedding, stack_top.length_as_tensor(self.device),
+                buffer_embedding, token_top.length_as_tensor(self.device),
+            )
 
     def get_valid_indices(self, valid_actions):
         valid_indices = []

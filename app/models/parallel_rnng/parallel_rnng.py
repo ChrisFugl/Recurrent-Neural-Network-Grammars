@@ -208,14 +208,20 @@ class ParallelRNNG(AbstractRNNG):
         return torch.ones((batch_size,), device=self.device, dtype=torch.long)
 
     def get_representation(self):
-        history_embedding, history_lengths = self.action_history.contents()
-        stack_embedding, stack_lengths = self.stack.contents()
-        token_buffer_embedding, token_buffer_lengths = self.token_buffer.contents()
-        return self.representation(
-            history_embedding, history_lengths,
-            stack_embedding, stack_lengths,
-            token_buffer_embedding, token_buffer_lengths
-        )
+        if self.representation.top_only():
+            history_embedding = self.action_history.top()
+            stack_embedding = self.stack.top().unsqueeze(dim=0)
+            buffer_embedding = self.token_buffer.top()
+            return self.representation(history_embedding, None, stack_embedding, None, buffer_embedding, None)
+        else:
+            history_embedding, history_lengths = self.action_history.contents()
+            stack_embedding, stack_lengths = self.stack.contents()
+            buffer_embedding, buffer_lengths = self.token_buffer.contents()
+            return self.representation(
+                history_embedding, history_lengths,
+                stack_embedding, stack_lengths,
+                buffer_embedding, buffer_lengths
+            )
 
     def get_log_probs(self, representation, invalid_mask=None, posterior_scaling=1.0):
         """

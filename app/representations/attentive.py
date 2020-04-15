@@ -56,6 +56,12 @@ class AttentiveRepresentation(Representation):
         output = self.activation(output)
         return output
 
+    def top_only(self):
+        """
+        :rtype: bool
+        """
+        return False
+
     def embed(self, inputs2query, inputs2key, inputs2value, value2embedding, inputs, lengths):
         max_length, batch_size, hidden_size = inputs.shape
         query_inputs = batched_index_select(inputs, lengths - 1) # 1, batch_size, hidden_size

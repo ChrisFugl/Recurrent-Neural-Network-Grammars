@@ -50,6 +50,13 @@ class Stack(torch.nn.Module):
         else:
             return top.parent
 
+    def top(self, top):
+        """
+        :type top: StackNode
+        :rtype: torch.Tensor
+        """
+        return top.output
+
     def __str__(self):
         return f'Stack(rnn={self._rnn})'
 

@@ -1,5 +1,4 @@
 from app.representations.representation import Representation
-from app.utils import batched_index_select
 from torch import nn
 
 class StackOnlyRepresentation(Representation):
@@ -29,11 +28,17 @@ class StackOnlyRepresentation(Representation):
         :type token_buffer_lengths: torch.Tensor
         :rtype: torch.Tensor
         """
-        output = batched_index_select(stack, stack_lengths - 1)
+        output = stack
         output = self.dropout(output)
         output = self.feedforward(output)
         output = self.activation(output)
         return output
+
+    def top_only(self):
+        """
+        :rtype: bool
+        """
+        return True
 
     def __str__(self):
         return f'StackOnly(size={self.representation_size})'

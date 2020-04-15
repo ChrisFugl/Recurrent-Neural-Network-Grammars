@@ -16,3 +16,9 @@ class Representation(nn.Module):
         :rtype: torch.Tensor
         """
         raise NotImplementedError('must be implemented by subclass')
+
+    def top_only(self):
+        """
+        :rtype: bool
+        """
+        raise NotImplementedError('must be implemented by subclass')
