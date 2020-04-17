@@ -5,6 +5,7 @@ from networkx.drawing.nx_agraph import graphviz_layout
 
 NODE_COLOR = [[0, 0, 0, 0]]
 FONT_COLOR = 'blue'
+FONT_FAMILY = 'Heiti TC' # for chinese character support
 FONT_SIZE = 9
 
 def visualize_tree(actions, tokens):
@@ -15,7 +16,7 @@ def visualize_tree(actions, tokens):
     fig = plt.figure()
     graph = make_graph(actions, tokens)
     pos = graphviz_layout(graph, prog='dot')
-    nx.draw(graph, pos, with_labels=True, arrows=False, node_color=NODE_COLOR, font_size=FONT_SIZE, font_color=FONT_COLOR)
+    nx.draw(graph, pos, with_labels=True, arrows=False, node_color=NODE_COLOR, font_size=FONT_SIZE, font_color=FONT_COLOR, font_family=FONT_FAMILY)
     return fig
 
 def make_graph(actions, tokens):
