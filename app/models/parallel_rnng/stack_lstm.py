@@ -5,7 +5,7 @@ from torch import nn
 
 class StackLSTM(nn.Module):
 
-    def __init__(self, device, input_size, hidden_size, num_layers, bias, dropout):
+    def __init__(self, device, input_size, hidden_size, num_layers, bias, dropout, weight_drop):
         """
         :type device: torch.device
         :type input_size: int
@@ -13,13 +13,14 @@ class StackLSTM(nn.Module):
         :type num_layers: int
         :type bias: bool
         :type dropout: float
+        :type weight_drop: float
         """
         super().__init__()
         self.device = device
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.lstm = MultiLayerLSTMCell(input_size, hidden_size, num_layers, bias, dropout)
+        self.lstm = MultiLayerLSTMCell(input_size, hidden_size, num_layers, bias, dropout, weight_drop)
 
     def contents(self):
         """

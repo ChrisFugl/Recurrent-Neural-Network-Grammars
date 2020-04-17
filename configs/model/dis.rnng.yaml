@@ -19,6 +19,7 @@ model:
     bias: true
     dropout: 0.2
     bidirectional: false
+    weight_drop: null
   size:
     action: 16
     pos: 12

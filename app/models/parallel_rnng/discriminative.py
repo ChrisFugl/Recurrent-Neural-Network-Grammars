@@ -6,7 +6,7 @@ from torch import nn
 
 class DiscriminativeParallelRNNG(ParallelRNNG):
 
-    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes,sample_stack_size, pos_size, pos_embedding):
+    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, sample_stack_size, pos_size, pos_embedding):
         """
         :type device: torch.device
         :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding

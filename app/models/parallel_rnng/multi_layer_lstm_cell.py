@@ -1,27 +1,31 @@
 """
 Based on https://github.com/shuoyangd/hoolock/blob/master/model/MultiLayerLSTMCell.py
 """
-
+from app.dropout.weight_drop import WeightDrop
 import torch
 from torch import nn
 
 class MultiLayerLSTMCell(nn.Module):
 
-  def __init__(self, input_size, hidden_size, num_layers, bias, dropout):
+  def __init__(self, input_size, hidden_size, num_layers, bias, dropout, weight_drop):
       """
       :type input_size: int
       :type hidden_size: int
       :type num_layers: int
       :type bias: bool
       :type dropout: float
+      :type weight_drop: float
       """
       super(MultiLayerLSTMCell, self).__init__()
       self.num_layers = num_layers
       self.dropout = nn.Dropout(p=dropout)
       self.lstm = nn.ModuleList()
       self.lstm.append(nn.LSTMCell(input_size, hidden_size, bias=bias))
+      weights = ['weight_hh']
       for i in range(num_layers - 1):
           self.lstm.append(nn.LSTMCell(hidden_size, hidden_size, bias=bias))
+          if weight_drop is not None:
+              self.lstm[i] = WeightDrop(self.lstm[i], weights, weight_drop)
 
   def forward(self, input, prev):
       """
