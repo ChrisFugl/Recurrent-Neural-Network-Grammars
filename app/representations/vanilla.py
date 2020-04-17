@@ -47,5 +47,23 @@ class VanillaRepresentation(Representation):
         """
         return True
 
+    def uses_action_history(self):
+        """
+        :rtype: bool
+        """
+        return True
+
+    def uses_stack(self):
+        """
+        :rtype: bool
+        """
+        return True
+
+    def uses_token_buffer(self):
+        """
+        :rtype: bool
+        """
+        return True
+
     def __str__(self):
         return f'Vanilla(size={self.representation_size})'

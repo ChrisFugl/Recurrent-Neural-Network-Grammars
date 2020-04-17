@@ -62,6 +62,24 @@ class AttentiveRepresentation(Representation):
         """
         return False
 
+    def uses_action_history(self):
+        """
+        :rtype: bool
+        """
+        return True
+
+    def uses_stack(self):
+        """
+        :rtype: bool
+        """
+        return True
+
+    def uses_token_buffer(self):
+        """
+        :rtype: bool
+        """
+        return True
+
     def embed(self, inputs2query, inputs2key, inputs2value, value2embedding, inputs, lengths):
         max_length, batch_size, hidden_size = inputs.shape
         query_inputs = batched_index_select(inputs, lengths - 1) # 1, batch_size, hidden_size

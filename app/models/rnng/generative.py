@@ -21,12 +21,17 @@ class GenerativeRNNG(RNNG):
         super().__init__(device, embeddings, structures, converters, representation, composer, sizes, threads, action_set, generative)
         self.token_distribution = token_distribution
 
-    def generate(self, log_probs, outputs, action):
-        token_index = self.token_converter.token2integer(action.argument)
-        token_tensor = torch.tensor([[token_index]], device=self.device, dtype=torch.long)
-        token_embedding = self.token_embedding(token_tensor)
-        stack_top = self.stack.push(token_embedding, data=action, top=outputs.stack_top)
-        token_top = self.token_buffer.push(token_embedding, top=outputs.token_top)
+    def generate(self, log_probs, tokens, tags, outputs, action):
+        stack_top = outputs.stack_top
+        token_top = outputs.token_top
+        if self.uses_stack or self.uses_buffer:
+            token_index = self.token_converter.token2integer(action.argument)
+            token_tensor = torch.tensor([[token_index]], device=self.device, dtype=torch.long)
+            token_embedding = self.token_embedding(token_tensor)
+            if self.uses_stack:
+                stack_top = self.stack.push(token_embedding, data=action, top=outputs.stack_top)
+            if self.uses_buffer:
+                token_top = self.token_buffer.push(token_embedding, top=outputs.token_top)
         if log_probs is None:
             action_log_prob = None
         else:
@@ -49,9 +54,9 @@ class GenerativeRNNG(RNNG):
     def __str__(self):
         return (
             'GenerativeRNNG(\n'
-            + f'  action_history={self.action_history}\n'
-            + f'  token_buffer={self.token_buffer}\n'
-            + f'  stack={self.stack}\n'
+            + ('' if not self.uses_history else f'  action_history={self.action_history}\n')
+            + ('' if not self.uses_buffer else f'  token_buffer={self.token_buffer}\n')
+            + ('' if not self.uses_stack else f'  stack={self.stack}\n')
             + f'  representation={self.representation}\n'
             + f'  composer={self.composer}\n'
             + f'  token_distribution={self.token_distribution}\n'

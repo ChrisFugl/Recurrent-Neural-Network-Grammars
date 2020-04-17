@@ -22,3 +22,21 @@ class Representation(nn.Module):
         :rtype: bool
         """
         raise NotImplementedError('must be implemented by subclass')
+
+    def uses_action_history(self):
+        """
+        :rtype: bool
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
+    def uses_stack(self):
+        """
+        :rtype: bool
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
+    def uses_token_buffer(self):
+        """
+        :rtype: bool
+        """
+        raise NotImplementedError('must be implemented by subclass')

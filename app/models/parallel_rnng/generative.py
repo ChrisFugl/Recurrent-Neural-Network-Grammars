@@ -57,9 +57,9 @@ class GenerativeParallelRNNG(ParallelRNNG):
     def __str__(self):
         return (
             'GenerativeParallelRNNG(\n'
-            + f'  action_history={self.action_history}\n'
-            + f'  token_buffer={self.token_buffer}\n'
-            + f'  stack={self.stack}\n'
+            + ('' if not self.uses_history else f'  action_history={self.action_history}\n')
+            + ('' if not self.uses_buffer else f'  token_buffer={self.token_buffer}\n')
+            + ('' if not self.uses_stack else f'  stack={self.stack}\n')
             + f'  representation={self.representation}\n'
             + f'  composer={self.composer}\n'
             + ')'

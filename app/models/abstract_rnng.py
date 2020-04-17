@@ -27,18 +27,26 @@ class AbstractRNNG(Model):
         self.device = device
         self.action_converter, self.token_converter, self.tag_converter, self.non_terminal_converter = converters
         self.action_embedding, self.token_embedding, self.nt_embedding, self.nt_compose_embedding = embeddings
-        self.action_history, self.token_buffer, self.stack = structures
         self.representation = representation
+        self.uses_buffer = representation.uses_token_buffer()
+        self.uses_history = representation.uses_action_history()
+        self.uses_stack = representation.uses_stack()
+        action_history, token_buffer, stack = structures
+        if self.uses_history:
+            self.action_history = action_history
+            start_action_embedding = torch.FloatTensor(action_size).uniform_(-1, 1)
+            self.start_action_embedding = nn.Parameter(start_action_embedding, requires_grad=True)
+        if self.uses_buffer:
+            self.token_buffer = token_buffer
+            start_token_embedding = torch.FloatTensor(token_size).uniform_(-1, 1)
+            self.start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)
+        if self.uses_stack:
+            self.stack = stack
+            start_stack_embedding = torch.FloatTensor(rnn_input_size).uniform_(-1, 1)
+            self.start_stack_embedding = nn.Parameter(start_stack_embedding, requires_grad=True)
         self.representation2logits = nn.Linear(in_features=rnn_input_size, out_features=base_out_features, bias=True)
         self.composer = composer
         self.logits2log_prob = nn.LogSoftmax(dim=2)
-
-        start_action_embedding = torch.FloatTensor(action_size).uniform_(-1, 1)
-        self.start_action_embedding = nn.Parameter(start_action_embedding, requires_grad=True)
-        start_token_embedding = torch.FloatTensor(token_size).uniform_(-1, 1)
-        self.start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)
-        start_stack_embedding = torch.FloatTensor(rnn_input_size).uniform_(-1, 1)
-        self.start_stack_embedding = nn.Parameter(start_stack_embedding, requires_grad=True)
 
     def save(self, path):
         """

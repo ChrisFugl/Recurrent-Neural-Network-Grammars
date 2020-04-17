@@ -109,13 +109,14 @@ class RNNG(AbstractRNNG):
             action_args_log_probs = ActionLogProbs(representation, log_probs, self.index2action)
             action_args_outputs = ActionOutputs(stack_top, token_top, open_non_terminals_count, token_counter)
             action_fn = self.type2action[action.type()]
-            action_outputs = action_fn(action_args_log_probs, action_args_outputs, action)
+            action_outputs = action_fn(action_args_log_probs, tokens_tensor, tags_tensor, action_args_outputs, action)
             action_log_prob, stack_top, token_top, open_non_terminals_count, token_counter = action_outputs
             action_index = self.action_converter.action2integer(action)
             output_log_probs[sequence_index, action_index] = action_log_prob
-            action_tensor = actions_tensor[sequence_index].unsqueeze(dim=0)
-            action_embedding = self.action_embedding(action_tensor)
-            action_top = self.action_history.push(action_embedding, data=action, top=action_top)
+            if self.uses_history:
+                action_tensor = actions_tensor[sequence_index].unsqueeze(dim=0)
+                action_embedding = self.action_embedding(action_tensor)
+                action_top = self.action_history.push(action_embedding, data=action, top=action_top)
         return output_log_probs
 
     def initial_state(self, tokens, tags, lengths):
@@ -135,7 +136,7 @@ class RNNG(AbstractRNNG):
             tokens_tensor = tokens[:length, i].unsqueeze(dim=1)
             tags_tensor = tags[:length, i].unsqueeze(dim=1)
             action_top, stack_top, token_top = self.initialize_structures(tokens_tensor, tags_tensor, length)
-            state = RNNGState(stack_top, action_top, token_top, tokens_tensor, length, open_non_terminals_count, token_counter)
+            state = RNNGState(stack_top, action_top, token_top, tokens_tensor, tags_tensor, length, open_non_terminals_count, token_counter)
             states.append(state)
         return states
 
@@ -154,18 +155,20 @@ class RNNG(AbstractRNNG):
             else:
                 tokens_length = state.tokens_length
                 token_counter = state.token_counter
-                last_action = state.stack_top.data
+                last_action = state.last_action
                 open_non_terminals_count = state.open_non_terminals_count
                 valid_actions = self.action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
                 assert action.type() in valid_actions, f'{action} is not a valid action. (valid_actions = {valid_actions})'
                 action_args_outputs = ActionOutputs(state.stack_top, state.token_top, open_non_terminals_count, token_counter)
-                action_outputs = self.type2action[action.type()](None, action_args_outputs, action)
+                action_outputs = self.type2action[action.type()](None, state.tokens, state.tags, action_args_outputs, action)
                 _, stack_top, token_top, open_non_terminals_count, token_counter = action_outputs
-                action_index = self.action_converter.action2integer(action)
-                action_tensor = torch.tensor([[action_index]], device=self.device, dtype=torch.long)
-                action_embedding = self.action_embedding(action_tensor)
-                action_top = self.action_history.push(action_embedding, data=action, top=state.action_top)
-                next_state = state.next(stack_top, action_top, token_top, open_non_terminals_count, token_counter)
+                action_top = state.action_top
+                if self.uses_history:
+                    action_index = self.action_converter.action2integer(action)
+                    action_tensor = torch.tensor([[action_index]], device=self.device, dtype=torch.long)
+                    action_embedding = self.action_embedding(action_tensor)
+                    action_top = self.action_history.push(action_embedding, data=action, top=state.action_top)
+                next_state = state.next(action, stack_top, action_top, token_top, open_non_terminals_count, token_counter)
             next_states.append(next_state)
         return next_states
 
@@ -221,35 +224,38 @@ class RNNG(AbstractRNNG):
         for state in states:
             tokens_length = state.tokens_length
             token_counter = state.token_counter
-            last_action = state.stack_top.data
+            last_action = state.last_action
             open_non_terminals_count = state.open_non_terminals_count
             valid_actions = self.action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
             batch_valid_actions.append(valid_actions)
         return batch_valid_actions
 
-    def reduce(self, log_probs, outputs, action):
+    def reduce(self, log_probs, tokens, tags, outputs, action):
         stack_top = outputs.stack_top
-        children = []
-        while True:
-            popped_action, state = stack_top.data, stack_top.output
-            if popped_action.type() == ACTION_NON_TERMINAL_TYPE and popped_action.open:
-                break
+        if self.uses_stack:
+            children = []
+            while True:
+                popped_action, state = stack_top.data, stack_top.output
+                if popped_action.type() == ACTION_NON_TERMINAL_TYPE and popped_action.open:
+                    break
+                stack_top = self.stack.pop(stack_top)
+                children.append(state)
+            children_tensor = torch.cat(children, dim=0)
+            compose_action = NonTerminalAction(popped_action.argument, open=False)
             stack_top = self.stack.pop(stack_top)
-            children.append(state)
-        children_tensor = torch.cat(children, dim=0)
-        compose_action = NonTerminalAction(popped_action.argument, open=False)
-        stack_top = self.stack.pop(stack_top)
-        nt_embedding = self.get_nt_embedding(self.nt_compose_embedding, compose_action)
-        children_lengths = torch.tensor([len(children)], device=self.device, dtype=torch.long)
-        composed = self.composer(nt_embedding, children_tensor, children_lengths)
-        stack_top = self.stack.push(composed, data=compose_action, top=stack_top)
+            nt_embedding = self.get_nt_embedding(self.nt_compose_embedding, compose_action)
+            children_lengths = torch.tensor([len(children)], device=self.device, dtype=torch.long)
+            composed = self.composer(nt_embedding, children_tensor, children_lengths)
+            stack_top = self.stack.push(composed, data=compose_action, top=stack_top)
         action_log_prob = self.get_base_log_prop(log_probs, self.reduce_index)
         open_non_terminals_count = outputs.open_non_terminals_count - 1
         return outputs.update(action_log_prob=action_log_prob, stack_top=stack_top, open_non_terminals_count=open_non_terminals_count)
 
-    def non_terminal(self, log_probs, outputs, action):
-        nt_embedding = self.get_nt_embedding(self.nt_embedding, action)
-        stack_top = self.stack.push(nt_embedding, data=action, top=outputs.stack_top)
+    def non_terminal(self, log_probs, tokens, tags, outputs, action):
+        stack_top = outputs.stack_top
+        if self.uses_stack:
+            nt_embedding = self.get_nt_embedding(self.nt_embedding, action)
+            stack_top = self.stack.push(nt_embedding, data=action, top=outputs.stack_top)
         if log_probs is None:
             action_log_prob = None
         else:
@@ -258,16 +264,20 @@ class RNNG(AbstractRNNG):
         open_non_terminals_count = outputs.open_non_terminals_count + 1
         return outputs.update(action_log_prob=action_log_prob, stack_top=stack_top, open_non_terminals_count=open_non_terminals_count)
 
-    def shift(self, log_probs, outputs, action):
+    def shift(self, log_probs, tokens, tags, outputs, action):
         raise NotImplementedError('must be implemented by subclass')
 
-    def generate(self, log_probs, outputs, action):
+    def generate(self, log_probs, tokens, tags, outputs, action):
         raise NotImplementedError('must be implemented by subclass')
 
     def initialize_structures(self, tokens, tags, length):
-        action_top = self.action_history.push(self.start_action_embedding.view(1, 1, -1))
-        stack_top = self.stack.push(self.start_stack_embedding.view(1, 1, -1))
-        token_top = self.initialize_token_buffer(tokens, tags, length)
+        action_top, stack_top, token_top = None, None, None
+        if self.uses_history:
+            action_top = self.action_history.push(self.start_action_embedding.view(1, 1, -1))
+        if self.uses_stack:
+            stack_top = self.stack.push(self.start_stack_embedding.view(1, 1, -1))
+        if self.uses_buffer:
+            token_top = self.initialize_token_buffer(tokens, tags, length)
         return action_top, stack_top, token_top
 
     def initialize_token_buffer(self, tokens_tensor, tags_tensor, length):
@@ -298,19 +308,27 @@ class RNNG(AbstractRNNG):
         :type token_top: app.models.rnng.stack.StackNode
         """
         if self.representation.top_only():
-            history_embedding = self.action_history.top(action_top)
-            stack_embedding = self.stack.top(stack_top)
-            buffer_embedding = self.token_buffer.top(token_top)
+            history_embedding, stack_embedding, buffer_embedding = None, None, None
+            if self.uses_history:
+                history_embedding = self.action_history.top(action_top)
+            if self.uses_stack:
+                stack_embedding = self.stack.top(stack_top)
+            if self.uses_buffer:
+                buffer_embedding = self.token_buffer.top(token_top)
             return self.representation(history_embedding, None, stack_embedding, None, buffer_embedding, None)
         else:
-            history_embedding = self.action_history.contents(action_top)
-            stack_embedding = self.stack.contents(stack_top)
-            buffer_embedding = self.token_buffer.contents(token_top)
-            return self.representation(
-                history_embedding, action_top.length_as_tensor(self.device),
-                stack_embedding, stack_top.length_as_tensor(self.device),
-                buffer_embedding, token_top.length_as_tensor(self.device),
-            )
+            history_embedding, stack_embedding, buffer_embedding = None, None, None
+            history_length, stack_length, buffer_length = None, None, None
+            if self.uses_history:
+                history_embedding = self.action_history.contents(action_top)
+                history_length, action_top.length_as_tensor(self.device)
+            if self.uses_stack:
+                stack_embedding = self.stack.contents(stack_top)
+                stack_length, stack_top.length_as_tensor(self.device)
+            if self.uses_buffer:
+                buffer_embedding = self.token_buffer.contents(token_top)
+                buffer_length = token_top.length_as_tensor(self.device)
+            return self.representation(history_embedding, history_length, stack_embedding, stack_length, buffer_embedding, buffer_length)
 
     def get_valid_indices(self, valid_actions):
         valid_indices = []

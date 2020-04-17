@@ -29,10 +29,18 @@ class DiscriminativeRNNG(RNNG):
         start_tag_embedding = torch.FloatTensor(pos_size).uniform_(-1, 1)
         self.start_tag_embedding = nn.Parameter(start_tag_embedding, requires_grad=True)
 
-    def shift(self, log_probs, outputs, action):
-        word_embedding = outputs.token_top.data
-        token_top = self.token_buffer.pop(outputs.token_top)
-        stack_top = self.stack.push(word_embedding, data=action, top=outputs.stack_top)
+    def shift(self, log_probs, tokens, tags, outputs, action):
+        token_top = outputs.token_top
+        stack_top = outputs.stack_top
+        if self.uses_buffer or self.uses_stack:
+            if self.uses_buffer:
+                token_top = self.token_buffer.pop(outputs.token_top)
+            if self.uses_stack:
+                word_index = tokens.size(0) - outputs.token_counter - 1
+                token = tokens[word_index].unsqueeze(dim=0)
+                tag = tags[word_index].unsqueeze(dim=0)
+                word_embedding = self.get_word_embedding(token, tag)
+                stack_top = self.stack.push(word_embedding, data=action, top=outputs.stack_top)
         action_log_prob = self.get_base_log_prop(log_probs, self.shift_index)
         token_counter = outputs.token_counter + 1
         return outputs.update(action_log_prob=action_log_prob, stack_top=stack_top, token_top=token_top, token_counter=token_counter)
@@ -67,9 +75,9 @@ class DiscriminativeRNNG(RNNG):
     def __str__(self):
         return (
             'DiscriminativeRNNG(\n'
-            + f'  action_history={self.action_history}\n'
-            + f'  token_buffer={self.token_buffer}\n'
-            + f'  stack={self.stack}\n'
+            + ('' if not self.uses_history else f'  action_history={self.action_history}\n')
+            + ('' if not self.uses_buffer else f'  token_buffer={self.token_buffer}\n')
+            + ('' if not self.uses_stack else f'  stack={self.stack}\n')
             + f'  representation={self.representation}\n'
             + f'  composer={self.composer}\n'
             + ')'
