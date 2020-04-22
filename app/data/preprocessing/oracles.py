@@ -158,11 +158,38 @@ def get_tags_from_oracle(oracle):
     """
     lines_count = len(oracle)
     assert lines_count % 4 == 0, 'Oracle files must have a multiple of four lines.'
-    tags = []
-    for line_index in range(0, lines_count, 4):
-        line_tags, _ = _line2tokens(oracle[line_index])
-        tags.append(line_tags)
-    return tags
+    oracle_tags = []
+    for i in range(0, lines_count, 4):
+        line = oracle[i]
+        line_length = len(line)
+        line_tags = []
+        j = 0
+        while j != line_length:
+            assert line[j] == '(', f'Expected a "(" at line {i}, column {j} of oracle file.'
+            j += 1
+            tag_start = j
+            tag_end = tag_start
+            found_end = False
+            while True:
+                current = line[j]
+                if current == '(':
+                    # not a tag
+                    break
+                elif current == ')':
+                    # found a tag
+                    tag = line[tag_start:tag_end]
+                    line_tags.append(tag)
+                    # find next opening bracket or end of line
+                    while j != line_length and line[j] != '(':
+                        j += 1
+                    break
+                elif current == ' ' and not found_end:
+                    # found a potential tag, but could also be a non-terminal
+                    tag_end = j
+                    found_end = True
+                j += 1
+        oracle_tags.append(line_tags)
+    return oracle_tags
 
 def _get_from_oracle(oracle, start_index):
     lines_count = len(oracle)

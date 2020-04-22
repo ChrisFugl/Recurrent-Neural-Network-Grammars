@@ -1,13 +1,12 @@
-from app.constants import ACTION_REDUCE_TYPE, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_NON_TERMINAL_TYPE
-from app.data.actions.non_terminal import NonTerminalAction
+from app.constants import ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_NON_TERMINAL_TYPE
 
 class RNNGState:
 
-    def __init__(self, stack_top, action_top, token_top, tokens, tags, tokens_length, open_non_terminals_count, token_counter, last_action=None, parent_node=None):
+    def __init__(self, stack_top, action_state, buffer_state, tokens, tags, tokens_length, open_non_terminals_count, token_counter, last_action=None, parent_node=None):
         """
         :type stack_top: app.models.rnng.stack.StackNode
-        :type action_top: app.models.rnng.stack.StackNode
-        :type token_top: app.models.rnng.stack.StackNode
+        :type action_state: object
+        :type buffer_state: app.models.rnng.buffer.BufferState
         :type tokens: torch.Tensor
         :type tags: torch.Tensor
         :type tokens_length: int
@@ -17,8 +16,8 @@ class RNNGState:
         :type parent_node: Tree
         """
         self.stack_top = stack_top
-        self.action_top = action_top
-        self.token_top = token_top
+        self.action_state = action_state
+        self.buffer_state = buffer_state
         self.tokens = tokens
         self.tags = tags
         self.tokens_length = tokens_length
@@ -27,12 +26,13 @@ class RNNGState:
         self.last_action = last_action
         self.parent_node = parent_node
 
-    def next(self, action, stack_top, action_top, token_top, open_non_terminals_count, token_counter):
+    def next(self, action_converter, action, stack_top, action_state, buffer_state, open_non_terminals_count, token_counter):
         """
+        :type action_converter: app.data.converters.action.ActionConverter
         :type action: app.data.actions.action.Action
         :type stack_top: app.models.rnng.stack.StackNode
-        :type action_top: app.models.rnng.stack.StackNode
-        :type token_top: app.models.rnng.stack.StackNode
+        :type action_state: object
+        :type buffer_state: app.models.rnng.buffer.BufferState
         :type open_non_terminals_count: int
         :type token_counter: int
         :rtype: RNNGState
@@ -50,12 +50,12 @@ class RNNGState:
                 parent_node.add_child(node)
             parent_node = node
         else: # reduce
-            last_action = NonTerminalAction(parent_node.action.argument, open=False)
+            last_action = action_converter.get_cached_nt_action(parent_node.action.argument, False)
             parent_node = parent_node.parent
         return RNNGState(
             stack_top,
-            action_top,
-            token_top,
+            action_state,
+            buffer_state,
             self.tokens,
             self.tags,
             self.tokens_length,

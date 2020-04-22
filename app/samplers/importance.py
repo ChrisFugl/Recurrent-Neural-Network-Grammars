@@ -1,6 +1,4 @@
 from app.constants import ACTION_REDUCE_TYPE, ACTION_NON_TERMINAL_TYPE
-from app.data.actions.generate import GenerateAction
-from app.data.actions.non_terminal import NonTerminalAction
 from app.data.actions.reduce import ReduceAction
 from app.data.batch import Batch
 from app.data.batch_utils import sequences2tensor
@@ -122,10 +120,10 @@ class ImportanceSampler(Sampler):
                 action_gen = ReduceAction()
             elif type == ACTION_NON_TERMINAL_TYPE:
                 argument = action_dis.argument
-                action_gen = NonTerminalAction(argument)
+                action_gen = self.action_converter_gen.get_cached_nt_action(argument, False)
             else:
                 argument = tokens[token_index]
-                action_gen = GenerateAction(argument)
+                action_gen = self.action_converter_gen.get_cached_gen_action(argument)
                 token_index += 1
             actions_gen.append(action_gen)
         return actions_gen

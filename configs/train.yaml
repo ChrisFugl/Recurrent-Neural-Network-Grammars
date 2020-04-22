@@ -1,7 +1,7 @@
 defaults:
   - type: gen
   - model: ${defaults.0.type}.parallel_rnng
-  - iterator: unordered
+  - iterator: ordered
   - loader: wsj.${defaults.0.type}.oracle
   - loss: negative_log_likelihood
   - optimizer: adam

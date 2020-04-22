@@ -41,7 +41,7 @@ class ParallelRNNG(AbstractRNNG):
         nt_count = self.action_converter.count_non_terminals()
         self.nt_indices = list(range(nt_start, nt_start + nt_count))
         self.state_factory = StateFactory(
-            self.device, self.non_terminal_converter, self.token_converter,
+            self.device, self.action_converter, self.non_terminal_converter, self.token_converter,
             self.action_set, self.generative, self.action_count,
             self.reduce_index, self.shift_index, self.gen_indices, self.nt_indices
         )
@@ -56,7 +56,7 @@ class ParallelRNNG(AbstractRNNG):
         """
         states, stack_size = self.preprocess_batch(batch)
         # plus one to account for start embeddings
-        self.initialize_structures(batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths + 1, stack_size + 1)
+        self.initialize_structures(batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths + 1, stack_size + 1, batch.actions.tensor)
         output_shape = (batch.max_actions_length, batch.size, self.action_count)
         output_log_probs = torch.zeros(output_shape, device=self.device, dtype=torch.float)
         for sequence_index in range(batch.max_actions_length):
@@ -65,11 +65,9 @@ class ParallelRNNG(AbstractRNNG):
             output_log_probs[sequence_index] = self.get_log_probs(representation)
             self.do_actions(batch.size, state)
             if self.uses_history:
-                action_tensor = batch.actions.tensor[sequence_index].unsqueeze(dim=0)
-                action_embedding = self.action_embedding(action_tensor)
                 action_op = self.hold_op(batch.size)
                 action_op[state.non_pad_actions] = 1
-                self.action_history.hold_or_push(action_embedding, action_op)
+                self.action_history.hold_or_push(action_op)
         return output_log_probs
 
     def initial_state(self, tokens, tags, lengths):
@@ -109,7 +107,7 @@ class ParallelRNNG(AbstractRNNG):
             action_embedding = self.action_embedding(action_tensor)
             action_op = self.hold_op(batch_size)
             action_op[next_state.non_pad_actions] = 1
-            self.action_history.hold_or_push(action_embedding, action_op)
+            self.action_history.hold_or_push(action_op, action_embedding)
         return next_state
 
     def next_action_log_probs(self, state, posterior_scaling=1.0, token=None, include_gen=True, include_nt=True):
@@ -157,20 +155,25 @@ class ParallelRNNG(AbstractRNNG):
             states.append(state)
         return states, state.max_stack_size
 
-    def initialize_structures(self, tokens, tags, token_lengths, stack_size):
+    def initialize_structures(self, tokens, tags, token_lengths, stack_size, actions=None):
         batch_size = tokens.size(1)
         if self.uses_history:
-            self.initialize_action_history(batch_size)
+            self.initialize_action_history(batch_size, actions)
         if self.uses_stack:
             self.initialize_stack(stack_size, batch_size)
         if self.uses_buffer:
             self.initialize_token_buffer(tokens, tags, token_lengths)
 
-    def initialize_action_history(self, batch_size):
+    def initialize_action_history(self, batch_size, actions):
         start_action_embedding = self.start_action_embedding.view(1, 1, -1).expand(1, batch_size, -1)
         action_op = self.push_op(batch_size)
-        self.action_history.initialize(batch_size)
-        self.action_history.hold_or_push(start_action_embedding, action_op)
+        if actions is None:
+            self.action_history.initialize(batch_size)
+            self.action_history.hold_or_push(action_op, start_action_embedding)
+        else:
+            action_embeddings = self.action_embedding(actions)
+            init_actions = torch.cat((start_action_embedding, action_embeddings), dim=0)
+            self.action_history.initialize(batch_size, init_actions)
 
     def initialize_stack(self, stack_size, batch_size):
         start_stack_embedding = self.start_stack_embedding.view(1, -1).expand(batch_size, -1)

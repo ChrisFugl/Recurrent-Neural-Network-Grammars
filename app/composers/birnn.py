@@ -1,8 +1,7 @@
 from app.composers.composer import Composer
-from app.utils import padded_reverse
+from app.utils import batched_index_select, padded_reverse
 import torch
 from torch import nn
-from torch.nn.utils.rnn import pack_padded_sequence
 
 class BiRNNComposer(Composer):
 
@@ -24,7 +23,7 @@ class BiRNNComposer(Composer):
     def forward(self, nt_embedding, popped_items, popped_lengths):
         """
         :type nt_embedding: torch.Tensor
-        :type popped_items: torch.Tensor
+        :type popped_items: list of torch.Tensor
         :type popped_lengths: torch.Tensor
         :rtype: torch.Tensor
         """
@@ -37,13 +36,11 @@ class BiRNNComposer(Composer):
         return output
 
     def input2output(self, rnn, nt_embedding, items, lengths):
-        batch_size = items.size(1)
+        batch_size = nt_embedding.size(1)
         initial_state = rnn.initial_state(batch_size)
         _, state = rnn(nt_embedding, initial_state)
-        packed_input = pack_padded_sequence(items, lengths, enforce_sorted=False)
-        _, (hidden_state, _) = rnn(packed_input, state) # num layers, batch size, hidden size
-        last_layer_state = hidden_state[-1]
-        output = last_layer_state.unsqueeze(dim=0)
+        outputs, _ = rnn(items, state)
+        output = batched_index_select(outputs, lengths - 1)
         output = self.dropout(output)
         return output
 

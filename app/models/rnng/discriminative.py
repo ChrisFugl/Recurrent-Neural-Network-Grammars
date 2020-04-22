@@ -1,5 +1,6 @@
 from app.data.action_sets.discriminative import DiscriminativeActionSet
 from app.models.rnng.rnng import RNNG
+from app.utils import padded_reverse
 import torch
 from torch import nn
 
@@ -9,7 +10,7 @@ class DiscriminativeRNNG(RNNG):
         """
         :type device: torch.device
         :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
-        :type structures: app.models.rnng.stack.Stack, app.models.rnng.stack.Stack, app.models.rnng.stack.Stack
+        :type structures: app.models.rnng.stack.Stack, app.models.rnng.buffer.Buffer, app.models.rnng.stack.Stack
         :type converters: app.data.converters.action.ActionConverter, app.data.converters.token.TokenConverter, app.data.converters.tag.TagConverter, app.data.converters.non_terminal.NonTerminalConverter
         :type representation: app.representations.representation.Representation
         :type composer: app.composers.composer.Composer
@@ -30,36 +31,40 @@ class DiscriminativeRNNG(RNNG):
         self.start_tag_embedding = nn.Parameter(start_tag_embedding, requires_grad=True)
 
     def shift(self, log_probs, tokens, tags, outputs, action):
-        token_top = outputs.token_top
+        buffer_state = outputs.buffer_state
         stack_top = outputs.stack_top
         if self.uses_buffer or self.uses_stack:
             if self.uses_buffer:
-                token_top = self.token_buffer.pop(outputs.token_top)
+                buffer_state = self.token_buffer.pop(buffer_state)
             if self.uses_stack:
                 word_index = tokens.size(0) - outputs.token_counter - 1
                 token = tokens[word_index].unsqueeze(dim=0)
                 tag = tags[word_index].unsqueeze(dim=0)
                 word_embedding = self.get_word_embedding(token, tag)
-                stack_top = self.stack.push(word_embedding, data=action, top=outputs.stack_top)
+                stack_top = self.stack.push(word_embedding, data=action, top=stack_top)
         action_log_prob = self.get_base_log_prop(log_probs, self.shift_index)
         token_counter = outputs.token_counter + 1
-        return outputs.update(action_log_prob=action_log_prob, stack_top=stack_top, token_top=token_top, token_counter=token_counter)
+        return outputs.update(action_log_prob=action_log_prob, stack_top=stack_top, buffer_state=buffer_state, token_counter=token_counter)
 
-    def initialize_token_buffer(self, tokens_tensor, tags_tensor, length):
+    def initialize_token_buffer(self, tokens, tags, lengths):
         """
-        :type tokens_tensor: torch.Tensor
-        :type tags_tensor: torch.Tensor
-        :type length: int
-        :rtype: app.models.rnng.stack.StackNode
+        :type tokens: torch.Tensor
+        :type tags: torch.Tensor
+        :type lengths: torch.Tensor
+        :rtype: list of app.models.rnng.buffer.BufferState
         """
-        start_word_embedding = self.token_tag2word(self.start_token_embedding.view(1, 1, -1), self.start_tag_embedding.view(1, 1, -1))
-        token_top = self.token_buffer.push(start_word_embedding, data=start_word_embedding)
-        # discriminative model processes tokens in reverse order
-        word_embeddings = self.get_word_embedding(tokens_tensor, tags_tensor)
-        for index in range(length - 1, -1, -1):
-            word_embedding = word_embeddings[index:index+1, :, :]
-            token_top = self.token_buffer.push(word_embedding, data=word_embedding, top=token_top)
-        return token_top
+        batch_size = lengths.size(0)
+        start_token_embedding = self.start_token_embedding.view(1, 1, -1).expand(1, batch_size, -1)
+        start_tag_embedding = self.start_tag_embedding.view(1, 1, -1).expand(1, batch_size, -1)
+        start_word_embedding = self.token_tag2word(start_token_embedding, start_tag_embedding)
+        tokens_reversed = padded_reverse(tokens, lengths)
+        tags_reversed = padded_reverse(tags, lengths)
+        word_embeddings = self.get_word_embedding(tokens_reversed, tags_reversed)
+        word_embeddings = torch.cat((start_word_embedding, word_embeddings), dim=0)
+        start_indices = lengths
+        # plus one to account for start embedding
+        buffer_states = self.token_buffer.initialize(word_embeddings, lengths + 1, start_indices)
+        return buffer_states
 
     def get_word_embedding(self, token, tag):
         token_embedding = self.token_embedding(token)

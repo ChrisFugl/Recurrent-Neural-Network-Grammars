@@ -1,4 +1,5 @@
 from app.dropout.weight_drop import WeightDrop
+from app.utils import batched_index_select
 import torch
 from torch import nn
 
@@ -38,39 +39,56 @@ class HistoryLSTM(nn.Module):
         :returns: history contents and batch lengths
         :rtype: torch.Tensor, torch.Tensor
         """
-        contents = torch.cat(self.history, dim=0)
-        return contents, self.lengths
+        if self.prefilled:
+            max_length = self.lengths.max()
+            contents = self.history[:max_length]
+            return contents, self.lengths
+        else:
+            contents = torch.cat(self.history, dim=0)
+            return contents, self.lengths
 
-    def initialize(self, batch_size):
+    def initialize(self, batch_size, inputs=None):
         """
         :type batch_size: int
+        :type inputs: torch.Tensor
         """
-        self.lengths = torch.zeros((batch_size,), device=self.device, dtype=torch.long)
-        state_shape = (self.num_layers, batch_size, self.hidden_size)
-        cell = torch.zeros(state_shape, device=self.device, requires_grad=True)
-        hidden = torch.zeros(state_shape, device=self.device, requires_grad=True)
-        self.state = hidden, cell
-        self.history = []
+        if inputs is None:
+            state_shape = (self.num_layers, batch_size, self.hidden_size)
+            cell = torch.zeros(state_shape, device=self.device, requires_grad=True)
+            hidden = torch.zeros(state_shape, device=self.device, requires_grad=True)
+            self.state = hidden, cell
+            self.history = []
+            self.lengths = torch.zeros((batch_size,), device=self.device, dtype=torch.long)
+            self.prefilled = False
+        else:
+            self.history, _ = self.lstm(inputs)
+            # assumes that start embedding is implicitly given through inputs
+            self.lengths = torch.ones((batch_size,), device=self.device, dtype=torch.long)
+            self.prefilled = True
 
-    def hold_or_push(self, input, op):
+    def hold_or_push(self, op, input=None):
         """
-        :type input: torch.Tensor
         :type op: torch.Tensor
+        :type input: torch.Tensor
         """
-        output, next_state = self.lstm(input, self.state)
         self.lengths = self.lengths + op
-        self.state = next_state
-        self.history.append(output)
+        if not self.prefilled:
+            output, next_state = self.lstm(input, self.state)
+            self.state = next_state
+            self.history.append(output)
 
     def top(self):
         """
         :rtype: torch.Tensor
         """
-        top = []
-        for i, length in enumerate(self.lengths):
-            output = self.history[length - 1][:, i, :]
-            top.append(output)
-        return torch.stack(top, dim=1)
+        if self.prefilled:
+            return batched_index_select(self.history, self.lengths - 1)
+        else:
+            top = []
+            for i, length in enumerate(self.lengths):
+                output = self.history[length - 1][:, i, :]
+                top.append(output)
+            return torch.stack(top, dim=1)
 
     def __str__(self):
         return f'HistoryLSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers})'

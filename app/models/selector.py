@@ -28,9 +28,11 @@ def get_model(device, generative, action_converter, token_converter, tag_convert
         composer = get_composer(device, config)
         sizes = (config.size.action, token_size, config.size.rnn, config.rnn.hidden_size)
         if config.type == 'rnng':
+            from app.models.rnng.buffer import Buffer
+            from app.models.rnng.history import History
             from app.models.rnng.stack import Stack
-            action_history = Stack(get_rnn(device, config.size.action, config.rnn))
-            token_buffer = Stack(get_rnn(device, config.size.rnn, config.rnn))
+            action_history = History(device, get_rnn(device, config.size.action, config.rnn))
+            token_buffer = Buffer(device, get_rnn(device, config.size.rnn, config.rnn))
             stack = Stack(get_rnn(device, config.size.rnn, config.rnn))
             structures = (action_history, token_buffer, stack)
             base_args = (device, embeddings, structures, converters, representation, composer, sizes, config.threads)

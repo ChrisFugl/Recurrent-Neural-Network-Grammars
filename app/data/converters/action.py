@@ -34,6 +34,8 @@ class ActionConverter:
         self._non_terminal_count = len(self._index2non_terminal)
         self._non_terminal_offset = ACTION_EMBEDDING_OFFSET + self._singleton_count + self._terminal_count
         self._actions_count = ACTION_EMBEDDING_OFFSET + self._singleton_count + self._terminal_count + self._non_terminal_count
+        self._cached_closed_nt_actions, self._cached_open_nt_actions = self._cache_nt_actions()
+        self._cached_gen_actions = self._cache_gen_actions()
 
     def count(self):
         """
@@ -106,14 +108,14 @@ class ActionConverter:
         """
         if index == PAD_INDEX:
             return PAD_SYMBOL
-        singleton_offset = self.get_singleton_offset()
+        singleton_offset = ACTION_EMBEDDING_OFFSET
         if index < singleton_offset + self._singleton_count:
             return self._index2singleton[index - singleton_offset]
-        terminal_offset = self.get_terminal_offset()
+        terminal_offset = self._terminal_offset
         if index < terminal_offset + self._terminal_count:
             terminal = self._index2terminal[index - terminal_offset]
             return f'GEN({terminal})'
-        non_terminal_offset = self.get_non_terminal_offset()
+        non_terminal_offset = self._non_terminal_offset
         non_terminal = self._index2non_terminal[index - non_terminal_offset]
         return f'NT({non_terminal})'
 
@@ -129,16 +131,16 @@ class ActionConverter:
             if type == ACTION_REDUCE_TYPE:
                 return ReduceAction()
             elif type == ACTION_GENERATE_TYPE:
-                return GenerateAction(argument)
+                return self._cached_gen_actions[argument]
             else:
-                return NonTerminalAction(argument)
+                return self._cached_open_nt_actions[argument]
         else:
             if type == ACTION_REDUCE_TYPE:
                 return ReduceAction()
             elif type == ACTION_SHIFT_TYPE:
                 return ShiftAction()
             else:
-                return NonTerminalAction(argument)
+                return self._cached_open_nt_actions[argument]
 
     def string2integer(self, action_string):
         """
@@ -157,7 +159,7 @@ class ActionConverter:
         :type token: str
         :rtype: int
         """
-        terminal_offset = self.get_terminal_offset()
+        terminal_offset = self._terminal_offset
         return terminal_offset + self._terminal2index[token]
 
     def non_terminal2integer(self, non_terminal):
@@ -167,8 +169,26 @@ class ActionConverter:
         :type non_terminal: str
         :rtype: int
         """
-        non_terminal_offset = self.get_non_terminal_offset()
+        non_terminal_offset = self._non_terminal_offset
         return non_terminal_offset + self._non_terminal2index[non_terminal]
+
+    def get_cached_nt_action(self, argument, open):
+        """
+        :type argument: str
+        :type open: bool
+        :rtype: app.data.actions.non_terminal.NonTerminalAction
+        """
+        if open:
+            return self._cached_open_nt_actions[argument]
+        else:
+            return self._cached_closed_nt_actions[argument]
+
+    def get_cached_gen_action(self, argument):
+        """
+        :type argument: str
+        :rtype: app.data.actions.generate.GenerateAction
+        """
+        return self._cached_gen_actions[argument]
 
     def _get_singleton_actions(self, generative):
         if generative:
@@ -213,21 +233,35 @@ class ActionConverter:
     def _action_args2integer(self, type, argument):
         if self._generative:
             if type == ACTION_REDUCE_TYPE:
-                singleton_offset = self.get_singleton_offset()
+                singleton_offset = ACTION_EMBEDDING_OFFSET
                 return singleton_offset + self._singleton2index['REDUCE']
             elif type == ACTION_GENERATE_TYPE:
-                terminal_offset = self.get_terminal_offset()
+                terminal_offset = self._terminal_offset
                 return terminal_offset + self._terminal2index[argument]
             else:
-                non_terminal_offset = self.get_non_terminal_offset()
+                non_terminal_offset = self._non_terminal_offset
                 return non_terminal_offset + self._non_terminal2index[argument]
         else:
             if type == ACTION_REDUCE_TYPE:
-                singleton_offset = self.get_singleton_offset()
+                singleton_offset = ACTION_EMBEDDING_OFFSET
                 return singleton_offset + self._singleton2index['REDUCE']
             elif type == ACTION_SHIFT_TYPE:
-                singleton_offset = self.get_singleton_offset()
+                singleton_offset = ACTION_EMBEDDING_OFFSET
                 return singleton_offset + self._singleton2index['SHIFT']
             else:
-                non_terminal_offset = self.get_non_terminal_offset()
+                non_terminal_offset = self._non_terminal_offset
                 return non_terminal_offset + self._non_terminal2index[argument]
+
+    def _cache_nt_actions(self):
+        closed_nt_actions = {}
+        open_nt_actions = {}
+        for non_terminal in self._index2non_terminal:
+            closed_nt_actions[non_terminal] = NonTerminalAction(non_terminal, open=False)
+            open_nt_actions[non_terminal] = NonTerminalAction(non_terminal, open=True)
+        return closed_nt_actions, open_nt_actions
+
+    def _cache_gen_actions(self):
+        gen_actions = {}
+        for terminal in self._index2terminal:
+            gen_actions[terminal] = GenerateAction(terminal)
+        return gen_actions

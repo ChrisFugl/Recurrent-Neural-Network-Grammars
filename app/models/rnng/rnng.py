@@ -14,7 +14,7 @@ class RNNG(AbstractRNNG):
         """
         :type device: torch.device
         :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
-        :type structures: app.models.rnng.stack.Stack, app.models.rnng.stack.Stack, app.models.rnng.stack.Stack
+        :type structures: app.models.rnng.stack.Stack, app.models.rnng.buffer.Buffer, app.models.rnng.stack.Stack
         :type converters: app.data.converters.action.ActionConverter, app.data.converters.token.TokenConverter, app.data.converters.tag.TagConverter, app.data.converters.non_terminal.NonTerminalConverter
         :type representation: app.representations.representation.Representation
         :type composer: app.composers.composer.Composer
@@ -64,6 +64,8 @@ class RNNG(AbstractRNNG):
         :type batch: app.data.batch.Batch
         :rtype: torch.Tensor
         """
+        history = (batch.actions.tensor, batch.actions.lengths)
+        action_states, buffer_states = self.initialize_batch_structures(batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths, history=history)
         jobs_args = []
         for batch_index in range(batch.size):
             element = batch.get(batch_index)
@@ -72,9 +74,11 @@ class RNNG(AbstractRNNG):
             actions_tensor = element.actions.tensor[:element.actions.length]
             actions = element.actions.actions
             actions_max_length = element.actions.max_length
-            job_args = (tokens_tensor, tags_tensor, actions_tensor, actions, actions_max_length)
+            action_state = action_states[batch_index]
+            buffer_state = buffer_states[batch_index]
+            job_args = (action_state, buffer_state, tokens_tensor, tags_tensor, actions_tensor, actions, actions_max_length)
             jobs_args.append(job_args)
-        if 1 < self.threads:
+        if 1 < self.threads and 1 < batch.size:
             get_log_probs = delayed(self.tree_log_probs)
             log_probs_list = Parallel(n_jobs=self.threads, backend='threading')(get_log_probs(*job_args) for job_args in jobs_args)
         else:
@@ -82,10 +86,12 @@ class RNNG(AbstractRNNG):
         log_probs = torch.stack(log_probs_list, dim=1)
         return log_probs
 
-    def tree_log_probs(self, tokens_tensor, tags_tensor, actions_tensor, actions, actions_max_length=None):
+    def tree_log_probs(self, action_state, buffer_state, tokens_tensor, tags_tensor, actions_tensor, actions, actions_max_length=None):
         """
         Compute log probs of each action in a tree.
 
+        :type action_state: object
+        :type buffer_state: app.models.rnng.buffer.BufferState
         :type tokens_tensor: torch.Tensor
         :type tags_tensor: torch.Tensor
         :type actions_tensor: torch.Tensor
@@ -94,29 +100,26 @@ class RNNG(AbstractRNNG):
         :rtype: torch.Tensor
         """
         actions_length = len(actions)
-        tokens_length = len(tokens_tensor)
         if actions_max_length is None:
             actions_max_length = actions_length
         token_counter = 0
         open_non_terminals_count = 0
-        action_top, stack_top, token_top = self.initialize_structures(tokens_tensor, tags_tensor, tokens_length)
+        stack_top = self.initialize_stack()
         output_log_probs = torch.zeros((actions_max_length, self.action_count), dtype=torch.float, device=self.device)
         for sequence_index in range(actions_length):
             action = actions[sequence_index]
-            representation = self.get_representation(action_top, stack_top, token_top)
+            representation = self.get_representation(action_state, stack_top, buffer_state)
             logits = self.representation2logits(representation)
             log_probs = self.logits2log_prob(logits)
             action_args_log_probs = ActionLogProbs(representation, log_probs, self.index2action)
-            action_args_outputs = ActionOutputs(stack_top, token_top, open_non_terminals_count, token_counter)
+            action_args_outputs = ActionOutputs(stack_top, buffer_state, open_non_terminals_count, token_counter)
             action_fn = self.type2action[action.type()]
             action_outputs = action_fn(action_args_log_probs, tokens_tensor, tags_tensor, action_args_outputs, action)
-            action_log_prob, stack_top, token_top, open_non_terminals_count, token_counter = action_outputs
+            action_log_prob, stack_top, buffer_state, open_non_terminals_count, token_counter = action_outputs
             action_index = self.action_converter.action2integer(action)
             output_log_probs[sequence_index, action_index] = action_log_prob
             if self.uses_history:
-                action_tensor = actions_tensor[sequence_index].unsqueeze(dim=0)
-                action_embedding = self.action_embedding(action_tensor)
-                action_top = self.action_history.push(action_embedding, data=action, top=action_top)
+                action_state = self.action_history.push(action_state)
         return output_log_probs
 
     def initial_state(self, tokens, tags, lengths):
@@ -129,14 +132,17 @@ class RNNG(AbstractRNNG):
         :returns: initial state
         :rtype: list of app.models.rnng.state.RNNGState
         """
+        action_states, buffer_states = self.initialize_batch_structures(tokens, tags, lengths)
         states = []
         for i, length in enumerate(lengths):
             token_counter = 0
             open_non_terminals_count = 0
             tokens_tensor = tokens[:length, i].unsqueeze(dim=1)
             tags_tensor = tags[:length, i].unsqueeze(dim=1)
-            action_top, stack_top, token_top = self.initialize_structures(tokens_tensor, tags_tensor, length)
-            state = RNNGState(stack_top, action_top, token_top, tokens_tensor, tags_tensor, length, open_non_terminals_count, token_counter)
+            stack_top = self.initialize_stack()
+            action_state = action_states[i]
+            buffer_state = buffer_states[i]
+            state = RNNGState(stack_top, action_state, buffer_state, tokens_tensor, tags_tensor, length, open_non_terminals_count, token_counter)
             states.append(state)
         return states
 
@@ -159,16 +165,16 @@ class RNNG(AbstractRNNG):
                 open_non_terminals_count = state.open_non_terminals_count
                 valid_actions = self.action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
                 assert action.type() in valid_actions, f'{action} is not a valid action. (valid_actions = {valid_actions})'
-                action_args_outputs = ActionOutputs(state.stack_top, state.token_top, open_non_terminals_count, token_counter)
+                action_args_outputs = ActionOutputs(state.stack_top, state.buffer_state, open_non_terminals_count, token_counter)
                 action_outputs = self.type2action[action.type()](None, state.tokens, state.tags, action_args_outputs, action)
-                _, stack_top, token_top, open_non_terminals_count, token_counter = action_outputs
-                action_top = state.action_top
+                _, stack_top, buffer_state, open_non_terminals_count, token_counter = action_outputs
+                action_state = state.action_state
                 if self.uses_history:
                     action_index = self.action_converter.action2integer(action)
                     action_tensor = torch.tensor([[action_index]], device=self.device, dtype=torch.long)
                     action_embedding = self.action_embedding(action_tensor)
-                    action_top = self.action_history.push(action_embedding, data=action, top=state.action_top)
-                next_state = state.next(action, stack_top, action_top, token_top, open_non_terminals_count, token_counter)
+                    action_state = self.action_history.push(action_state, input=action_embedding)
+                next_state = state.next(self.action_converter, action, stack_top, action_state, buffer_state, open_non_terminals_count, token_counter)
             next_states.append(next_state)
         return next_states
 
@@ -187,7 +193,7 @@ class RNNG(AbstractRNNG):
         batch_log_probs.fill_(INVALID_ACTION_LOG_PROB)
         batch_valid_actions = self.valid_actions(states)
         for i, (state, valid_actions) in enumerate(zip(states, batch_valid_actions)):
-            representation = self.get_representation(state.action_top, state.stack_top, state.token_top)
+            representation = self.get_representation(state.action_state, state.stack_top, state.buffer_state)
             valid_indices, action2index = self.get_valid_indices(valid_actions)
             # base log probabilities
             logits = self.representation2logits(representation)
@@ -270,22 +276,43 @@ class RNNG(AbstractRNNG):
     def generate(self, log_probs, tokens, tags, outputs, action):
         raise NotImplementedError('must be implemented by subclass')
 
-    def initialize_structures(self, tokens, tags, length):
-        action_top, stack_top, token_top = None, None, None
+    def initialize_batch_structures(self, tokens, tags, tokens_lengths, history=None):
+        action_states, buffer_states = None, None
         if self.uses_history:
-            action_top = self.action_history.push(self.start_action_embedding.view(1, 1, -1))
+            batch_size = tokens_lengths.size(0)
+            action_states = self.initialize_history(batch_size, history)
+        if self.uses_buffer:
+            buffer_states = self.initialize_token_buffer(tokens, tags, tokens_lengths)
+        return action_states, buffer_states
+
+    def initialize_history(self, batch_size, history):
+        if history is None:
+            start_action_embedding = self.start_action_embedding.view(1, 1, -1)
+            action_states = self.action_history.initialize(batch_size)
+            for i in range(batch_size):
+                action_states[i] = self.action_history.push(action_states[i], input=start_action_embedding)
+        else:
+            actions, actions_lengths = history
+            start_action_embedding = self.start_action_embedding.view(1, 1, -1).expand(1, batch_size, -1)
+            action_embeddings = self.action_embedding(actions)
+            action_embeddings = torch.cat((start_action_embedding, action_embeddings), dim=0)
+            # plus one to account for start embedding
+            history_init_inputs = (action_embeddings, actions_lengths + 1)
+            action_states = self.action_history.initialize(batch_size, inputs=history_init_inputs)
+        return action_states
+
+    def initialize_stack(self):
+        stack_top = None
         if self.uses_stack:
             stack_top = self.stack.push(self.start_stack_embedding.view(1, 1, -1))
-        if self.uses_buffer:
-            token_top = self.initialize_token_buffer(tokens, tags, length)
-        return action_top, stack_top, token_top
+        return stack_top
 
-    def initialize_token_buffer(self, tokens_tensor, tags_tensor, length):
+    def initialize_token_buffer(self, tokens, tags, lengths):
         """
-        :type tokens_tensor: torch.Tensor
-        :type tags_tensor: torch.Tensor
-        :type length: int
-        :rtype: app.models.rnng.stack.StackNode
+        :type tokens: torch.Tensor
+        :type tags: torch.Tensor
+        :type lengths: torch.Tensor
+        :rtype: list of app.models.rnng.buffer.BufferState
         """
         raise NotImplementedError('must be implemented by subclass')
 
@@ -301,33 +328,31 @@ class RNNG(AbstractRNNG):
         else:
             return log_probs.log_prob_base[:, :, log_probs.action2index[action_index]]
 
-    def get_representation(self, action_top, stack_top, token_top):
+    def get_representation(self, action_state, stack_top, buffer_state):
         """
-        :type action_top: app.models.rnng.stack.StackNode
+        :type action_state: object
         :type stack_top: app.models.rnng.stack.StackNode
-        :type token_top: app.models.rnng.stack.StackNode
+        :type buffer_state: app.models.rnng.buffer.BufferState
         """
         if self.representation.top_only():
             history_embedding, stack_embedding, buffer_embedding = None, None, None
             if self.uses_history:
-                history_embedding = self.action_history.top(action_top)
+                history_embedding = self.action_history.top(action_state)
             if self.uses_stack:
                 stack_embedding = self.stack.top(stack_top)
             if self.uses_buffer:
-                buffer_embedding = self.token_buffer.top(token_top)
+                buffer_embedding = self.token_buffer.top(buffer_state)
             return self.representation(history_embedding, None, stack_embedding, None, buffer_embedding, None)
         else:
             history_embedding, stack_embedding, buffer_embedding = None, None, None
             history_length, stack_length, buffer_length = None, None, None
             if self.uses_history:
-                history_embedding = self.action_history.contents(action_top)
-                history_length, action_top.length_as_tensor(self.device)
+                history_embedding, history_length = self.action_history.contents(action_state)
             if self.uses_stack:
                 stack_embedding = self.stack.contents(stack_top)
-                stack_length, stack_top.length_as_tensor(self.device)
+                stack_length = stack_top.length_as_tensor(self.device)
             if self.uses_buffer:
-                buffer_embedding = self.token_buffer.contents(token_top)
-                buffer_length = token_top.length_as_tensor(self.device)
+                buffer_embedding, buffer_length = self.token_buffer.contents(buffer_state)
             return self.representation(history_embedding, history_length, stack_embedding, stack_length, buffer_embedding, buffer_length)
 
     def get_valid_indices(self, valid_actions):

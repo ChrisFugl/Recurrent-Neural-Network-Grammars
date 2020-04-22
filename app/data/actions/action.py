@@ -1,5 +1,3 @@
-import torch
-
 class Action:
     """
     All actions should inherit from this class.

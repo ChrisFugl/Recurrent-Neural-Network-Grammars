@@ -1,15 +1,15 @@
 from app.constants import ACTION_REDUCE_TYPE, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_NON_TERMINAL_TYPE, PAD_INDEX
-from app.data.actions.non_terminal import NonTerminalAction
 import torch
 
 class StateFactory:
 
     def __init__(self,
-        device, nt_converter, token_converter,
+        device, action_converter, nt_converter, token_converter,
         action_set, generative, action_count, reduce_index, shift_index, gen_indices, nt_indices,
     ):
         """
         :type device: torch.device
+        :type action_converter: app.data.converters.action.ActionConverter
         :type nt_converter: app.data.converters.non_terminal.NonTerminalConverter
         :type token_converter: app.data.converters.token.TokenConverter
         :type action_set: app.data.action_sets.action_set.ActionSet
@@ -21,6 +21,7 @@ class StateFactory:
         :type nt_indices: list of int
         """
         self.device = device
+        self.action_converter = action_converter
         self.nt_converter = nt_converter
         self.token_converter = token_converter
         self.action_set = action_set
@@ -87,8 +88,8 @@ class StateFactory:
                     # token buffer processes terminals in reverse order
                     tokens_length = state.tokens_lengths[i]
                     shift_tensor_index = tokens_length - shift_index - 1
-                    token_index[i] = state.tokens_tensor[shift_tensor_index, i].cpu().item()
-                    tag_index[i] = state.tags_tensor[shift_tensor_index, i].cpu().item()
+                    token_index[i] = state.tokens_tensor[shift_tensor_index, i]
+                    tag_index[i] = state.tags_tensor[shift_tensor_index, i]
                     state.shift_index[i] = shift_index + 1
                     state.token_counter[i] = state.token_counter[i] + 1
                     state.stack_size[i] = state.stack_size[i] + 1
@@ -109,7 +110,7 @@ class StateFactory:
                     state.open_nt_count[i] = state.open_nt_count[i] + 1
                     state.stack_size[i] = state.stack_size[i] + 1
                     state.parent_node[i] = node
-                    state.last_action[i] = NonTerminalAction(action.argument, open=True)
+                    state.last_action[i] = self.action_converter.get_cached_nt_action(action.argument, True)
                     nt_actions.append(i)
                 else:
                     compose_nt_index[i] = self.nt_converter.non_terminal2integer(parent.action.argument)
@@ -117,7 +118,7 @@ class StateFactory:
                     state.open_nt_count[i] = state.open_nt_count[i] - 1
                     state.stack_size[i] = state.stack_size[i] - len(parent.children)
                     state.parent_node[i] = parent.parent
-                    state.last_action[i] = NonTerminalAction(parent.action.argument, open=False)
+                    state.last_action[i] = self.action_converter.get_cached_nt_action(parent.action.argument, False)
                     reduce_actions.append(i)
                 max_stack_size = max(max_stack_size, state.stack_size[i])
         nt_index_tensor = torch.tensor(nt_index, device=self.device, dtype=torch.long)

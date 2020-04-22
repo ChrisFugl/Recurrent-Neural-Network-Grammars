@@ -1,13 +1,14 @@
 import torch
+from torch import nn
 
-class Stack(torch.nn.Module):
+class Stack(nn.Module):
 
     def __init__(self, rnn):
         """
         :type rnn: app.rnn.rnn.RNN
         """
         super().__init__()
-        self._rnn = rnn
+        self.rnn = rnn
 
     def contents(self, top):
         """
@@ -32,10 +33,10 @@ class Stack(torch.nn.Module):
         """
         if top is None:
             _, batch_size, _ = embedding.shape
-            state = self._rnn.initial_state(batch_size)
+            state = self.rnn.initial_state(batch_size)
         else:
             state = top.state
-        output, next_state = self._rnn(embedding, state)
+        output, next_state = self.rnn(embedding, state)
         next_top = StackNode(output, next_state, top, data)
         return next_top
 
@@ -58,7 +59,7 @@ class Stack(torch.nn.Module):
         return top.output
 
     def __str__(self):
-        return f'Stack(rnn={self._rnn})'
+        return f'Stack(rnn={self.rnn})'
 
 class StackNode:
 
