@@ -24,6 +24,7 @@ class TimeStatsTask(Task):
         self.device = device
         self.uses_gpu = self.device.type == 'cuda'
 
+    @torch.no_grad()
     def run(self):
         self.logger.info(f'Using device: {self.device}')
         self.logger.info(f'Batch size: {self.iterator.get_batch_size()}')
@@ -48,12 +49,9 @@ class TimeStatsTask(Task):
         for i, batch in enumerate(self.iterator):
             self.start_measure_memory()
             time_start = time.time()
-            output = self.model.batch_log_likelihood(batch)
+            self.model.batch_log_likelihood(batch)
             time_stop = time.time()
             memory = self.stop_measure_memory()
-            if self.uses_gpu:
-                del output
-                torch.cuda.empty_cache()
             if memory is None:
                 allocated_gb, reserved_gb = None, None
             else:

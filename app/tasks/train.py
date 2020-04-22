@@ -236,6 +236,7 @@ class TrainTask(Task):
         else:
             return best_score
 
+    @torch.no_grad()
     def evaluate_loss(self):
         time_start = time.time()
         losses = []
@@ -275,6 +276,7 @@ class TrainTask(Task):
         predicted = visualize_action_probs(sample.prediction.actions, sample.prediction.probs)
         return groundtruth, predicted
 
+    @torch.no_grad()
     def sample(self):
         time_start = time.time()
         samples = self.sampler.evaluate()

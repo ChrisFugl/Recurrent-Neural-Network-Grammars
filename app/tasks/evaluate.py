@@ -4,6 +4,7 @@ import logging
 from math import exp, log
 import os
 import time
+import torch
 
 class EvaluateTask(Task):
 
@@ -19,6 +20,7 @@ class EvaluateTask(Task):
         self._data = data
         self._sampler = sampler
 
+    @torch.no_grad()
     def run(self):
         time_start = time.time()
         self._logger.info('Starting evaluation')
