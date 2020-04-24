@@ -1,3 +1,4 @@
+from app.constants import ACTION_REDUCE_TYPE
 from app.scores import scores_from_samples
 from app.tasks.task import Task
 from app.visualizations.actions import visualize_action_probs
@@ -70,6 +71,7 @@ class TrainTask(Task):
         self.start_sequence_count = 0
         self.logger = logging.getLogger('train')
         self.uses_gpu = self.device.type == 'cuda'
+        self.gradient_batch = self.get_gradient_batch(iterator_val)
         if load_checkpoint is not None:
             self.load_checkpoint(load_checkpoint)
 
@@ -254,13 +256,12 @@ class TrainTask(Task):
         time_taken = time_stop - time_start
         return losses, total_actions, total_tokens, total_sentences, time_taken
 
+    @torch.enable_grad()
     def make_gradient_visualizations(self):
-        for batch in self.iterator_val:
-            log_probs = self.model.batch_log_likelihood(batch)
-            loss = self.loss(log_probs, batch.actions.tensor, batch.actions.lengths)
-            self.model.zero_grad()
-            loss.backward()
-            break
+        log_probs = self.model.batch_log_likelihood(self.gradient_batch)
+        loss = self.loss(log_probs, self.gradient_batch.actions.tensor, self.gradient_batch.actions.lengths)
+        self.model.zero_grad()
+        loss.backward()
         gradients_all = visualize_gradients(self.model.named_parameters())
         gradients_compose_only = visualize_gradients_compose_only(self.model.named_parameters())
         gradients_exclude_rep = visualize_gradients_exclude_representation(self.model.named_parameters())
@@ -385,3 +386,21 @@ class TrainTask(Task):
             return None
         elements = list(map(itemgetter(index), values))
         return sum(elements) / len(elements)
+
+    def get_gradient_batch(self, iterator):
+        """
+        Find first batch to have at least two REDUCE actions.
+        This is needed as the gradient visualization may be
+        incorrect for the composition parameters, when it is
+        evaluated against a batch that only has a single
+        REDUCE action at the end of the action sequence.
+        """
+        for batch in iterator:
+            for actions in batch.actions.actions:
+                reduce_count = 0
+                for action in actions:
+                    if action.type() == ACTION_REDUCE_TYPE:
+                        reduce_count += 1
+                        if 1 < reduce_count:
+                            return batch
+        raise Exception('Could not find a batch with at least two REDUCE actions.')
