@@ -57,9 +57,9 @@ def batched_index_select(inputs, indices):
     """
     batch_size = inputs.size(1)
     hidden_shape = inputs.shape[2:]
-    indices_expanded = indices.view(1, batch_size, *[1] * len(hidden_shape))
-    indices_expanded = indices_expanded.expand(1, batch_size, *hidden_shape)
-    selected = torch.gather(inputs, 0, indices_expanded)
+    batch_indices = torch.arange(batch_size)
+    selected = inputs[indices, batch_indices]
+    selected = selected.view(1, batch_size, *hidden_shape)
     return selected
 
 def padded_reverse(sequences, lengths):

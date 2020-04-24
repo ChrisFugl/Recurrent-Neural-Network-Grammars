@@ -1,4 +1,3 @@
-from app.data.actions.non_terminal import NonTerminalAction
 from app.constants import ACTION_REDUCE_TYPE, ACTION_NON_TERMINAL_TYPE, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE
 from app.models.abstract_rnng import AbstractRNNG
 from app.models.rnng.action_args import ActionOutputs, ActionLogProbs
@@ -247,7 +246,7 @@ class RNNG(AbstractRNNG):
                 stack_top = self.stack.pop(stack_top)
                 children.append(state)
             children_tensor = torch.cat(children, dim=0)
-            compose_action = NonTerminalAction(popped_action.argument, open=False)
+            compose_action = self.action_converter.get_cached_nt_action(popped_action.argument, False)
             stack_top = self.stack.pop(stack_top)
             nt_embedding = self.get_nt_embedding(self.nt_compose_embedding, compose_action)
             children_lengths = torch.tensor([len(children)], device=self.device, dtype=torch.long)
