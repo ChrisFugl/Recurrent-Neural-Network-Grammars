@@ -1,19 +1,10 @@
-from app.constants import PAD_INDEX
-from torch.nn import Embedding
+from app.embeddings.embedding import Embedding
 
-def get_embedding(num_embeddings, size, config):
+def get_embedding(num_embeddings, size, dropout, config):
     """
     :type num_embeddings: int
     :type size: int
     :type config: object
-    :rtype: torch.nn.Embedding
+    :rtype: app.embeddings.embedding.Embedding
     """
-    return Embedding(
-        num_embeddings,
-        size,
-        max_norm=config.max_norm,
-        norm_type=config.norm_type,
-        scale_grad_by_freq=config.scale_grad_by_freq,
-        sparse=config.sparse,
-        padding_idx=PAD_INDEX,
-    )
+    return Embedding(num_embeddings, size, dropout, config.max_norm, config.norm_type, config.scale_grad_by_freq, config.sparse)

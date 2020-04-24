@@ -25,4 +25,9 @@ model:
     pos: 12
     token: 32
     rnn: 128
+  action_emb_drop: null
+  nt_emb_drop: null
+  nt_com_emb_drop: null
+  token_emb_drop: null
+  pos_emb_drop: null
   threads: 1

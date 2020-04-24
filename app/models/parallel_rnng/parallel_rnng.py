@@ -13,7 +13,7 @@ class ParallelRNNG(AbstractRNNG):
     def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, sample_stack_size, action_set, generative):
         """
         :type device: torch.device
-        :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
+        :type embeddings: app.embeddings.embedding.Embedding, app.embeddings.embedding.Embedding, app.embeddings.embedding.Embedding, app.embeddings.embedding.Embedding
         :type structures: app.models.parallel_rnng.history_lstm.HistoryLSTM, app.models.parallel_rnng.buffer_lstm.BufferLSTM, app.models.parallel_rnng.stack_lstm.StackLSTM
         :type converters: app.data.converters.action.ActionConverter, app.data.converters.token.TokenConverter, app.data.converters.tag.TagConverter, app.data.converters.non_terminal.NonTerminalConverter
         :type representation: app.representations.representation.Representation
@@ -54,6 +54,7 @@ class ParallelRNNG(AbstractRNNG):
         :type batch: app.data.batch.Batch
         :rtype: torch.Tensor
         """
+        self.reset()
         states, stack_size = self.preprocess_batch(batch)
         # plus one to account for start embeddings
         self.initialize_structures(batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths + 1, stack_size + 1, batch.actions.tensor)
@@ -79,6 +80,7 @@ class ParallelRNNG(AbstractRNNG):
         :type lengths: torch.Tensor
         :rtype: app.models.parallel_rnng.state.State
         """
+        self.reset()
         batch_size = lengths.size(0)
         # plus one to account for start embeddings
         self.initialize_structures(tokens, tags, lengths + 1, self.sample_stack_size)
@@ -297,3 +299,11 @@ class ParallelRNNG(AbstractRNNG):
             stack_op = self.hold_op(batch_size)
             stack_op[non_pad_indices] = 1
             self.stack.hold_or_push(stack_input, stack_op)
+
+    def reset(self):
+        self.action_embedding.reset()
+        self.nt_embedding.reset()
+        self.nt_compose_embedding.reset()
+        self.token_embedding.reset()
+        if not self.generative:
+            self.pos_embedding.reset()

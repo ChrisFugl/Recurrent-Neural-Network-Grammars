@@ -26,4 +26,8 @@ model:
   size:
     action: 16
     rnn: 256
+  action_emb_drop: null
+  nt_emb_drop: null
+  nt_com_emb_drop: null
+  token_emb_drop: null
   threads: 1

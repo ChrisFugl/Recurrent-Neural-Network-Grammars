@@ -7,7 +7,7 @@ class GenerativeRNNG(RNNG):
     def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, threads, token_distribution):
         """
         :type device: torch.device
-        :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
+        :type embeddings: app.embeddings.embedding.Embedding, app.embeddings.embedding.Embedding, app.embeddings.embedding.Embedding, app.embeddings.embedding.Embedding
         :type structures: app.models.rnng.stack.Stack, app.models.rnng.buffer.Buffer, app.models.rnng.stack.Stack
         :type converters: app.data.converters.action.ActionConverter, app.data.converters.token.TokenConverter, app.data.converters.tag.TagConverter, app.data.converters.non_terminal.NonTerminalConverter
         :type representation: app.representations.representation.Representation

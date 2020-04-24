@@ -10,7 +10,7 @@ class AbstractRNNG(Model):
     def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, action_set, generative, base_out_features):
         """
         :type device: torch.device
-        :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
+        :type embeddings: app.embeddings.embedding.Embedding, app.embeddings.embedding.Embedding, app.embeddings.embedding.Embedding, app.embeddings.embedding.Embedding
         :type structures: object, object, object
         :type converters: app.data.converters.action.ActionConverter, app.data.converters.token.TokenConverter, app.data.converters.tag.TagConverter, app.data.converters.non_terminal.NonTerminalConverter
         :type representation: app.representations.representation.Representation

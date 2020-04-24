@@ -12,7 +12,7 @@ class RNNG(AbstractRNNG):
     def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, threads, action_set, generative):
         """
         :type device: torch.device
-        :type embeddings: torch.Embedding, torch.Embedding, torch.Embedding, torch.Embedding
+        :type embeddings: app.embeddings.embedding.Embedding, app.embeddings.embedding.Embedding, app.embeddings.embedding.Embedding, app.embeddings.embedding.Embedding
         :type structures: app.models.rnng.stack.Stack, app.models.rnng.buffer.Buffer, app.models.rnng.stack.Stack
         :type converters: app.data.converters.action.ActionConverter, app.data.converters.token.TokenConverter, app.data.converters.tag.TagConverter, app.data.converters.non_terminal.NonTerminalConverter
         :type representation: app.representations.representation.Representation
@@ -63,6 +63,7 @@ class RNNG(AbstractRNNG):
         :type batch: app.data.batch.Batch
         :rtype: torch.Tensor
         """
+        self.reset()
         history = (batch.actions.tensor, batch.actions.lengths)
         action_states, buffer_states = self.initialize_batch_structures(batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths, history=history)
         jobs_args = []
@@ -131,6 +132,7 @@ class RNNG(AbstractRNNG):
         :returns: initial state
         :rtype: list of app.models.rnng.state.RNNGState
         """
+        self.reset()
         action_states, buffer_states = self.initialize_batch_structures(tokens, tags, lengths)
         states = []
         for i, length in enumerate(lengths):
@@ -376,3 +378,11 @@ class RNNG(AbstractRNNG):
                 action2index[nt_index] = counter
                 counter += 1
         return valid_indices, action2index
+
+    def reset(self):
+        self.action_embedding.reset()
+        self.nt_embedding.reset()
+        self.nt_compose_embedding.reset()
+        self.token_embedding.reset()
+        if not self.generative:
+            self.pos_embedding.reset()

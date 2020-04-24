@@ -18,10 +18,10 @@ def get_model(device, generative, action_converter, token_converter, tag_convert
     if config.type == 'rnng' or config.type == 'parallel_rnng':
         token_size = config.size.rnn if generative else config.size.token
         nt_count = nt_converter.count()
-        action_embedding = get_embedding(action_converter.count(), config.size.action, config.embedding)
-        nt_embedding = get_embedding(nt_count, config.size.rnn, config.embedding)
-        nt_compose_embedding = get_embedding(nt_count, config.rnn.hidden_size, config.embedding)
-        token_embedding = get_embedding(token_converter.count(), token_size, config.embedding)
+        action_embedding = get_embedding(action_converter.count(), config.size.action, config.action_emb_drop, config.embedding)
+        nt_embedding = get_embedding(nt_count, config.size.rnn, config.nt_emb_drop, config.embedding)
+        nt_compose_embedding = get_embedding(nt_count, config.rnn.hidden_size, config.nt_com_emb_drop, config.embedding)
+        token_embedding = get_embedding(token_converter.count(), token_size, config.token_emb_drop, config.embedding)
         embeddings = (action_embedding, token_embedding, nt_embedding, nt_compose_embedding)
         converters = (action_converter, token_converter, tag_converter, nt_converter)
         representation = get_representation(config.size.rnn, config.rnn.hidden_size, config.representation)
@@ -42,7 +42,7 @@ def get_model(device, generative, action_converter, token_converter, tag_convert
                 model = GenerativeRNNG(*base_args, token_distribution)
             else:
                 from app.models.rnng.discriminative import DiscriminativeRNNG
-                pos_embedding = get_embedding(tag_converter.count(), config.size.pos, config.embedding)
+                pos_embedding = get_embedding(tag_converter.count(), config.size.pos, config.pos_emb_drop, config.embedding)
                 model = DiscriminativeRNNG(*base_args, config.size.pos, pos_embedding)
         else:
             from app.models.parallel_rnng.history_lstm import HistoryLSTM
@@ -61,7 +61,7 @@ def get_model(device, generative, action_converter, token_converter, tag_convert
             else:
                 from app.models.parallel_rnng.discriminative import DiscriminativeParallelRNNG
                 from app.models.parallel_rnng.input_buffer_lstm import InputBufferLSTM
-                pos_embedding = get_embedding(tag_converter.count(), config.size.pos, config.embedding)
+                pos_embedding = get_embedding(tag_converter.count(), config.size.pos, config.pos_emb_drop, config.embedding)
                 token_buffer = InputBufferLSTM(device, config.size.rnn, *rnn_args, config.rnn.weight_drop)
                 structures[1] = token_buffer
                 model = DiscriminativeParallelRNNG(*base_args, config.size.pos, pos_embedding)
