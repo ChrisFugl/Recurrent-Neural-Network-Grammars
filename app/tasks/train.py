@@ -61,10 +61,7 @@ class TrainTask(Task):
         self.action_count = action_count
         working_directory = os.getcwd()
         tensorboard_directory = os.path.join(working_directory, 'tb')
-        train_directory = os.path.join(tensorboard_directory, 'train')
-        val_directory = os.path.join(tensorboard_directory, 'val')
-        self.writer_train = SummaryWriter(log_dir=train_directory)
-        self.writer_val = SummaryWriter(log_dir=val_directory)
+        self.writer = SummaryWriter(log_dir=tensorboard_directory)
         self.total_time_offset = 0
         self.start_epoch = 0
         self.start_batch_count = 0
@@ -115,8 +112,7 @@ class TrainTask(Task):
         time_days = time_hours / 24
         self.logger.info(f'Training time: {time_seconds:0.2f} s/{time_hours:0.2f} h/{time_days:0.2f} d')
         self.logger.info('Finished training')
-        self.writer_train.close()
-        self.writer_val.close()
+        self.writer.close()
 
     def train_epoch(self, epoch, batch_count, sequence_count, last_log_count, log_values, best_val_score):
         time_epoch_start = time.time()
@@ -145,8 +141,8 @@ class TrainTask(Task):
         time_epoch = time_epoch_stop - time_epoch_start
         time_total = self.get_time_elapsed()
         self.log_epoch(epoch, batch_count, sequence_count, learning_rate)
-        self.writer_train.add_scalar('time/epoch_s', time_epoch, sequence_count)
-        self.writer_train.add_scalar('time/total_s', time_total, sequence_count)
+        self.writer.add_scalar('time/epoch_s', time_epoch, sequence_count)
+        self.writer.add_scalar('time/total_s', time_total, sequence_count)
         return epoch, batch_count, sequence_count, last_log_count, False, log_values, best_val_score
 
     def train_batch(self, batch):
@@ -198,30 +194,30 @@ class TrainTask(Task):
         tokens_per_second = total_tokens / time_val
         sentences_per_second = total_sentences / time_val
         loss_val = sum(losses) / len(losses)
-        self.writer_val.add_scalar('training/loss', loss_val, sequence_count)
+        self.writer.add_scalar('training/loss_val', loss_val, sequence_count)
         self.stopping_criterion.add_val_loss(loss_val)
         memory = self.stop_measure_memory()
         if memory is not None:
             allocated_gb, reserved_gb = memory
-            self.writer_val.add_scalar('memory/allocated_gb', allocated_gb, sequence_count)
-            self.writer_val.add_scalar('memory/reserved_gb', reserved_gb, sequence_count)
-        self.writer_val.add_figure('gradients/all', gradients_all, sequence_count)
-        self.writer_val.add_figure('gradients/compose_only', gradients_compose_only, sequence_count)
-        self.writer_val.add_figure('gradients/exclude_representation', gradients_exclude_rep, sequence_count)
-        self.writer_val.add_scalar('time/evaluate_s', time_evaluate, sequence_count)
-        self.writer_val.add_scalar('time/val_s', time_val, sequence_count)
-        self.writer_val.add_scalar('time/actions_per_s', actions_per_second, sequence_count)
-        self.writer_val.add_scalar('time/tokens_per_s', tokens_per_second, sequence_count)
-        self.writer_val.add_scalar('time/sentences_per_s', sentences_per_second, sequence_count)
+            self.writer.add_scalar('memory/allocated_gb_val', allocated_gb, sequence_count)
+            self.writer.add_scalar('memory/reserved_gb_val', reserved_gb, sequence_count)
+        self.writer.add_figure('gradients/all', gradients_all, sequence_count)
+        self.writer.add_figure('gradients/compose_only', gradients_compose_only, sequence_count)
+        self.writer.add_figure('gradients/exclude_representation', gradients_exclude_rep, sequence_count)
+        self.writer.add_scalar('time/evaluate_s', time_evaluate, sequence_count)
+        self.writer.add_scalar('time/val_s', time_val, sequence_count)
+        self.writer.add_scalar('time/actions_per_s_val', actions_per_second, sequence_count)
+        self.writer.add_scalar('time/tokens_per_s_val', tokens_per_second, sequence_count)
+        self.writer.add_scalar('time/sentences_per_s_val', sentences_per_second, sequence_count)
         if self.sampler is not None:
-            self.writer_val.add_figure('tree/groundtruth', groundtruth_tree, sequence_count)
-            self.writer_val.add_figure('tree/predicted', predicted_tree, sequence_count)
-            self.writer_val.add_figure('actions/groundtruth', groundtruth_probs, sequence_count)
-            self.writer_val.add_figure('actions/predicted', predicted_probs, sequence_count)
-            self.writer_val.add_scalar('time/sample_s', time_sample, sequence_count)
-            self.writer_val.add_scalar('training/f1', f1, sequence_count)
-            self.writer_val.add_scalar('training/precision', precision, sequence_count)
-            self.writer_val.add_scalar('training/recall', recall, sequence_count)
+            self.writer.add_figure('tree/groundtruth', groundtruth_tree, sequence_count)
+            self.writer.add_figure('tree/predicted', predicted_tree, sequence_count)
+            self.writer.add_figure('actions/groundtruth', groundtruth_probs, sequence_count)
+            self.writer.add_figure('actions/predicted', predicted_probs, sequence_count)
+            self.writer.add_scalar('time/sample_s', time_sample, sequence_count)
+            self.writer.add_scalar('training/f1', f1, sequence_count)
+            self.writer.add_scalar('training/precision', precision, sequence_count)
+            self.writer.add_scalar('training/recall', recall, sequence_count)
             self.logger.info(f'epoch={epoch}, batch={batch_count}, sequences={sequence_count}, loss_val={loss_val:0.6f}, f1_val={f1:0.2f}')
             score = f1
             is_new_best_score = best_score is None or best_score < score
@@ -312,7 +308,7 @@ class TrainTask(Task):
         torch.save(checkpoint, checkpoint_path)
         time_checkpoint_stop = time.time()
         time_checkpoint = time_checkpoint_stop - time_checkpoint_start
-        self.writer_train.add_scalar('time/checkpoint_s', time_checkpoint, sequence_count)
+        self.writer.add_scalar('time/checkpoint_s', time_checkpoint, sequence_count)
 
     def load_checkpoint(self, path):
         absolute_path = hydra.utils.to_absolute_path(path)
@@ -329,8 +325,8 @@ class TrainTask(Task):
 
     def log_epoch(self, epoch, batch_count, sequence_count, learning_rate):
         self.logger.info(f'epoch={epoch}, batch={batch_count}, sequences={sequence_count}, learning rate={learning_rate}')
-        self.writer_train.add_scalar('training/epoch', epoch, sequence_count)
-        self.writer_train.add_scalar('training/learning_rate', learning_rate, sequence_count)
+        self.writer.add_scalar('training/epoch', epoch, sequence_count)
+        self.writer.add_scalar('training/learning_rate', learning_rate, sequence_count)
 
     def count_parameters(self):
         parameters = filter(lambda p: p.requires_grad, self.model.parameters())
@@ -370,16 +366,16 @@ class TrainTask(Task):
         sentences_per_second = self.mean_from_tuple_index(values, 5)
         time_batch = self.mean_from_tuple_index(values, 6)
         time_optimize = self.mean_from_tuple_index(values, 7)
-        self.writer_train.add_scalar('training/loss', loss, sequence_count)
-        self.writer_train.add_scalar('time/actions_per_s', actions_per_second, sequence_count)
-        self.writer_train.add_scalar('time/tokens_per_s', tokens_per_second, sequence_count)
-        self.writer_train.add_scalar('time/sentences_per_s', sentences_per_second, sequence_count)
-        self.writer_train.add_scalar('time/batch_s', time_batch, sequence_count)
-        self.writer_train.add_scalar('time/optimize_s', time_optimize, sequence_count)
+        self.writer.add_scalar('training/loss_train', loss, sequence_count)
+        self.writer.add_scalar('time/actions_per_s_train', actions_per_second, sequence_count)
+        self.writer.add_scalar('time/tokens_per_s_train', tokens_per_second, sequence_count)
+        self.writer.add_scalar('time/sentences_per_s_train', sentences_per_second, sequence_count)
+        self.writer.add_scalar('time/batch_s', time_batch, sequence_count)
+        self.writer.add_scalar('time/optimize_s', time_optimize, sequence_count)
         if allocated_gb is not None:
-            self.writer_train.add_scalar('memory/allocated_gb', allocated_gb, sequence_count)
+            self.writer.add_scalar('memory/allocated_gb_train', allocated_gb, sequence_count)
         if reserved_gb is not None:
-            self.writer_train.add_scalar('memory/reserved_gb', reserved_gb, sequence_count)
+            self.writer.add_scalar('memory/reserved_gb_train', reserved_gb, sequence_count)
 
     def mean_from_tuple_index(self, values, index):
         if values[0][index] is None:
