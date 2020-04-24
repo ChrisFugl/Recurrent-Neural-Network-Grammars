@@ -149,8 +149,8 @@ class TrainTask(Task):
         self.start_measure_memory()
         time_batch_start = time.time()
         batch_log_probs = self.model.batch_log_likelihood(batch)
-        loss = self.loss(batch_log_probs, batch.actions.tensor, batch.actions.lengths)
         time_batch_stop = time.time()
+        loss = self.loss(batch_log_probs, batch.actions.tensor, batch.actions.lengths)
         time_optimize_start = time.time()
         self.optimize(loss)
         loss_scalar = loss.cpu().item()
@@ -176,7 +176,9 @@ class TrainTask(Task):
         self.start_measure_memory()
         time_evaluate_start = time.time()
         self.model.eval()
-        losses, total_actions, total_tokens, total_sentences, time_val = self.evaluate_loss()
+        loss_train = self.evaluate_train_loss()
+        loss_val, total_actions, total_tokens, total_sentences, time_val = self.evaluate_val_loss()
+        loss_diff = loss_val - loss_train
         if self.sampler is not None:
             samples, time_sample = self.sample()
             scores, _, _, _ = scores_from_samples(samples)
@@ -193,8 +195,9 @@ class TrainTask(Task):
         actions_per_second = total_actions / time_val
         tokens_per_second = total_tokens / time_val
         sentences_per_second = total_sentences / time_val
-        loss_val = sum(losses) / len(losses)
-        self.writer.add_scalar('training/loss_val', loss_val, sequence_count)
+        self.writer.add_scalar('evaluation/loss_train', loss_train, sequence_count)
+        self.writer.add_scalar('evaluation/loss_val', loss_val, sequence_count)
+        self.writer.add_scalar('evaluation/loss_val - loss_train', loss_diff, sequence_count)
         self.stopping_criterion.add_val_loss(loss_val)
         memory = self.stop_measure_memory()
         if memory is not None:
@@ -215,14 +218,14 @@ class TrainTask(Task):
             self.writer.add_figure('actions/groundtruth', groundtruth_probs, sequence_count)
             self.writer.add_figure('actions/predicted', predicted_probs, sequence_count)
             self.writer.add_scalar('time/sample_s', time_sample, sequence_count)
-            self.writer.add_scalar('training/f1', f1, sequence_count)
-            self.writer.add_scalar('training/precision', precision, sequence_count)
-            self.writer.add_scalar('training/recall', recall, sequence_count)
-            self.logger.info(f'epoch={epoch}, batch={batch_count}, sequences={sequence_count}, loss_val={loss_val:0.6f}, f1_val={f1:0.2f}')
+            self.writer.add_scalar('evaluation/f1', f1, sequence_count)
+            self.writer.add_scalar('evaluation/precision', precision, sequence_count)
+            self.writer.add_scalar('evaluation/recall', recall, sequence_count)
+            self.logger.info(f'epoch={epoch}, batch={batch_count}, sequences={sequence_count},  loss_train={loss_train:0.6f}, loss_val={loss_val:0.6f}, f1_val={f1:0.2f}')
             score = f1
             is_new_best_score = best_score is None or best_score < score
         else:
-            self.logger.info(f'epoch={epoch}, batch={batch_count}, sequences={sequence_count}, loss_val={loss_val:0.8f}')
+            self.logger.info(f'epoch={epoch}, batch={batch_count}, sequences={sequence_count},  loss_train={loss_train:0.6f}, loss_val={loss_val:0.6f}')
             score = loss_val
             is_new_best_score = best_score is None or score < best_score
         self.evaluator.evaluation_finished()
@@ -235,22 +238,44 @@ class TrainTask(Task):
             return best_score
 
     @torch.no_grad()
-    def evaluate_loss(self):
-        time_start = time.time()
+    def evaluate_train_loss(self):
+        """
+        Evaluate train loss against the (approximate) same number of
+        sentences as in the validationset.
+        """
+        total_val_sentences = self.iterator_val.size()
+        sentences = 0
         losses = []
+        for batch in self.iterator_train:
+            log_probs = self.model.batch_log_likelihood(batch)
+            loss = self.loss(log_probs, batch.actions.tensor, batch.actions.lengths)
+            loss_scalar = loss.cpu().item()
+            losses.append(loss_scalar)
+            sentences += batch.size
+            if total_val_sentences <= sentences:
+                break
+        loss = sum(losses) / len(losses)
+        return loss
+
+    @torch.no_grad()
+    def evaluate_val_loss(self):
+        losses = []
+        time_taken = 0
         total_actions = 0
         total_tokens = 0
         total_sentences = self.iterator_val.size()
         for batch in self.iterator_val:
+            time_start = time.time()
             log_probs = self.model.batch_log_likelihood(batch)
+            time_stop = time.time()
+            time_taken += time_stop - time_start
             loss = self.loss(log_probs, batch.actions.tensor, batch.actions.lengths)
             loss_scalar = loss.cpu().item()
             losses.append(loss_scalar)
             total_actions += self.count_actions(batch)
             total_tokens += self.count_tokens(batch)
-        time_stop = time.time()
-        time_taken = time_stop - time_start
-        return losses, total_actions, total_tokens, total_sentences, time_taken
+        loss = sum(losses) / len(losses)
+        return loss, total_actions, total_tokens, total_sentences, time_taken
 
     @torch.enable_grad()
     def make_gradient_visualizations(self):
@@ -376,6 +401,7 @@ class TrainTask(Task):
             self.writer.add_scalar('memory/allocated_gb_train', allocated_gb, sequence_count)
         if reserved_gb is not None:
             self.writer.add_scalar('memory/reserved_gb_train', reserved_gb, sequence_count)
+        return loss
 
     def mean_from_tuple_index(self, values, index):
         if values[0][index] is None:
