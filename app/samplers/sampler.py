@@ -135,7 +135,8 @@ class Sampler:
         for i, valid_actions in enumerate(batch_valid_actions):
             valid_indices, index2action = self.get_valid_indices(valid_actions)
             valid_log_probs = log_probs[i, valid_indices]
-            sample = self.sample_action(valid_log_probs)
+            normalized_valid_log_probs = valid_log_probs - self.log_sum_exp(valid_log_probs)
+            sample = self.sample_action(normalized_valid_log_probs)
             action_index = index2action[sample]
             samples.append(action_index)
         return samples
@@ -190,3 +191,9 @@ class Sampler:
                 index2action[counter] = nt_index
                 counter += 1
         return valid_indices, index2action
+
+    def log_sum_exp(self, values):
+        max = values.max()
+        shifted = torch.exp(values - max)
+        summed = shifted.sum()
+        return max + summed.log()
