@@ -27,7 +27,7 @@ class DiscriminativeRNNG(RNNG):
         token_size = sizes[1]
         rnn_input_size = sizes[2]
         self.word2buffer = nn.Linear(in_features=token_size + pos_size, out_features=rnn_input_size, bias=True)
-        start_tag_embedding = torch.FloatTensor(pos_size).uniform_(-1, 1)
+        start_tag_embedding = torch.FloatTensor(pos_size).normal_()
         self.start_tag_embedding = nn.Parameter(start_tag_embedding, requires_grad=True)
 
     def shift(self, log_probs, tokens, tags, outputs, action):

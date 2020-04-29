@@ -34,15 +34,15 @@ class AbstractRNNG(Model):
         action_history, token_buffer, stack = structures
         if self.uses_history:
             self.action_history = action_history
-            start_action_embedding = torch.FloatTensor(action_size).uniform_(-1, 1)
+            start_action_embedding = torch.FloatTensor(action_size).normal_()
             self.start_action_embedding = nn.Parameter(start_action_embedding, requires_grad=True)
         if self.uses_buffer:
             self.token_buffer = token_buffer
-            start_token_embedding = torch.FloatTensor(token_size).uniform_(-1, 1)
+            start_token_embedding = torch.FloatTensor(token_size).normal_()
             self.start_token_embedding = nn.Parameter(start_token_embedding, requires_grad=True)
         if self.uses_stack:
             self.stack = stack
-            start_stack_embedding = torch.FloatTensor(rnn_input_size).uniform_(-1, 1)
+            start_stack_embedding = torch.FloatTensor(rnn_input_size).normal_()
             self.start_stack_embedding = nn.Parameter(start_stack_embedding, requires_grad=True)
         self.representation2logits = nn.Linear(in_features=rnn_input_size, out_features=base_out_features, bias=True)
         self.composer = composer
