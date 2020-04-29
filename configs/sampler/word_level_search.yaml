@@ -1,6 +1,0 @@
-sampler:
-  type: word_level_search
-  load_dir: null
-  beam_size: 2000
-  samples: 200
-  fast_track: 20

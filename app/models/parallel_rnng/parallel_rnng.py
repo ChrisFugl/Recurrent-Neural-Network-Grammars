@@ -6,9 +6,6 @@ import torch
 INVALID_ACTION_FILL = - 10e10
 
 class ParallelRNNG(AbstractRNNG):
-    """
-    This model does currently NOT support word-level search.
-    """
 
     def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, sample_stack_size, action_set, generative):
         """
