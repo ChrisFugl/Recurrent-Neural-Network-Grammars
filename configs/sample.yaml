@@ -1,0 +1,10 @@
+defaults:
+  - sampler: ancestral
+  - data: val
+  - iterator: evaluate
+gpu: null
+seed: null
+name: tmp
+hydra:
+  run:
+    dir: ./outputs/sample/${name}

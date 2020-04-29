@@ -11,15 +11,18 @@ EVALB_RECALL = 'Bracketing Recall'
 EVALB_PRECISION = 'Bracketing Precision'
 EVALB_F1 = 'Bracketing FMeasure'
 
-def scores_from_samples(samples):
+def scores_from_samples(tokens, tags, gold_actions, predicted_actions):
     """
-    :type samples: list of app.samplers.sample.Sample
+    :type tokens: list of list of str
+    :type tags: list of list of str
+    :type gold_actions: list of list of app.data.actions.action.Action
+    :type predicted_actions: list of list of app.data.actions.action.Action
     :rtype: (float, float, float), str, str, str
     """
     tool_path = hydra.utils.to_absolute_path(EVALB_TOOL_PATH)
     params_path = hydra.utils.to_absolute_path(EVALB_PARAMS_PATH)
-    gold_path = save_trees_to_brackets('gold', samples)
-    predicted_path = save_trees_to_brackets('predicted', samples)
+    gold_path = save_trees_to_brackets(tokens, tags, gold_actions, 'trees.gld')
+    predicted_path = save_trees_to_brackets(tokens, tags, predicted_actions, 'trees.tst')
     process = subprocess.run([tool_path, '-p', params_path, gold_path, predicted_path], capture_output=True)
     evalb_output = str(process.stdout, 'utf-8')
     lines = evalb_output.split('\n')
@@ -29,28 +32,21 @@ def scores_from_samples(samples):
     scores = (f1, precision, recall)
     return scores, evalb_output, gold_path, predicted_path
 
-def save_trees_to_brackets(type, samples):
+def save_trees_to_brackets(tokens, tags, actions, filename):
     """
     :type type: str
-    :type samples: list of app.samplers.sample.Sample
+    :type tokens: list of list of str
+    :type tags: list of list of str
+    :type actions: list of list of str app.data.actions.action.Action
     """
-    # name, filename, trees, trees_tokens, trees_tags
-    tokens = [sample.gold.tokens for sample in samples]
-    tags = [sample.gold.tags for sample in samples]
-    if type == 'gold':
-        filename = 'trees.gld'
-        trees = [sample.gold.actions for sample in samples]
-    else:
-        filename = 'trees.tst'
-        trees = [sample.prediction.actions for sample in samples]
     path = get_path(filename)
-    brackets = trees2brackets(trees, tokens, tags)
+    brackets = trees2brackets(tokens, tags, actions)
     content = '\n'.join(brackets)
     with open(path, 'w') as file:
         file.write(content)
     return path
 
-def trees2brackets(trees, trees_tokens, trees_tags):
+def trees2brackets(trees_tokens, trees_tags, trees):
     brackets = []
     for tree, tokens, tags in zip(trees, trees_tokens, trees_tags):
         tree_brackets = []

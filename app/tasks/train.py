@@ -180,8 +180,7 @@ class TrainTask(Task):
         loss_val, total_actions, total_tokens, total_sentences, time_val = self.evaluate_val_loss()
         loss_diff = loss_val - loss_train
         if self.sampler is not None:
-            samples, time_sample = self.sample()
-            scores, _, _, _ = scores_from_samples(samples)
+            samples, scores, time_sample = self.sample()
             f1, precision, recall = scores
         self.model.train()
         gradients_all, gradients_compose_only, gradients_exclude_rep = self.make_gradient_visualizations()
@@ -290,21 +289,31 @@ class TrainTask(Task):
 
     def make_tree_visualizations(self, sample):
         groundtruth = visualize_tree(sample.gold.actions, sample.gold.tokens)
-        predicted = visualize_tree(sample.prediction.actions, sample.gold.tokens)
+        # assumes that only a single tree is predicted
+        predicted = visualize_tree(sample.predictions[0].actions, sample.gold.tokens)
         return groundtruth, predicted
 
     def make_action_visualizations(self, sample):
-        groundtruth = visualize_action_probs(sample.gold.actions, sample.gold.probs)
-        predicted = visualize_action_probs(sample.prediction.actions, sample.prediction.probs)
+        gold_probs = [prob.cpu().item() for prob in sample.gold.log_probs.exp()]
+        groundtruth = visualize_action_probs(sample.gold.actions, gold_probs)
+        # assumes that only a single tree is predicted
+        prediction = sample.predictions[0]
+        pred_probs = [prob.cpu().item() for prob in prediction.log_probs.exp()]
+        predicted = visualize_action_probs(prediction.actions, pred_probs)
         return groundtruth, predicted
 
     @torch.no_grad()
     def sample(self):
         time_start = time.time()
-        samples = self.sampler.evaluate()
+        samples = self.sampler.get_samples()
         time_stop = time.time()
         time_taken = time_stop - time_start
-        return samples, time_taken
+        tokens = [sample.gold.tokens for sample in samples]
+        tags = [sample.gold.tags for sample in samples]
+        gold_trees = [sample.gold.actions for sample in samples]
+        predicted_trees = [sample.predictions[0].actions for sample in samples] # assumes that only one tree is sampled
+        scores, _, _, _ = scores_from_samples(tokens, tags, gold_trees, predicted_trees)
+        return samples, scores, time_taken
 
     def save(self):
         file_name = 'model.pt'

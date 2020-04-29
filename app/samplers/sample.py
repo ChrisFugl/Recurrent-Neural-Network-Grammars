@@ -1,45 +1,37 @@
 class Sample:
 
-    def __init__(self, gold_actions, gold_tokens, gold_tags, gold_log_prob, gold_probs, predicted_actions, predicted_log_prob, predicted_probs, tokens_prob):
+    def __init__(self, gold, predictions):
         """
-        :type gold_actions: list of app.data.actions.action.Action
-        :type gold_tokens: list of str
-        :type gold_tags: list of str
-        :type gold_log_prob: float
-        :type gold_probs: list of float
-        :type predicted_actions: list of app.data.actions.action.Action
-        :type predicted_log_prob: float
-        :type predicted_probs: list of float
-        :type tokens_prob: float
+        :type gold: (list of app.data.actions.action.Action, list of str, list of str, torch.Tensor, float)
+        :type predictions: list of (list of app.data.actions.action.Action, torch.Tensor, float)
         """
-        self.gold = Gold(gold_actions, gold_tokens, gold_tags, gold_log_prob, gold_probs)
-        self.prediction = Prediction(predicted_actions, predicted_log_prob, predicted_probs)
-        self.tokens_prob = tokens_prob
+        self.gold = Gold(*gold)
+        self.predictions = [Prediction(*prediction) for prediction in predictions]
 
 class Gold:
 
-    def __init__(self, actions, tokens, tags, log_prob, probs):
+    def __init__(self, actions, tokens, tags, log_probs, log_likelihood):
         """
         :type actions: list of app.data.actions.action.Action
         :type tokens: list of str
         :type tags: list of str
-        :type log_prob: float
-        :type probs: list of float
+        :type log_probs: torch.Tensor
+        :type log_likelihood: float
         """
         self.actions = actions
         self.tokens = tokens
         self.tags = tags
-        self.log_prob = log_prob
-        self.probs = probs
+        self.log_probs = log_probs
+        self.log_likelihood = log_likelihood
 
 class Prediction:
 
-    def __init__(self, actions, log_prob, probs):
+    def __init__(self, actions, log_probs, log_likelihood):
         """
         :type actions: list of app.data.actions.action.Action
-        :type log_prob: float
-        :type probs: list of float
+        :type log_probs: torch.Tensor
+        :type log_likelihood: float
         """
         self.actions = actions
-        self.log_prob = log_prob
-        self.probs = probs
+        self.log_probs = log_probs
+        self.log_likelihood = log_likelihood

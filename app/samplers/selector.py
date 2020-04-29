@@ -40,7 +40,7 @@ def get_sampler(device, data, iterator_config, config):
 def _load_from_dir(device, data, iterator_config, load_dir):
     training_config = get_training_config(load_dir)
     generative = is_generative(training_config.type)
-    loader = get_loader(training_config.loader, name=training_config.name)
+    loader = get_loader(training_config.loader, name=f'loader_{training_config.name}')
     _, actions_train, _, unknownified_tokens_train, tags_train = loader.load_train()
     _, actions_eval, _, unknownified_tokens_eval, tags_eval = _load_evaluation_data(loader, data)
     token_converter = TokenConverter(unknownified_tokens_train)

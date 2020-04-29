@@ -1,4 +1,4 @@
-from app.constants import ACTION_NON_TERMINAL_TYPE, ACTION_REDUCE_TYPE, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE
+from app.constants import ACTION_NON_TERMINAL_TYPE, ACTION_REDUCE_TYPE, ACTION_SHIFT_TYPE
 from app.data.batch import Batch
 from app.data.batch_utils import sequences2lengths, sequences2tensor
 import logging
@@ -6,31 +6,24 @@ import torch
 
 class Sampler:
 
-    def __init__(self, device, action_converter, generative, log=True):
+    def __init__(self, device, action_converter, log=True):
         """
         :type device: torch.device
         :type action_converter: app.data.converters.action.ActionConverter
-        :type generative: bool
         :type log: bool
         """
         self.device = device
         self.action_converter = action_converter
-        self.generative = generative
         self.log = log
         self.logger = logging.getLogger('sampler')
         self.action_count = action_converter.count()
         self.reduce_index = action_converter.string2integer('REDUCE')
-        if generative:
-            gen_start = action_converter.get_terminal_offset()
-            gen_count = action_converter.count_terminals()
-            self.gen_indices = list(range(gen_start, gen_start + gen_count))
-        else:
-            self.shift_index = action_converter.string2integer('SHIFT')
+        self.shift_index = action_converter.string2integer('SHIFT')
         nt_start = action_converter.get_non_terminal_offset()
         nt_count = action_converter.count_non_terminals()
         self.nt_indices = list(range(nt_start, nt_start + nt_count))
 
-    def evaluate(self):
+    def get_samples(self):
         """
         :rtype: list of app.samplers.sample.Sample
         """
@@ -40,7 +33,7 @@ class Sampler:
         threshold_counter = 0
         threshold = count / 10 # log every 10% of total iterations
         for batch in iterator:
-            batch_samples = self.evaluate_batch(batch)
+            batch_samples = self.sample_batch(batch)
             batch_size = len(batch_samples)
             samples.extend(batch_samples)
             tree_counter += batch_size
@@ -50,7 +43,7 @@ class Sampler:
                 threshold_counter = 0
         return samples
 
-    def evaluate_batch(self, batch):
+    def sample_batch(self, batch):
         """
         :rtype: list of app.samplers.sample.Sample
         """
@@ -67,10 +60,7 @@ class Sampler:
         return (
                 len(actions) > 2
             and self.count_actions(actions, ACTION_NON_TERMINAL_TYPE) == self.count_actions(actions, ACTION_REDUCE_TYPE)
-            and (
-                   self.count_actions(actions, ACTION_SHIFT_TYPE) == tokens_length
-                or self.count_actions(actions, ACTION_GENERATE_TYPE) == tokens_length
-            )
+            and self.count_actions(actions, ACTION_SHIFT_TYPE) == tokens_length
         )
 
     def sample(self, batch):
@@ -141,27 +131,24 @@ class Sampler:
             samples.append(action_index)
         return samples
 
-    def batch_stats(self, batch_log_probs, actions, lengths):
+    def batch_log_probs(self, batch_log_probs, actions, lengths):
         """
         :param batch_log_probs: tensor, S x B x A
         :type batch_log_probs: torch.Tensor
         :param actions: tensor, S x B
         :type actions: torch.Tensor
         :type lengths: torch.Tensor
-        :rtype: list of float, list of list of float
+        :rtype: list of torch.Tensor, list of float
         """
         max_length, batch_size = actions.shape
         indices = actions.unsqueeze(dim=2)
         selected_log_probs = torch.gather(batch_log_probs, 2, indices).view(max_length, batch_size)
-        log_probs = [self.get_log_prob(selected_log_probs[:length, i]) for i, length in enumerate(lengths)]
-        probs = [self.get_probs(selected_log_probs[:length, i]) for i, length in enumerate(lengths)]
-        return log_probs, probs
+        selected_log_probs = [selected_log_probs[:length, i] for i, length in enumerate(lengths)]
+        log_likelihoods = [self.log_likelihood(log_probs) for log_probs in selected_log_probs]
+        return selected_log_probs, log_likelihoods
 
-    def get_log_prob(self, log_probs):
+    def log_likelihood(self, log_probs):
         return log_probs.sum().cpu().item()
-
-    def get_probs(self, log_probs):
-        return [prob.cpu().item() for prob in log_probs.exp()]
 
     def count_actions(self, actions, type):
         filtered = filter(lambda action: action.type() == type, actions)
@@ -175,16 +162,10 @@ class Sampler:
             valid_indices.append(self.reduce_index)
             index2action[counter] = self.reduce_index
             counter += 1
-        if not self.generative and ACTION_SHIFT_TYPE in valid_actions:
+        if ACTION_SHIFT_TYPE in valid_actions:
             valid_indices.append(self.shift_index)
             index2action[counter] = self.shift_index
             counter += 1
-        if self.generative and ACTION_GENERATE_TYPE in valid_actions:
-            gen_indices = self.gen_indices
-            valid_indices.extend(gen_indices)
-            for gen_index in self.gen_indices:
-                index2action[counter] = gen_index
-                counter += 1
         if ACTION_NON_TERMINAL_TYPE in valid_actions:
             valid_indices.extend(self.nt_indices)
             for nt_index in self.nt_indices:

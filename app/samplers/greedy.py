@@ -12,33 +12,28 @@ class GreedySampler(Sampler):
         :type posterior_scaling: float
         :type log: bool
         """
-        super().__init__(device, action_converter, False, log=log)
+        super().__init__(device, action_converter, log=log)
         self.model = model
         self.iterator = iterator
         self.posterior_scaling = posterior_scaling
 
-    def evaluate_batch(self, batch):
+    def sample_batch(self, batch):
         """
         :type batch: app.data.batch.Batch
         :rtype: list of app.samplers.sample.Sample
         """
         self.model.eval()
-        predicted_batch = self.sample(batch)
-        predicted_log_probs = self.model.batch_log_likelihood(predicted_batch)
-        predicted_log_prob, predicted_probs = self.batch_stats(predicted_log_probs, predicted_batch.actions.tensor, predicted_batch.actions.lengths)
+        pred_batch = self.sample(batch)
+        pred_log_probs = self.model.batch_log_likelihood(pred_batch)
+        pred_selected_log_probs, pred_log_likelihood = self.batch_log_probs(pred_log_probs, pred_batch.actions.tensor, pred_batch.actions.lengths)
         gold_log_probs = self.model.batch_log_likelihood(batch)
-        gold_log_prob, gold_probs = self.batch_stats(gold_log_probs, batch.actions.tensor, batch.actions.lengths)
+        gold_selected_log_probs, gold_log_likelihood = self.batch_log_probs(gold_log_probs, batch.actions.tensor, batch.actions.lengths)
         samples = []
         for i in range(batch.size):
-            g_actions = batch.actions.actions[i]
-            g_tokens = batch.tokens.tokens[i]
-            g_tags = batch.tags.tags[i]
-            g_log_prob = gold_log_prob[i]
-            g_probs = gold_probs[i]
-            p_actions = predicted_batch.actions.actions[i]
-            p_log_prob = predicted_log_prob[i]
-            p_probs = predicted_probs[i]
-            sample = Sample(g_actions, g_tokens, g_tags, g_log_prob, g_probs, p_actions, p_log_prob, p_probs, None)
+            gold = (batch.actions.actions[i], batch.tokens.tokens[i], batch.tags.tags[i], gold_selected_log_probs[i], gold_log_likelihood[i])
+            prediction = (pred_batch.actions.actions[i], pred_selected_log_probs[i], pred_log_likelihood[i])
+            predictions = [prediction]
+            sample = Sample(gold, predictions)
             samples.append(sample)
         return samples
 

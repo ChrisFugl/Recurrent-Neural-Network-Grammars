@@ -37,7 +37,7 @@ class ImportanceSampler(Sampler):
         self.action_converter_dis = action_converter_dis
         self.action_converter_gen = action_converter_gen
 
-    def evaluate_batch(self, batch):
+    def sample_batch(self, batch):
         """
         :type batch: app.data.batch.Batch, app.data.batch.Batch
         :rtype: app.samplers.sample.Sample

@@ -12,7 +12,6 @@ def load_saved_model(device, load_dir):
     """
     :type device: torch.device
     :type load_dir: str
-    :rtype: app.models.model.Model, app.data.converters.action.ActionConverter
     """
     training_config = get_training_config(load_dir)
     generative = is_generative(training_config.type)
@@ -24,7 +23,7 @@ def load_saved_model(device, load_dir):
     non_terminal_converter = NonTerminalConverter(actions)
     model = get_model(device, generative, action_converter, token_converter, tag_converter, non_terminal_converter, training_config.model)
     load_model_params(model, load_dir)
-    return model, action_converter
+    return model, generative, action_converter, token_converter, tag_converter, non_terminal_converter
 
 def load_model_params(model, load_dir):
     """

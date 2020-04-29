@@ -14,43 +14,32 @@ class AncestralSampler(Sampler):
         :type samples: int
         :type log: bool
         """
-        super().__init__(device, action_converter, False, log=log)
+        super().__init__(device, action_converter, log=log)
         self.model = model
         self.iterator = iterator
         self.posterior_scaling = posterior_scaling
         self.samples = samples
 
-    def evaluate_batch(self, batch):
+    def sample_batch(self, batch):
         """
         :type batch: app.data.batch.Batch
         :rtype: list of app.samplers.sample.Sample
         """
         self.model.eval()
-        best_actions = [None] * batch.size
-        best_probs = [None] * batch.size
-        best_log_prob = [None] * batch.size
+        predictions = [[] for _ in range(batch.size)]
         for _ in range(self.samples):
             pred_batch = self.sample(batch)
             pred_log_probs = self.model.batch_log_likelihood(pred_batch)
-            pred_log_prob, pred_probs = self.batch_stats(pred_log_probs, pred_batch.actions.tensor, pred_batch.actions.lengths)
+            pred_selected_log_probs, pred_log_likelihood = self.batch_log_probs(pred_log_probs, pred_batch.actions.tensor, pred_batch.actions.lengths)
             for i in range(batch.size):
-                if best_log_prob[i] is None or best_log_prob[i] < pred_log_prob[i]:
-                    best_actions[i] = pred_batch.actions.actions[i]
-                    best_probs[i] = pred_probs[i]
-                    best_log_prob[i] = pred_log_prob[i]
+                prediction = (pred_batch.actions.actions[i], pred_selected_log_probs[i], pred_log_likelihood[i])
+                predictions[i].append(prediction)
         gold_log_probs = self.model.batch_log_likelihood(batch)
-        gold_log_prob, gold_probs = self.batch_stats(gold_log_probs, batch.actions.tensor, batch.actions.lengths)
+        gold_selected_log_probs, gold_log_likelihood = self.batch_log_probs(gold_log_probs, batch.actions.tensor, batch.actions.lengths)
         samples = []
         for i in range(batch.size):
-            g_actions = batch.actions.actions[i]
-            g_tokens = batch.tokens.tokens[i]
-            g_tags = batch.tags.tags[i]
-            g_log_prob = gold_log_prob[i]
-            g_probs = gold_probs[i]
-            p_actions = best_actions[i]
-            p_log_prob = best_log_prob[i]
-            p_probs = best_probs[i]
-            sample = Sample(g_actions, g_tokens, g_tags, g_log_prob, g_probs, p_actions, p_log_prob, p_probs, None)
+            gold = (batch.actions.actions[i], batch.tokens.tokens[i], batch.tags.tags[i], gold_selected_log_probs[i], gold_log_likelihood[i])
+            sample = Sample(gold, predictions[i])
             samples.append(sample)
         return samples
 

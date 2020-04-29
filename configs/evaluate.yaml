@@ -1,10 +1,8 @@
-defaults:
-  - iterator: evaluate
-  - data: val
-  - sampler: importance
 gpu: null
 seed: null
+model_dir: null
+samples: null
 name: tmp
 hydra:
   run:
-    dir: ./outputs/evaluate/${name}/${now:%Y-%m-%d_%H-%M-%S}
+    dir: ./outputs/evaluate/${name}
