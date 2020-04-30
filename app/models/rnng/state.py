@@ -2,12 +2,19 @@ from app.constants import ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_NON_TE
 
 class RNNGState:
 
-    def __init__(self, stack_top, action_state, buffer_state, tokens, tags, tokens_length, open_non_terminals_count, token_counter, last_action=None, parent_node=None):
+    def __init__(self,
+        stack_top, action_state, buffer_state,
+        tokens, unknownified_tokens, singletons, tags, tokens_length,
+        open_non_terminals_count, token_counter,
+        last_action=None, parent_node=None
+    ):
         """
         :type stack_top: app.models.rnng.stack.StackNode
         :type action_state: object
         :type buffer_state: app.models.rnng.buffer.BufferState
         :type tokens: torch.Tensor
+        :type unknownified_tokens: torch.Tensor
+        :type singletons: torch.Tensor
         :type tags: torch.Tensor
         :type tokens_length: int
         :type open_non_terminals_count: int
@@ -19,6 +26,8 @@ class RNNGState:
         self.action_state = action_state
         self.buffer_state = buffer_state
         self.tokens = tokens
+        self.unknownified_tokens = unknownified_tokens
+        self.singletons = singletons
         self.tags = tags
         self.tokens_length = tokens_length
         self.open_non_terminals_count = open_non_terminals_count
@@ -57,6 +66,8 @@ class RNNGState:
             action_state,
             buffer_state,
             self.tokens,
+            self.unknownified_tokens,
+            self.singletons,
             self.tags,
             self.tokens_length,
             open_non_terminals_count,

@@ -14,7 +14,7 @@ class Evaluator:
         self.tag_converter = tag_converter
         self.non_terminal_converter = non_terminal_converter
 
-    def evaluate_predictions(self, tokens, tags, predictions):
+    def evaluate_predictions(self, tokens, unknownified_tokens, tags, predictions):
         raise NotImplementedError('must be implemented by subclass')
 
     def get_predicted_log_likelihoods(self, evaluations):

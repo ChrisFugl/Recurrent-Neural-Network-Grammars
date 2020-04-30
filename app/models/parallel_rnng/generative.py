@@ -19,16 +19,18 @@ class GenerativeParallelRNNG(ParallelRNNG):
         generative = True
         super().__init__(device, embeddings, structures, converters, representation, composer, sizes, sample_stack_size, action_set, generative)
 
-    def initialize_token_buffer(self, tokens_tensor, tags_tensor, token_lengths):
+    def initialize_token_buffer(self, tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor, token_lengths):
         """
         :type tokens_tensor: torch.Tensor
+        :type unknownified_tokens_tensor: torch.Tensor
+        :type singletons_tensor: torch.Tensor
         :type tags_tensor: torch.Tensor
-        :type token_lengths: torch.Tensor
+        :type token_lengths: int
         """
         batch_size = tokens_tensor.size(1)
         start_token_embedding = self.start_token_embedding.view(1, 1, -1).expand(1, batch_size, -1)
         push_op = self.push_op(batch_size)
-        token_embeddings = self.token_embedding(tokens_tensor)
+        token_embeddings = self.token_embedding(unknownified_tokens_tensor)
         token_embeddings = torch.cat((start_token_embedding, token_embeddings), dim=0)
         self.token_buffer.initialize(token_embeddings)
         self.token_buffer.hold_or_push(push_op)

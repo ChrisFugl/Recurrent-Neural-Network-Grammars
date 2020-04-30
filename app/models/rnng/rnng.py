@@ -65,18 +65,31 @@ class RNNG(AbstractRNNG):
         """
         self.reset()
         history = (batch.actions.tensor, batch.actions.lengths)
-        action_states, buffer_states = self.initialize_batch_structures(batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths, history=history)
+        action_states, buffer_states = self.initialize_batch_structures(
+            batch.tokens.tensor,
+            batch.unknownified_tokens.tensor,
+            batch.singletons,
+            batch.tags.tensor,
+            batch.tokens.lengths,
+            history=history
+        )
         jobs_args = []
         for batch_index in range(batch.size):
             element = batch.get(batch_index)
             tokens_tensor = element.tokens.tensor[:element.tokens.length]
-            tags_tensor = element.tags.tensor[:element.tags.length]
+            unknownified_tokens_tensor = element.unknownified_tokens.tensor[:element.tokens.length]
+            singletons_tensor = element.singletons[:element.tokens.length]
+            tags_tensor = element.tags.tensor[:element.tokens.length]
             actions_tensor = element.actions.tensor[:element.actions.length]
             actions = element.actions.actions
             actions_max_length = element.actions.max_length
             action_state = action_states[batch_index]
             buffer_state = buffer_states[batch_index]
-            job_args = (action_state, buffer_state, tokens_tensor, tags_tensor, actions_tensor, actions, actions_max_length)
+            job_args = (
+                action_state, buffer_state,
+                tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor,
+                actions_tensor, actions, actions_max_length
+            )
             jobs_args.append(job_args)
         if 1 < self.threads and 1 < batch.size:
             get_log_probs = delayed(self.tree_log_probs)
@@ -86,13 +99,19 @@ class RNNG(AbstractRNNG):
         log_probs = torch.stack(log_probs_list, dim=1)
         return log_probs
 
-    def tree_log_probs(self, action_state, buffer_state, tokens_tensor, tags_tensor, actions_tensor, actions, actions_max_length=None):
+    def tree_log_probs(self,
+        action_state, buffer_state,
+        tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor,
+        actions_tensor, actions, actions_max_length=None
+    ):
         """
         Compute log probs of each action in a tree.
 
         :type action_state: object
         :type buffer_state: app.models.rnng.buffer.BufferState
         :type tokens_tensor: torch.Tensor
+        :type unknownified_tokens_tensor: torch.Tensor
+        :type singletons_tensor: torch.Tensor
         :type tags_tensor: torch.Tensor
         :type actions_tensor: torch.Tensor
         :type actions: list of app.data.actions.action.Action
@@ -114,7 +133,11 @@ class RNNG(AbstractRNNG):
             action_args_log_probs = ActionLogProbs(representation, log_probs, self.index2action)
             action_args_outputs = ActionOutputs(stack_top, buffer_state, open_non_terminals_count, token_counter)
             action_fn = self.type2action[action.type()]
-            action_outputs = action_fn(action_args_log_probs, tokens_tensor, tags_tensor, action_args_outputs, action)
+            action_outputs = action_fn(
+                action_args_log_probs,
+                tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor,
+                action_args_outputs, action
+            )
             action_log_prob, stack_top, buffer_state, open_non_terminals_count, token_counter = action_outputs
             action_index = self.action_converter.action2integer(action)
             output_log_probs[sequence_index, action_index] = action_log_prob
@@ -122,28 +145,36 @@ class RNNG(AbstractRNNG):
                 action_state = self.action_history.push(action_state)
         return output_log_probs
 
-    def initial_state(self, tokens, tags, lengths):
+    def initial_state(self, tokens, unknownified_tokens, singletons, tags, lengths):
         """
         Get initial state of model in a parse.
 
         :type tokens: torch.Tensor
+        :type unknownified_tokens: torch.Tensor
+        :type singletons: torch.Tensor
         :type tags: torch.Tensor
         :type lengths: torch.Tensor
         :returns: initial state
         :rtype: list of app.models.rnng.state.RNNGState
         """
         self.reset()
-        action_states, buffer_states = self.initialize_batch_structures(tokens, tags, lengths)
+        action_states, buffer_states = self.initialize_batch_structures(tokens, unknownified_tokens, singletons, tags, lengths)
         states = []
         for i, length in enumerate(lengths):
             token_counter = 0
             open_non_terminals_count = 0
             tokens_tensor = tokens[:length, i].unsqueeze(dim=1)
+            unknownified_tokens_tensor = unknownified_tokens[:length, i].unsqueeze(dim=1)
+            singletons_tensor = singletons[:length, i].unsqueeze(dim=1)
             tags_tensor = tags[:length, i].unsqueeze(dim=1)
             stack_top = self.initialize_stack()
             action_state = action_states[i]
             buffer_state = buffer_states[i]
-            state = RNNGState(stack_top, action_state, buffer_state, tokens_tensor, tags_tensor, length, open_non_terminals_count, token_counter)
+            state = RNNGState(
+                stack_top, action_state, buffer_state,
+                tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor, length,
+                open_non_terminals_count, token_counter
+            )
             states.append(state)
         return states
 
@@ -167,7 +198,10 @@ class RNNG(AbstractRNNG):
                 valid_actions = self.action_set.valid_actions(tokens_length, token_counter, last_action, open_non_terminals_count)
                 assert action.type() in valid_actions, f'{action} is not a valid action. (valid_actions = {valid_actions})'
                 action_args_outputs = ActionOutputs(state.stack_top, state.buffer_state, open_non_terminals_count, token_counter)
-                action_outputs = self.type2action[action.type()](None, state.tokens, state.tags, action_args_outputs, action)
+                action_outputs = self.type2action[action.type()](None,
+                    state.tokens, state.unknownified_tokens, state.singletons, state.tags,
+                    action_args_outputs, action
+                )
                 _, stack_top, buffer_state, open_non_terminals_count, token_counter = action_outputs
                 action_state = state.action_state
                 if self.uses_history:
@@ -237,7 +271,7 @@ class RNNG(AbstractRNNG):
             batch_valid_actions.append(valid_actions)
         return batch_valid_actions
 
-    def reduce(self, log_probs, tokens, tags, outputs, action):
+    def reduce(self, log_probs, tokens, unknownified_tokens, singletons, tags, outputs, action):
         stack_top = outputs.stack_top
         if self.uses_stack:
             children = []
@@ -258,7 +292,7 @@ class RNNG(AbstractRNNG):
         open_non_terminals_count = outputs.open_non_terminals_count - 1
         return outputs.update(action_log_prob=action_log_prob, stack_top=stack_top, open_non_terminals_count=open_non_terminals_count)
 
-    def non_terminal(self, log_probs, tokens, tags, outputs, action):
+    def non_terminal(self, log_probs, tokens, unknownified_tokens, singletons, tags, outputs, action):
         stack_top = outputs.stack_top
         if self.uses_stack:
             nt_embedding = self.get_nt_embedding(self.nt_embedding, action)
@@ -271,19 +305,19 @@ class RNNG(AbstractRNNG):
         open_non_terminals_count = outputs.open_non_terminals_count + 1
         return outputs.update(action_log_prob=action_log_prob, stack_top=stack_top, open_non_terminals_count=open_non_terminals_count)
 
-    def shift(self, log_probs, tokens, tags, outputs, action):
+    def shift(self, log_probs, tokens, unknownified_tokens, singletons, tags, outputs, action):
         raise NotImplementedError('must be implemented by subclass')
 
-    def generate(self, log_probs, tokens, tags, outputs, action):
+    def generate(self, log_probs, tokens, unknownified_tokens, singletons, tags, outputs, action):
         raise NotImplementedError('must be implemented by subclass')
 
-    def initialize_batch_structures(self, tokens, tags, tokens_lengths, history=None):
+    def initialize_batch_structures(self, tokens, unknownified_tokens, singletons, tags, tokens_lengths, history=None):
         action_states, buffer_states = None, None
         if self.uses_history:
             batch_size = tokens_lengths.size(0)
             action_states = self.initialize_history(batch_size, history)
         if self.uses_buffer:
-            buffer_states = self.initialize_token_buffer(tokens, tags, tokens_lengths)
+            buffer_states = self.initialize_token_buffer(tokens, unknownified_tokens, singletons, tags, tokens_lengths)
         return action_states, buffer_states
 
     def initialize_history(self, batch_size, history):
@@ -308,7 +342,7 @@ class RNNG(AbstractRNNG):
             stack_top = self.stack.push(self.start_stack_embedding.view(1, 1, -1))
         return stack_top
 
-    def initialize_token_buffer(self, tokens, tags, lengths):
+    def initialize_token_buffer(self, tokens, unknownified_tokens, singletons, tags, lengths):
         """
         :type tokens: torch.Tensor
         :type tags: torch.Tensor

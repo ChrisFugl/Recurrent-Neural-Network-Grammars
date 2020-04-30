@@ -25,6 +25,7 @@ model:
     pos: 12
     token: 32
     rnn: 128
+  unk_token_prob: 0.5
   action_emb_drop: null
   nt_emb_drop: null
   nt_com_emb_drop: null

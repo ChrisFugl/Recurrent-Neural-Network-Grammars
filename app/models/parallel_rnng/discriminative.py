@@ -6,7 +6,7 @@ from torch import nn
 
 class DiscriminativeParallelRNNG(ParallelRNNG):
 
-    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, sample_stack_size, pos_size, pos_embedding):
+    def __init__(self, device, embeddings, structures, converters, representation, composer, sizes, sample_stack_size, pos_size, pos_embedding, unk_token_prob):
         """
         :type device: torch.device
         :type embeddings: app.embeddings.embedding.Embedding, app.embeddings.embedding.Embedding, app.embeddings.embedding.Embedding, app.embeddings.embedding.Embedding
@@ -18,11 +18,13 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         :type sample_stack_size: int
         :type pos_size: int
         :type pos_embedding: app.embeddings.embedding.Embedding
+        :type unk_token_prob: float
         """
         action_set = DiscriminativeActionSet()
         generative = False
         super().__init__(device, embeddings, structures, converters, representation, composer, sizes, sample_stack_size, action_set, generative)
         self.pos_embedding = pos_embedding
+        self.unk_token_prob = unk_token_prob
         self.activation = nn.ReLU()
         token_size = sizes[1]
         rnn_input_size = sizes[2]
@@ -30,21 +32,29 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         start_tag_embedding = torch.FloatTensor(pos_size).normal_()
         self.start_tag_embedding = nn.Parameter(start_tag_embedding, requires_grad=True)
 
-    def initialize_token_buffer(self, tokens_tensor, tags_tensor, token_lengths):
+    def initialize_token_buffer(self, tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor, token_lengths):
         """
         :type tokens_tensor: torch.Tensor
+        :type unknownified_tokens_tensor: torch.Tensor
+        :type singletons_tensor: torch.Tensor
         :type tags_tensor: torch.Tensor
-        :type token_lengths: torch.Tensor
-        :rtype: app.models.parallel_rnng.buffer_lstm.Buffer
+        :type token_lengths: int
         """
         batch_size = tokens_tensor.size(1)
         start_token_embedding = self.start_token_embedding.view(1, 1, -1).expand(1, batch_size, -1)
         start_tag_embedding = self.start_tag_embedding.view(1, 1, -1).expand(1, batch_size, -1)
         start_word_embedding = self.token_tag2word(start_token_embedding, start_tag_embedding)
-        # add tokens in reverse order
-        tokens_tensor_reversed = padded_reverse(tokens_tensor, token_lengths - 1)
-        tags_tensor_reversed = padded_reverse(tags_tensor, token_lengths - 1)
-        word_embeddings = self.token_tag2embedding(tokens_tensor_reversed, tags_tensor_reversed)
+        if self.training:
+            singletons_tensor_reversed = padded_reverse(singletons_tensor, token_lengths - 1)
+            unknown_prob_mask = torch.rand(singletons_tensor_reversed.shape, device=self.device) < self.unk_token_prob
+            unknown_mask = singletons_tensor_reversed & unknown_prob_mask
+            unknownified_tokens_reversed = padded_reverse(unknownified_tokens_tensor, token_lengths - 1)
+            tokens = padded_reverse(tokens_tensor, token_lengths - 1)
+            tokens[unknown_mask] = unknownified_tokens_reversed[unknown_mask]
+        else:
+            tokens = padded_reverse(unknownified_tokens_tensor, token_lengths - 1)
+        tags = padded_reverse(tags_tensor, token_lengths - 1)
+        word_embeddings = self.token_tag2embedding(tokens, tags)
         word_embeddings = torch.cat((start_word_embedding, word_embeddings), dim=0)
         self.token_buffer.initialize(word_embeddings, token_lengths)
 
@@ -53,7 +63,14 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         :type state: app.models.parallel_rnng.state.State
         :rtype: torch.Tensor, torch.Tensor
         """
-        word_embeddings = self.token_tag2embedding(state.token_index, state.tag_index, dim=1)
+        if self.training:
+            unknown_prob_mask = torch.rand(state.singletons.shape, device=self.device) < self.unk_token_prob
+            unknown_mask = state.singletons & unknown_prob_mask
+            tokens = state.token_index
+            tokens[unknown_mask] = state.unk_token_index[unknown_mask]
+        else:
+            tokens = state.unk_token_index
+        word_embeddings = self.token_tag2embedding(tokens, state.tag_index, dim=1)
         return word_embeddings
 
     def update_token_buffer(self, batch_size, token_action_indices, word_embeddings):

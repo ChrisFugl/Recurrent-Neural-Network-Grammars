@@ -38,7 +38,14 @@ class AncestralSampler(Sampler):
         gold_selected_log_probs, gold_log_likelihood = self.batch_log_probs(gold_log_probs, batch.actions.tensor, batch.actions.lengths)
         samples = []
         for i in range(batch.size):
-            gold = (batch.actions.actions[i], batch.tokens.tokens[i], batch.tags.tags[i], gold_selected_log_probs[i], gold_log_likelihood[i])
+            gold = (
+                batch.actions.actions[i],
+                batch.tokens.tokens[i],
+                batch.unknownified_tokens.tokens[i],
+                batch.tags.tags[i],
+                gold_selected_log_probs[i],
+                gold_log_likelihood[i]
+            )
             sample = Sample(gold, predictions[i])
             samples.append(sample)
         return samples
@@ -47,7 +54,13 @@ class AncestralSampler(Sampler):
         return self.iterator, self.iterator.size()
 
     def get_initial_state(self, batch):
-        return self.model.initial_state(batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths)
+        return self.model.initial_state(
+            batch.tokens.tensor,
+            batch.unknownified_tokens.tensor,
+            batch.singletons,
+            batch.tags.tensor,
+            batch.tokens.lengths
+        )
 
     def get_next_log_probs(self, state):
         return self.model.next_action_log_probs(state, posterior_scaling=self.posterior_scaling)

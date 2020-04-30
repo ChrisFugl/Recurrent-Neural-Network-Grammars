@@ -93,7 +93,9 @@ class Sampler:
         return Batch(
             predicted_tensor, predicted_lengths, predicted_actions,
             batch.tokens.tensor, batch.tokens.lengths, batch.tokens.tokens,
-            batch.tags.tensor, batch.tags.lengths, batch.tags.tags,
+            batch.unknownified_tokens.tensor, batch.unknownified_tokens.tokens,
+            batch.singletons,
+            batch.tags.tensor, batch.tags.tags,
         )
 
     def get_initial_state(self, batch):

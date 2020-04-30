@@ -4,7 +4,10 @@ from app.data.iterators.iterator import Iterator
 
 class UnorderedIterator(Iterator):
 
-    def __init__(self, device, action_converter, token_converter, tag_converter, batch_size, shuffle, tokens, actions_strings, tags):
+    def __init__(self,
+        device, action_converter, token_converter, tag_converter, batch_size, shuffle,
+        tokens, unknownified_tokens, actions_strings, tags
+    ):
         """
         :type device: torch.device
         :type action_converter: app.data.converters.action.ActionConverter
@@ -13,6 +16,7 @@ class UnorderedIterator(Iterator):
         :type batch_size: int
         :type shuffle: bool
         :type tokens: list of list of str
+        :type unknownified_tokens: list of list of str
         :type actions_strings: list of list of str
         :type tags: list of list of str
         """
@@ -21,6 +25,9 @@ class UnorderedIterator(Iterator):
         self._actions_integers = map_sequences(action_converter.string2integer, actions_strings)
         self._tokens_strings = tokens
         self._tokens_integers = map_sequences(token_converter.token2integer, tokens)
+        self._unknownified_tokens_strings = unknownified_tokens
+        self._unknownified_tokens_integers = map_sequences(token_converter.token2integer, unknownified_tokens)
+        self._singletons = map_sequences(token_converter.is_singleton, tokens)
         self._tags_strings = tags
         self._tags_integers = map_sequences(tag_converter.tag2integer, tags)
         self._device = device
@@ -29,9 +36,11 @@ class UnorderedIterator(Iterator):
 
     def __iter__(self):
         if self._shuffle:
-            actions_integers, actions, tokens_integers, tokens_strings, tags_integers, tags_strings = self._shuffle_lists(
+            actions_integers, actions, tokens_integers, tokens_strings, unk_tokens_integers, unk_tokens_strings, singletons, tags_integers, tags_strings = self._shuffle_lists(
                 self._actions_integers, self._actions,
                 self._tokens_integers, self._tokens_strings,
+                self._unknownified_tokens_integers, self._unknownified_tokens_strings,
+                self._singletons,
                 self._tags_integers, self._tags_strings
             )
         else:
@@ -39,9 +48,19 @@ class UnorderedIterator(Iterator):
             actions = self._actions
             tokens_integers = self._tokens_integers
             tokens_strings = self._tokens_strings
+            unk_tokens_integers = self._unknownified_tokens_integers
+            unk_tokens_strings = self._unknownified_tokens_strings
+            singletons = self._singletons
             tags_integers = self._tags_integers
             tags_strings = self._tags_strings
-        return Iterable(tokens_integers, tokens_strings, actions_integers, actions, tags_integers, tags_strings, self._device, self._batch_size)
+        return Iterable(
+            tokens_integers, tokens_strings,
+            unk_tokens_integers, unk_tokens_strings,
+            singletons,
+            actions_integers, actions,
+            tags_integers, tags_strings,
+            self._device, self._batch_size
+        )
 
     def get_batch_size(self):
         """

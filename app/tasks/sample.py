@@ -58,6 +58,7 @@ class SampleTask(Task):
             'actions': list(map(str, gold.actions)),
             'log_likelihood': gold.log_likelihood,
             'tokens': gold.tokens,
+            'unknownified_tokens': gold.unknownified_tokens,
             'tags': gold.tags,
         }
 

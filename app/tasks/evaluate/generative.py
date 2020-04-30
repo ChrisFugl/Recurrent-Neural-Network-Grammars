@@ -23,19 +23,20 @@ class GenerativeEvaluator(Evaluator):
         super().__init__(model, action_converter, token_converter, tag_converter, non_terminal_converter)
         self.device = device
 
-    def evaluate_predictions(self, tokens, tags, predictions):
+    def evaluate_predictions(self, tokens, unknownified_tokens, tags, predictions):
         """
         :type tokens: list of str
+        :type unknownified_tokens: list of str
         :type tags: list of str
         :type predictions: list of object
         :rtype: list of app.data.actions.action.Action, (float, float, int)
         """
         self.model.eval()
-        actions = self.predictions2actions(tokens, predictions)
-        batch = self.create_batch(tokens, tags, actions)
+        actions = self.predictions2actions(unknownified_tokens, predictions)
+        batch = self.create_batch(tokens, unknownified_tokens, tags, actions)
         generative_log_likelihoods = self.evaluate_batch(batch)
         discriminative_log_likelihoods = self.predictions2log_likelihoods(predictions)
-        best_prediction, best_log_likelihood = self.get_best_prediction(tokens, predictions, generative_log_likelihoods)
+        best_prediction, best_log_likelihood = self.get_best_prediction(unknownified_tokens, predictions, generative_log_likelihoods)
         weights = [exp(g_log_lik - d_log_lik) for g_log_lik, d_log_lik in zip(generative_log_likelihoods, discriminative_log_likelihoods)]
         tokens_likelihood = sum(weights) / len(weights)
         tokens_length = len(tokens)
@@ -78,28 +79,46 @@ class GenerativeEvaluator(Evaluator):
             batch_actions.append(actions)
         return batch_actions
 
-    def create_batch(self, tokens, tags, actions):
+    def create_batch(self, tokens, unknownified_tokens, tags, actions):
         """
         :type tokens: list of str
+        :type unknownified_tokens: list of str
         :type tags: list of tags
         :type actions: list of list of app.data.actions.action.Action
         """
         batch_size = len(actions)
         actions_tensor = sequences2tensor(self.device, self.action_converter.action2integer, actions)
         actions_lengths = sequences2lengths(self.device, actions)
-        token_integers = list(map(self.token_converter.token2integer, tokens))
-        token_integers = [[token] * batch_size for token in token_integers]
-        tokens_tensor = torch.tensor(token_integers, device=self.device, dtype=torch.long)
+        tokens_tensor = self.tokens2tensor(batch_size, tokens)
         tokens_lengths = torch.tensor([len(tokens)] * batch_size, device=self.device, dtype=torch.long)
-        tag_integers = list(map(self.tag_converter.tag2integer, tags))
-        tag_integers = [[tag] * batch_size for tag in tag_integers]
-        tags_tensor = torch.tensor(tag_integers, device=self.device, dtype=torch.long)
-        tags_lengths = torch.tensor([len(tags)] * batch_size, device=self.device, dtype=torch.long)
+        unknownified_tokens_tensor = self.tokens2tensor(batch_size, unknownified_tokens)
+        singletons_tensor = self.get_singletons_tensor(batch_size, tokens)
+        tags_tensor = self.tags2tensor(batch_size, tags)
         return Batch(
             actions_tensor, actions_lengths, actions,
             tokens_tensor, tokens_lengths, [tokens] * batch_size,
-            tags_tensor, tags_lengths, [tags] * batch_size,
+            unknownified_tokens_tensor, [unknownified_tokens] * batch_size,
+            singletons_tensor,
+            tags_tensor, [tags] * batch_size,
         )
+
+    def get_singletons_tensor(self, batch_size, tokens):
+        singletons = list(map(self.token_converter.is_singleton, tokens))
+        singletons = [[singleton] * batch_size for singleton in singletons]
+        tensor = torch.tensor(singletons, device=self.device, dtype=torch.bool)
+        return tensor
+
+    def tokens2tensor(self, batch_size, tokens):
+        integers = list(map(self.token_converter.token2integer, tokens))
+        integers = [[token] * batch_size for token in integers]
+        tensor = torch.tensor(integers, device=self.device, dtype=torch.long)
+        return tensor
+
+    def tags2tensor(self, batch_size, tags):
+        integers = list(map(self.tag_converter.tag2integer, tags))
+        integers = [[tag] * batch_size for tag in integers]
+        tensor = torch.tensor(integers, device=self.device, dtype=torch.long)
+        return tensor
 
     def evaluate_batch(self, batch):
         """

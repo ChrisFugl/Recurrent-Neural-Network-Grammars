@@ -53,8 +53,16 @@ class ParallelRNNG(AbstractRNNG):
         """
         self.reset()
         states, stack_size = self.preprocess_batch(batch)
-        # plus one to account for start embeddings
-        self.initialize_structures(batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths + 1, stack_size + 1, batch.actions.tensor)
+        self.initialize_structures(
+            batch.tokens.tensor,
+            batch.unknownified_tokens.tensor,
+            batch.singletons,
+            batch.tags.tensor,
+            # plus one to account for start embeddings
+            batch.tokens.lengths + 1,
+            stack_size + 1,
+            batch.actions.tensor
+        )
         output_shape = (batch.max_actions_length, batch.size, self.action_count)
         output_log_probs = torch.zeros(output_shape, device=self.device, dtype=torch.float)
         for sequence_index in range(batch.max_actions_length):
@@ -68,11 +76,13 @@ class ParallelRNNG(AbstractRNNG):
                 self.action_history.hold_or_push(action_op)
         return output_log_probs
 
-    def initial_state(self, tokens, tags, lengths):
+    def initial_state(self, tokens, unknownified_tokens, singletons, tags, lengths):
         """
         Get initial state of model in a parse.
 
         :type tokens: torch.Tensor
+        :type unknownified_tokens: torch.Tensor
+        :type singletons: torch.Tensor
         :type tags: torch.Tensor
         :type lengths: torch.Tensor
         :rtype: app.models.parallel_rnng.state.State
@@ -80,8 +90,8 @@ class ParallelRNNG(AbstractRNNG):
         self.reset()
         batch_size = lengths.size(0)
         # plus one to account for start embeddings
-        self.initialize_structures(tokens, tags, lengths + 1, self.sample_stack_size)
-        state = self.state_factory.initialize(batch_size, tokens, tags, lengths)
+        self.initialize_structures(tokens, unknownified_tokens, singletons, tags, lengths + 1, self.sample_stack_size)
+        state = self.state_factory.initialize(batch_size, tokens, unknownified_tokens, singletons, tags, lengths)
         return state
 
     def next_state(self, state, actions):
@@ -142,7 +152,15 @@ class ParallelRNNG(AbstractRNNG):
         :rtype: list of app.models.parallel_rnng.state.State, list of torch.Tensor, int
         """
         states = []
-        state = self.state_factory.initialize(batch.size, batch.tokens.tensor, batch.tags.tensor, batch.tokens.lengths, make_invalid_mask=False)
+        state = self.state_factory.initialize(
+            batch.size,
+            batch.tokens.tensor,
+            batch.unknownified_tokens.tensor,
+            batch.singletons,
+            batch.tags.tensor,
+            batch.tokens.lengths,
+            make_invalid_mask=False
+        )
         for action_index in range(batch.max_actions_length):
             next_actions = []
             for actions in batch.actions.actions:
@@ -154,14 +172,14 @@ class ParallelRNNG(AbstractRNNG):
             states.append(state)
         return states, state.max_stack_size
 
-    def initialize_structures(self, tokens, tags, token_lengths, stack_size, actions=None):
+    def initialize_structures(self, tokens, unknownified_tokens, singletons, tags, token_lengths, stack_size, actions=None):
         batch_size = tokens.size(1)
         if self.uses_history:
             self.initialize_action_history(batch_size, actions)
         if self.uses_stack:
             self.initialize_stack(stack_size, batch_size)
         if self.uses_buffer:
-            self.initialize_token_buffer(tokens, tags, token_lengths)
+            self.initialize_token_buffer(tokens, unknownified_tokens, singletons, tags, token_lengths)
 
     def initialize_action_history(self, batch_size, actions):
         start_action_embedding = self.start_action_embedding.view(1, 1, -1).expand(1, batch_size, -1)
@@ -180,11 +198,13 @@ class ParallelRNNG(AbstractRNNG):
         push_all_op = self.push_op(batch_size)
         self.stack.hold_or_push(start_stack_embedding, push_all_op)
 
-    def initialize_token_buffer(self, tokens_tensor, tags_tensor):
+    def initialize_token_buffer(self, tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor, token_lengths):
         """
         :type tokens_tensor: torch.Tensor
+        :type unknownified_tokens_tensor: torch.Tensor
+        :type singletons_tensor: torch.Tensor
         :type tags_tensor: torch.Tensor
-        :type length: int
+        :type token_lengths: int
         """
         raise NotImplementedError('must be implemented by subclass')
 

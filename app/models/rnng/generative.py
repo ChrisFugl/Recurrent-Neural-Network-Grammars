@@ -21,15 +21,15 @@ class GenerativeRNNG(RNNG):
         super().__init__(device, embeddings, structures, converters, representation, composer, sizes, threads, action_set, generative)
         self.token_distribution = token_distribution
 
-    def generate(self, log_probs, tokens, tags, outputs, action):
+    def generate(self, log_probs, tokens, unknownified_tokens, singletons, tags, outputs, action):
         stack_top = outputs.stack_top
         buffer_state = outputs.buffer_state
         if self.uses_stack or self.uses_buffer:
             if self.uses_buffer:
                 buffer_state = self.token_buffer.push(buffer_state)
             if self.uses_stack:
-                token_index = self.token_converter.token2integer(action.argument)
-                token_tensor = torch.tensor([[token_index]], device=self.device, dtype=torch.long)
+                token_index = outputs.token_counter
+                token_tensor = tokens[token_index].unsqueeze(dim=0)
                 token_embedding = self.token_embedding(token_tensor)
                 stack_top = self.stack.push(token_embedding, data=action, top=stack_top)
         if log_probs is None:
@@ -41,16 +41,18 @@ class GenerativeRNNG(RNNG):
         token_counter = outputs.token_counter + 1
         return outputs.update(action_log_prob=action_log_prob, stack_top=stack_top, buffer_state=buffer_state, token_counter=token_counter)
 
-    def initialize_token_buffer(self, tokens, tags, lengths):
+    def initialize_token_buffer(self, tokens, unknownified_tokens, singletons, tags, lengths):
         """
         :type tokens: torch.Tensor
+        :type unknownified_tokens: torch.Tensor
+        :type singletons: torch.Tensor
         :type tags: torch.Tensor
         :type lengths: torch.Tensor
         :rtype: list of app.models.rnng.buffer.BufferState
         """
         batch_size = lengths.size(0)
         start_word_embedding = self.start_token_embedding.view(1, 1, -1).expand(1, batch_size, -1)
-        word_embeddings = self.token_embedding(tokens)
+        word_embeddings = self.token_embedding(unknownified_tokens)
         word_embeddings = torch.cat((start_word_embedding, word_embeddings), dim=0)
         start_indices = [0 for _ in range(batch_size)]
         # plus one to account for start embedding

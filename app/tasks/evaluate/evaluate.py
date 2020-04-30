@@ -82,7 +82,12 @@ class EvaluateTask(Task):
         evaluations = []
         for tree in self.samples['trees']:
             gold = tree['gold']
-            prediction, evaluation = self.evaluator.evaluate_predictions(gold['tokens'], gold['tags'], tree['predictions'])
+            prediction, evaluation = self.evaluator.evaluate_predictions(
+                gold['tokens'],
+                gold['unknownified_tokens'],
+                gold['tags'],
+                tree['predictions']
+            )
             tokens.append(gold['tokens'])
             tags.append(gold['tags'])
             gold_actions.append(self.string2action(gold['tokens'], gold['actions']))

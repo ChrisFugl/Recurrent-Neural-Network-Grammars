@@ -41,15 +41,15 @@ def _load_from_dir(device, data, iterator_config, load_dir):
     training_config = get_training_config(load_dir)
     generative = is_generative(training_config.type)
     loader = get_loader(training_config.loader, name=f'loader_{training_config.name}')
-    _, actions_train, _, unknownified_tokens_train, tags_train = loader.load_train()
-    _, actions_eval, _, unknownified_tokens_eval, tags_eval = _load_evaluation_data(loader, data)
-    token_converter = TokenConverter(unknownified_tokens_train)
+    _, actions_train, tokens_train, unknownified_tokens_train, tags_train = loader.load_train()
+    _, actions_eval, tokens_eval, unknownified_tokens_eval, tags_eval = _load_evaluation_data(loader, data)
+    token_converter = TokenConverter(tokens_train, unknownified_tokens_train)
     tag_converter = TagConverter(tags_train)
     action_converter = ActionConverter(generative, actions_train)
     non_terminal_converter = NonTerminalConverter(actions_train)
     model = get_model(device, generative, action_converter, token_converter, tag_converter, non_terminal_converter, training_config.model)
     load_model_params(model, load_dir)
-    iterator = get_iterator(device, action_converter, token_converter, tag_converter, unknownified_tokens_eval, actions_eval, tags_eval, iterator_config)
+    iterator = get_iterator(device, action_converter, token_converter, tag_converter, unknownified_tokens_eval, unknownified_tokens_eval, actions_eval, tags_eval, iterator_config)
     return model, iterator, action_converter
 
 def _load_evaluation_data(loader, data):

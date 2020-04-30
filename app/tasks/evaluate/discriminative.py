@@ -5,7 +5,7 @@ class DiscriminativeEvaluator(Evaluator):
     Select greatest log likelihood without regard to the loaded model.
     """
 
-    def evaluate_predictions(self, tokens, tags, predictions):
+    def evaluate_predictions(self, tokens, unknownified_tokens, tags, predictions):
         """
         :type tokens: list of str
         :type tags: list of str

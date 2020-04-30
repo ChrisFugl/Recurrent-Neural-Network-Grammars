@@ -14,11 +14,13 @@ class Model(nn.Module):
         """
         raise NotImplementedError('must be implemented by subclass')
 
-    def initial_state(self, tokens, tags, lengths):
+    def initial_state(self, tokens, unknownified_tokens, singletons, tags, lengths):
         """
         Get initial state of model in a parse.
 
         :type tokens: torch.Tensor
+        :type unknownified_tokens: torch.Tensor
+        :type singletons: torch.Tensor
         :type tags: torch.Tensor
         :type lengths: torch.Tensor
         :returns: initial state

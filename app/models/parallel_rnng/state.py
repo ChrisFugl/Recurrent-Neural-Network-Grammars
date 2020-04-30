@@ -32,10 +32,12 @@ class StateFactory:
         self.gen_indices = gen_indices
         self.nt_indices = nt_indices
 
-    def initialize(self, batch_size, tokens_tensor, tags_tensor, tokens_lengths, make_invalid_mask=True):
+    def initialize(self, batch_size, tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor, tokens_lengths, make_invalid_mask=True):
         """
         :type batch_size: int
         :type tokens_tensor: torch.Tensor
+        :type unknownified_tokens_tensor: torch.Tensor
+        :type singletons_tensor: torch.Tensor
         :type tags_tensor: torch.Tensor
         :type tokens_tensor_lengths: torch.Tensor
         :type make_invalid_mask: bool
@@ -52,10 +54,10 @@ class StateFactory:
         if make_invalid_mask:
             invalid_mask = self.get_invalid_mask(tokens_lengths, token_counter, last_action, open_nt_count)
         state = State(
-            tokens_tensor, tags_tensor,
+            tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor,
             parent_node, stack_size, max_stack_size, shift_index,
             tokens_lengths, token_counter, last_action, open_nt_count,
-            None, None, None, None, None, invalid_mask,
+            None, None, None, None, None, None, None, invalid_mask,
             None, None, None, None,
         )
         return state
@@ -72,6 +74,8 @@ class StateFactory:
         nt_index = [PAD_INDEX for _ in range(batch_size)]
         compose_nt_index = [PAD_INDEX for _ in range(batch_size)]
         token_index = [PAD_INDEX for _ in range(batch_size)]
+        unk_token_index = [PAD_INDEX for _ in range(batch_size)]
+        singletons = [False for _ in range(batch_size)]
         tag_index = [PAD_INDEX for _ in range(batch_size)]
         number_of_children = [0 for _ in range(batch_size)]
         nt_actions = []
@@ -89,6 +93,8 @@ class StateFactory:
                     tokens_length = state.tokens_lengths[i]
                     shift_tensor_index = tokens_length - shift_index - 1
                     token_index[i] = state.tokens_tensor[shift_tensor_index, i]
+                    unk_token_index[i] = state.unknownified_tokens_tensor[shift_tensor_index, i]
+                    singletons[i] = state.singletons_tensor[shift_tensor_index, i]
                     tag_index[i] = state.tags_tensor[shift_tensor_index, i]
                     state.shift_index[i] = shift_index + 1
                     state.token_counter[i] = state.token_counter[i] + 1
@@ -98,6 +104,8 @@ class StateFactory:
                     shift_actions.append(i)
                 elif type == ACTION_GENERATE_TYPE:
                     token_index[i] = self.token_converter.token2integer(action.argument)
+                    singletons[i] = state.singletons_tensor[state.token_counter[i], i]
+                    unk_token_index[i] = token_index[i]
                     state.token_counter[i] = state.token_counter[i] + 1
                     state.stack_size[i] = state.stack_size[i] + 1
                     parent.add_child(node)
@@ -124,16 +132,19 @@ class StateFactory:
         nt_index_tensor = torch.tensor(nt_index, device=self.device, dtype=torch.long)
         compose_nt_index_tensor = torch.tensor(compose_nt_index, device=self.device, dtype=torch.long)
         token_index_tensor = torch.tensor(token_index, device=self.device, dtype=torch.long)
+        unk_token_index_tensor = torch.tensor(unk_token_index, device=self.device, dtype=torch.long)
+        singletons_tensor = torch.tensor(singletons, device=self.device, dtype=torch.bool)
         tag_index_tensor = torch.tensor(tag_index, device=self.device, dtype=torch.long)
         number_of_children_tensor = torch.tensor(number_of_children, device=self.device, dtype=torch.long)
         invalid_mask = None
         if make_invalid_mask:
             invalid_mask = self.get_invalid_mask(state.tokens_lengths, state.token_counter, state.last_action, state.open_nt_count)
         next_state = State(
-            state.tokens_tensor, state.tags_tensor,
+            state.tokens_tensor, state.unknownified_tokens_tensor, state.singletons_tensor, state.tags_tensor,
             state.parent_node, state.stack_size, max_stack_size, state.shift_index,
             state.tokens_lengths, state.token_counter, state.last_action, state.open_nt_count,
-            nt_index_tensor, compose_nt_index_tensor, number_of_children_tensor, token_index_tensor, tag_index_tensor, invalid_mask,
+            nt_index_tensor, compose_nt_index_tensor, number_of_children_tensor,
+            token_index_tensor, unk_token_index_tensor, singletons_tensor, tag_index_tensor, invalid_mask,
             nt_actions, shift_actions, gen_actions, reduce_actions,
         )
         return next_state
@@ -156,14 +167,16 @@ class StateFactory:
 class State:
 
     def __init__(self,
-        tokens_tensor, tags_tensor,
+        tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor,
         parent_node, stack_size, max_stack_size, shift_index,
         tokens_lengths, token_counter, last_action, open_nt_count,
-        nt_index, compose_nt_index, number_of_children, token_index, tag_index, invalid_mask,
+        nt_index, compose_nt_index, number_of_children, token_index, unk_token_index, singletons, tag_index, invalid_mask,
         nt_actions, shift_actions, gen_actions, reduce_actions,
     ):
         """
         :type tokens_tensor: torch.Tensor
+        :type unknownified_tokens_tensor: torch.Tensor
+        :type singletons_tensor: torch.Tensor
         :type tags_tensor: torch.Tensor
         :type parent_node: list of app.models.parallel_rnng.state.Tree
         :type stack_size: list of int
@@ -177,6 +190,8 @@ class State:
         :type compose_nt_index: torch.Tensor
         :type number_of_children: torch.Tensor
         :type token_index: torch.Tensor
+        :type unk_token_index: torch.Tensor
+        :type singletons: torch.Tensor
         :type tag_index: torch.Tensor
         :type invalid_mask: torch.Tensor
         :type nt_actions: list of int
@@ -185,6 +200,8 @@ class State:
         :type reduce_actions: list of int
         """
         self.tokens_tensor = tokens_tensor
+        self.unknownified_tokens_tensor = unknownified_tokens_tensor
+        self.singletons_tensor = singletons_tensor
         self.tags_tensor = tags_tensor
         self.parent_node = parent_node
         self.stack_size = stack_size
@@ -198,6 +215,8 @@ class State:
         self.compose_nt_index = compose_nt_index
         self.number_of_children = number_of_children
         self.token_index = token_index
+        self.unk_token_index = unk_token_index
+        self.singletons = singletons
         self.tag_index = tag_index
         self.invalid_mask = invalid_mask
         self.nt_actions = nt_actions
