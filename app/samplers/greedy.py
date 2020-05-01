@@ -49,6 +49,7 @@ class GreedySampler(Sampler):
 
     def get_initial_state(self, batch):
         return self.model.initial_state(
+            batch.tokens.tokens,
             batch.tokens.tensor,
             batch.unknownified_tokens.tensor,
             batch.singletons,

@@ -38,6 +38,12 @@ class TokenConverter:
         """
         return self._token2integer[token]
 
+    def dict(self):
+        """
+        :rtype: dict
+        """
+        return self._token2integer
+
     def tokens(self):
         """
         :rtype: list of str

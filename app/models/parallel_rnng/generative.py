@@ -19,8 +19,9 @@ class GenerativeParallelRNNG(ParallelRNNG):
         generative = True
         super().__init__(device, embeddings, structures, converters, representation, composer, sizes, sample_stack_size, action_set, generative)
 
-    def initialize_token_buffer(self, tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor, token_lengths):
+    def initialize_token_buffer(self, tokens, tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor, token_lengths):
         """
+        :type tokens: list of list of str
         :type tokens_tensor: torch.Tensor
         :type unknownified_tokens_tensor: torch.Tensor
         :type singletons_tensor: torch.Tensor

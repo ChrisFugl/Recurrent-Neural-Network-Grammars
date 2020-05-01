@@ -1,4 +1,5 @@
 from app.constants import ACTION_REDUCE_TYPE, ACTION_SHIFT_TYPE, ACTION_GENERATE_TYPE, ACTION_NON_TERMINAL_TYPE, PAD_INDEX
+from operator import itemgetter
 import torch
 
 class StateFactory:
@@ -32,9 +33,13 @@ class StateFactory:
         self.gen_indices = gen_indices
         self.nt_indices = nt_indices
 
-    def initialize(self, batch_size, tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor, tokens_lengths, make_invalid_mask=True):
+    def initialize(self,
+        batch_size, sentences, tokens_tensor, unknownified_tokens_tensor,
+        singletons_tensor, tags_tensor, tokens_lengths, make_invalid_mask=True
+    ):
         """
         :type batch_size: int
+        :type sentences: list of list of str
         :type tokens_tensor: torch.Tensor
         :type unknownified_tokens_tensor: torch.Tensor
         :type singletons_tensor: torch.Tensor
@@ -51,10 +56,11 @@ class StateFactory:
         last_action = [None for _ in range(batch_size)]
         open_nt_count = [0 for _ in range(batch_size)]
         invalid_mask = None
+        tokens = list(map(itemgetter(0), sentences))
         if make_invalid_mask:
             invalid_mask = self.get_invalid_mask(tokens_lengths, token_counter, last_action, open_nt_count)
         state = State(
-            tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor,
+            sentences, tokens, tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor,
             parent_node, stack_size, max_stack_size, shift_index,
             tokens_lengths, token_counter, last_action, open_nt_count,
             None, None, None, None, None, None, None, invalid_mask,
@@ -71,6 +77,7 @@ class StateFactory:
         """
         batch_size = len(actions)
         max_stack_size = state.max_stack_size
+        tokens = ['' for _ in range(batch_size)]
         nt_index = [PAD_INDEX for _ in range(batch_size)]
         compose_nt_index = [PAD_INDEX for _ in range(batch_size)]
         token_index = [PAD_INDEX for _ in range(batch_size)]
@@ -92,6 +99,7 @@ class StateFactory:
                     # token buffer processes terminals in reverse order
                     tokens_length = state.tokens_lengths[i]
                     shift_tensor_index = tokens_length - shift_index - 1
+                    tokens[i] = state.sentences[i][shift_tensor_index]
                     token_index[i] = state.tokens_tensor[shift_tensor_index, i]
                     unk_token_index[i] = state.unknownified_tokens_tensor[shift_tensor_index, i]
                     singletons[i] = state.singletons_tensor[shift_tensor_index, i]
@@ -103,6 +111,7 @@ class StateFactory:
                     parent.add_child(node)
                     shift_actions.append(i)
                 elif type == ACTION_GENERATE_TYPE:
+                    tokens[i] = action.argument
                     token_index[i] = self.token_converter.token2integer(action.argument)
                     singletons[i] = state.singletons_tensor[state.token_counter[i], i]
                     unk_token_index[i] = token_index[i]
@@ -140,7 +149,7 @@ class StateFactory:
         if make_invalid_mask:
             invalid_mask = self.get_invalid_mask(state.tokens_lengths, state.token_counter, state.last_action, state.open_nt_count)
         next_state = State(
-            state.tokens_tensor, state.unknownified_tokens_tensor, state.singletons_tensor, state.tags_tensor,
+            state.sentences, tokens, state.tokens_tensor, state.unknownified_tokens_tensor, state.singletons_tensor, state.tags_tensor,
             state.parent_node, state.stack_size, max_stack_size, state.shift_index,
             state.tokens_lengths, state.token_counter, state.last_action, state.open_nt_count,
             nt_index_tensor, compose_nt_index_tensor, number_of_children_tensor,
@@ -167,13 +176,15 @@ class StateFactory:
 class State:
 
     def __init__(self,
-        tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor,
+        sentences, tokens, tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor,
         parent_node, stack_size, max_stack_size, shift_index,
         tokens_lengths, token_counter, last_action, open_nt_count,
         nt_index, compose_nt_index, number_of_children, token_index, unk_token_index, singletons, tag_index, invalid_mask,
         nt_actions, shift_actions, gen_actions, reduce_actions,
     ):
         """
+        :type sentences: list of list of str
+        :type tokens: list of str
         :type tokens_tensor: torch.Tensor
         :type unknownified_tokens_tensor: torch.Tensor
         :type singletons_tensor: torch.Tensor
@@ -199,6 +210,8 @@ class State:
         :type gen_actions: list of int
         :type reduce_actions: list of int
         """
+        self.sentences = sentences
+        self.tokens = tokens
         self.tokens_tensor = tokens_tensor
         self.unknownified_tokens_tensor = unknownified_tokens_tensor
         self.singletons_tensor = singletons_tensor

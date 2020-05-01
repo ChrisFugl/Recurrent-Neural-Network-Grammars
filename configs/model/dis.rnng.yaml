@@ -9,6 +9,7 @@ model:
     norm_type: 2.0
     scale_grad_by_freq: false
     sparse: false
+  pretrained_word_vectors: null
   representation:
     type: vanilla
     dropout: 0.2
@@ -31,4 +32,5 @@ model:
   nt_com_emb_drop: null
   token_emb_drop: null
   pos_emb_drop: null
+  pretrained_emb_drop: null
   threads: 1

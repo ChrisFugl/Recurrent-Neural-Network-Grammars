@@ -4,7 +4,7 @@ class RNNGState:
 
     def __init__(self,
         stack_top, action_state, buffer_state,
-        tokens, unknownified_tokens, singletons, tags, tokens_length,
+        tokens_tensor, tokens, unknownified_tokens_tensor, singletons_tensor, tags_tensor, tokens_length,
         open_non_terminals_count, token_counter,
         last_action=None, parent_node=None
     ):
@@ -12,10 +12,11 @@ class RNNGState:
         :type stack_top: app.models.rnng.stack.StackNode
         :type action_state: object
         :type buffer_state: app.models.rnng.buffer.BufferState
-        :type tokens: torch.Tensor
-        :type unknownified_tokens: torch.Tensor
-        :type singletons: torch.Tensor
-        :type tags: torch.Tensor
+        :type tokens_tensor: torch.Tensor
+        :type tokens: list of str
+        :type unknownified_tokens_tensor: torch.Tensor
+        :type singletons_tensor: torch.Tensor
+        :type tags_tensor: torch.Tensor
         :type tokens_length: int
         :type open_non_terminals_count: int
         :type token_counter: int
@@ -25,10 +26,11 @@ class RNNGState:
         self.stack_top = stack_top
         self.action_state = action_state
         self.buffer_state = buffer_state
+        self.tokens_tensor = tokens_tensor
         self.tokens = tokens
-        self.unknownified_tokens = unknownified_tokens
-        self.singletons = singletons
-        self.tags = tags
+        self.unknownified_tokens_tensor = unknownified_tokens_tensor
+        self.singletons_tensor = singletons_tensor
+        self.tags_tensor = tags_tensor
         self.tokens_length = tokens_length
         self.open_non_terminals_count = open_non_terminals_count
         self.token_counter = token_counter
@@ -65,10 +67,11 @@ class RNNGState:
             stack_top,
             action_state,
             buffer_state,
+            self.tokens_tensor,
             self.tokens,
-            self.unknownified_tokens,
-            self.singletons,
-            self.tags,
+            self.unknownified_tokens_tensor,
+            self.singletons_tensor,
+            self.tags_tensor,
             self.tokens_length,
             open_non_terminals_count,
             token_counter,
