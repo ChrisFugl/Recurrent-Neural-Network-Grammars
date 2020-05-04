@@ -65,6 +65,9 @@ class Buffer(nn.Module):
         output = output.view(1, 1, hidden_size)
         return output
 
+    def reset(self):
+        self.rnn.reset()
+
     def __str__(self):
         return f'Buffer(rnn={self.rnn})'
 

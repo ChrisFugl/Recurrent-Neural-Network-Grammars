@@ -18,8 +18,16 @@ class BufferLSTM(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, bias=bias, dropout=dropout)
-        if weight_drop is not None:
+        self.dropout = dropout
+        self.weight_drop = weight_drop
+        self.use_weight_drop = weight_drop is not None
+        if self.use_weight_drop:
             weights = [f'weight_hh_l{i}' for i in range(self.num_layers)]
             self.lstm = nn.LSTM(input_size, hidden_size, num_layers, bias=bias)
             self.lstm = WeightDrop(self.lstm, weights, weight_drop)
+        else:
+            self.lstm = nn.LSTM(input_size, hidden_size, num_layers, bias=bias, dropout=dropout)
+
+    def reset(self):
+        if self.use_weight_drop:
+            self.lstm.reset()

@@ -69,5 +69,9 @@ class GenerativeRNNG(RNNG):
             + f'  representation={self.representation}\n'
             + f'  composer={self.composer}\n'
             + f'  token_distribution={self.token_distribution}\n'
+            + f'  action_embedding={self.action_embedding}\n'
+            + f'  nt_embedding={self.nt_embedding}\n'
+            + f'  nt_compose_embedding={self.nt_compose_embedding}\n'
+            + f'  token_embedding={self.token_embedding}\n'
             + ')'
         )

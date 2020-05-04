@@ -37,4 +37,10 @@ class InputBufferLSTM(BufferLSTM):
         return batched_index_select(self.buffer, self.lengths - 1)
 
     def __str__(self):
-        return f'InputBufferLSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers})'
+        base_args = f'input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers}'
+        if self.use_weight_drop:
+            return f'InputBufferLSTM({base_args}, weight_drop={self.weight_drop})'
+        elif self.dropout is not None:
+            return f'InputBufferLSTM({base_args}, dropout={self.dropout})'
+        else:
+            return f'InputBufferLSTM({base_args})'

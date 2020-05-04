@@ -18,6 +18,7 @@ class BiRNNComposer(Composer):
         self.rnn_backward = rnn_backward
         self.affine = nn.Linear(in_features=2 * stack_hidden_size, out_features=stack_input_size, bias=True)
         self.activation = nn.ReLU()
+        self.dropout_p = dropout
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, nt_embedding, popped_items, popped_lengths):
@@ -44,5 +45,12 @@ class BiRNNComposer(Composer):
         output = self.dropout(output)
         return output
 
+    def reset(self):
+        self.rnn_forward.reset()
+        self.rnn_backward.reset()
+
     def __str__(self):
-        return f'BiRNN(rnn_forward={self.rnn_forward}, rnn_backward={self.rnn_backward})'
+        if self.dropout_p is None:
+            return f'BiRNN(forward={self.rnn_forward}, backward={self.rnn_backward})'
+        else:
+            return f'BiRNN(forward={self.rnn_forward}, backward={self.rnn_backward}, dropout={self.dropout_p})'

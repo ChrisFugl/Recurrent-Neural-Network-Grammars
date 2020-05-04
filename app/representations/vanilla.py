@@ -20,6 +20,7 @@ class VanillaRepresentation(Representation):
         self.affine = nn.Linear(in_features=input_size, out_features=representation_size, bias=True)
         self.activation = nn.ReLU()
         self.dropout = nn.Dropout(p=dropout)
+        self.dropout_p = dropout
 
     def forward(self, action_history, action_history_lengths, stack, stack_lengths, token_buffer, token_buffer_lengths):
         """
@@ -66,4 +67,7 @@ class VanillaRepresentation(Representation):
         return True
 
     def __str__(self):
-        return f'Vanilla(size={self.representation_size})'
+        if self.dropout_p is None:
+            return f'Vanilla(size={self.representation_size})'
+        else:
+            return f'Vanilla(size={self.representation_size}, dropout={self.dropout_p})'

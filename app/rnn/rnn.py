@@ -18,3 +18,9 @@ class RNN(nn.Module):
         :rtype: object
         """
         raise NotImplementedError('must be implemented by subclass')
+
+    def reset(self):
+        """
+        Resets internal state.
+        """
+        raise NotImplementedError('must be implemented by subclass')

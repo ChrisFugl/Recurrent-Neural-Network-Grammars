@@ -81,6 +81,9 @@ class History(nn.Module):
         else:
             return state.output
 
+    def reset(self):
+        self.rnn.reset()
+
     def __str__(self):
         return f'History(rnn={self.rnn})'
 

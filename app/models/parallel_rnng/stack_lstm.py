@@ -19,6 +19,8 @@ class StackLSTM(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
+        self.dropout = dropout
+        self.weight_drop = weight_drop
         self.lstm = MultiLayerLSTMCell(input_size, hidden_size, num_layers, bias, dropout, weight_drop)
 
     def contents(self):
@@ -78,5 +80,14 @@ class StackLSTM(nn.Module):
         output = output[:, :, self.num_layers - 1]
         return output
 
+    def reset(self):
+        self.lstm.reset()
+
     def __str__(self):
-        return f'StackLSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers})'
+        base_args = f'input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers}'
+        if self.weight_drop is not None:
+            return f'StackLSTM({base_args}, weight_drop={self.weight_drop})'
+        elif self.dropout is not None:
+            return f'StackLSTM({base_args}, dropout={self.dropout})'
+        else:
+            return f'StackLSTM({base_args})'

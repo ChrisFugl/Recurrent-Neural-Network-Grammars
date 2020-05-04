@@ -35,10 +35,12 @@ class WeightDrop(nn.Module):
             setattr(self.module, name, param)
 
     def forward(self, *args):
+        return self.module.forward(*args)
+
+    def reset(self):
         self.set_weights()
         if issubclass(type(self.module), nn.RNNBase):
             self.module.flatten_parameters()
-        return self.module.forward(*args)
 
     def __str__(self):
         return f'WeightDrop(dropout={self.dropout}, module={self.module})'

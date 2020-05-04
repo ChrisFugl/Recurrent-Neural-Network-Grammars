@@ -34,6 +34,7 @@ class AttentiveRepresentation(Representation):
         input_size = 3 * embedding_size
         self.embedding2representation = nn.Linear(in_features=input_size, out_features=representation_size, bias=True)
         self.activation = nn.ReLU()
+        self.dropout_p = dropout
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, his, his_lengths, stack, stack_lengths, buf, buf_lengths):
@@ -102,4 +103,7 @@ class AttentiveRepresentation(Representation):
         return output
 
     def __str__(self):
-        return f'Attentive(size={self.representation_size})'
+        if self.dropout_p is None:
+            return f'Attentive(size={self.representation_size})'
+        else:
+            return f'Attentive(size={self.representation_size}, dropout={self.dropout_p})'

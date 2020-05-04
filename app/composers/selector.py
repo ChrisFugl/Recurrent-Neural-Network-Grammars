@@ -12,9 +12,8 @@ def get_composer(device, config):
         from app.composers.birnn import BiRNNComposer
         rnn_config = deepcopy(config.rnn)
         rnn_config['bidirectional'] = False
-        rnn_config['dropout'] = config.composer.dropout
         if config.composer.num_layers == 1:
-            rnn_config['dropout'] = 0.0
+            rnn_config['dropout'] = None
         rnn_config['num_layers'] = config.composer.num_layers
         rnn_forward = get_rnn(device, config.rnn.hidden_size, rnn_config)
         rnn_backward = get_rnn(device, config.rnn.hidden_size, rnn_config)

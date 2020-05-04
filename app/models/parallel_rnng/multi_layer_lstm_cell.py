@@ -24,7 +24,9 @@ class MultiLayerLSTMCell(nn.Module):
       weights = ['weight_hh']
       for i in range(num_layers - 1):
           self.lstm.append(nn.LSTMCell(hidden_size, hidden_size, bias=bias))
-          if weight_drop is not None:
+      self.use_weight_drop = weight_drop is not None
+      if self.use_weight_drop:
+          for i in range(num_layers):
               self.lstm[i] = WeightDrop(self.lstm[i], weights, weight_drop)
 
   def forward(self, input, prev):
@@ -41,7 +43,16 @@ class MultiLayerLSTMCell(nn.Module):
           next_hidden_i, next_cell_i = self.lstm[i](lstm_input, (prev_hidden_i, prev_cell_i))
           next_hidden += [next_hidden_i]
           next_cell += [next_cell_i]
-          lstm_input = self.dropout(next_hidden_i)
+          if self.use_weight_drop:
+              lstm_input = next_hidden_i
+          else:
+              lstm_input = self.dropout(next_hidden_i)
       next_hidden = torch.stack(next_hidden).permute(1, 2, 0)
       next_cell = torch.stack(next_cell).permute(1, 2, 0)
       return next_hidden, next_cell
+
+
+  def reset(self):
+      if self.use_weight_drop:
+          for i in range(self.num_layers):
+              self.lstm[i].reset()

@@ -58,6 +58,9 @@ class Stack(nn.Module):
         """
         return top.output
 
+    def reset(self):
+        self.rnn.reset()
+
     def __str__(self):
         return f'Stack(rnn={self.rnn})'
 

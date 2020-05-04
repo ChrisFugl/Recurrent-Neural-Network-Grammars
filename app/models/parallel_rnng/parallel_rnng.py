@@ -339,3 +339,10 @@ class ParallelRNNG(AbstractRNNG):
             self.pos_embedding.reset()
             if self.pretrained is not None:
                 self.pretrained.reset()
+        if self.uses_buffer:
+            self.token_buffer.reset()
+        if self.uses_history:
+            self.action_history.reset()
+        if self.uses_stack:
+            self.stack.reset()
+        self.composer.reset()

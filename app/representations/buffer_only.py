@@ -16,6 +16,7 @@ class BufferOnlyRepresentation(Representation):
         self.representation_size = representation_size
         self.feedforward = nn.Linear(in_features=embedding_size, out_features=representation_size, bias=True)
         self.activation = nn.ReLU()
+        self.dropout_p = dropout
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, action_history, action_history_lengths, stack, stack_lengths, token_buffer, token_buffer_lengths):
@@ -59,4 +60,7 @@ class BufferOnlyRepresentation(Representation):
         return True
 
     def __str__(self):
-        return f'BufferOnly(size={self.representation_size})'
+        if self.dropout_p is None:
+            return f'BufferOnly(size={self.representation_size})'
+        else:
+            return f'BufferOnly(size={self.representation_size}, dropout={self.dropout_p})'

@@ -22,10 +22,18 @@ class LSTM(RNN):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.bidirectional = bidirectional
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, bias=bias, dropout=dropout, bidirectional=bidirectional)
-        if weight_drop is not None:
+        self.dropout = dropout
+        self.weight_drop = weight_drop
+        self.use_weight_drop = weight_drop is not None
+        if self.use_weight_drop:
             weights = [f'weight_hh_l{i}' for i in range(num_layers)]
+            self.lstm = nn.LSTM(input_size, hidden_size, num_layers, bias=bias, bidirectional=bidirectional)
             self.lstm = WeightDrop(self.lstm, weights, weight_drop)
+        else:
+            if dropout is None:
+                self.lstm = nn.LSTM(input_size, hidden_size, num_layers, bias=bias, bidirectional=bidirectional)
+            else:
+                self.lstm = nn.LSTM(input_size, hidden_size, num_layers, bias=bias, dropout=dropout, bidirectional=bidirectional)
 
     def forward(self, input, hidden_state):
         """
@@ -48,5 +56,14 @@ class LSTM(RNN):
         hidden = torch.zeros(shape, device=self.device, requires_grad=True)
         return cell, hidden
 
+    def reset(self):
+        if self.use_weight_drop:
+            self.lstm.reset()
+
     def __str__(self):
-        return f'LSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers})'
+        if self.use_weight_drop:
+            return f'LSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers}, weight_drop={self.weight_drop})'
+        elif self.dropout is not None:
+            return f'LSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers}, dropout={self.dropout})'
+        else:
+            return f'LSTM(input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers})'

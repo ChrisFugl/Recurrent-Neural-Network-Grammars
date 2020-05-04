@@ -143,6 +143,11 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
             + ('' if not self.uses_stack else f'  stack={self.stack}\n')
             + f'  representation={self.representation}\n'
             + f'  composer={self.composer}\n'
+            + f'  action_embedding={self.action_embedding}\n'
+            + f'  nt_embedding={self.nt_embedding}\n'
+            + f'  nt_compose_embedding={self.nt_compose_embedding}\n'
+            + f'  token_embedding={self.token_embedding}\n'
+            + f'  pos_embedding={self.pos_embedding}\n'
             + ('' if self.pretrained is None else f'  pretrained={self.pretrained}\n')
             + ')'
         )

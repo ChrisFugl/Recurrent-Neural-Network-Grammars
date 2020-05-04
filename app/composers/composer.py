@@ -10,3 +10,9 @@ class Composer(nn.Module):
         :rtype: torch.Tensor
         """
         raise NotImplementedError('must be implemented by subclass')
+
+    def reset(self):
+        """
+        Resets internal state.
+        """
+        raise NotImplementedError('must be implemented by subclass')

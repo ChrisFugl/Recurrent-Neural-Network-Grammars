@@ -45,3 +45,9 @@ class TrainableEmbedding(Embedding):
     def reset(self):
         if self.use_dropout and self.training:
             self.mask = embedding_dropout_mask(self.embedding.weight, self.dropout)
+
+    def __str__(self):
+        if self.use_dropout:
+            return f'Trainable(dropout={self.dropout})'
+        else:
+            return f'Trainable()'
