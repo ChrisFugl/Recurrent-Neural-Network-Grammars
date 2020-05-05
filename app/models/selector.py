@@ -69,6 +69,14 @@ def get_model(device, generative, action_converter, token_converter, tag_convert
                 token_buffer = InputBufferLSTM(device, config.size.rnn, *rnn_args, config.rnn.weight_drop)
                 structures[1] = token_buffer
                 model = DiscriminativeParallelRNNG(*base_args, config.size.pos, pos_embedding, config.unk_token_prob, pretrained)
+    elif config.type == 'rnn_lm':
+        assert generative, 'RNN LM is only defined for generative parsing.'
+        from app.models.rnn_lm.rnn_lm import RNNLM
+        action_embedding_size = config.size.rnn
+        action_count = action_converter.count()
+        rnn = get_rnn(device, config.size.rnn, config.rnn)
+        action_embedding = get_embedding(action_count, action_embedding_size, config.action_emb_drop, config.embedding)
+        model = RNNLM(device, rnn, action_embedding, action_embedding_size, action_converter)
     elif config.type == 'rnn_parser':
         assert not generative, 'RNN parser is only defined for discriminative parsing.'
         from app.models.rnn_parser.rnn_parser import RNNParser

@@ -1,0 +1,18 @@
+model:
+  type: rnn_lm
+  embedding:
+    max_norm: null
+    norm_type: 2.0
+    scale_grad_by_freq: false
+    sparse: false
+  rnn:
+    type: lstm
+    hidden_size: 1500
+    num_layers: 3
+    bias: true
+    dropout: 0.3
+    bidirectional: false
+    weight_drop: null
+  size:
+    rnn: 1500
+  action_emb_drop: null
