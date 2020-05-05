@@ -2,7 +2,7 @@ from app.constants import ACTION_REDUCE_TYPE
 from app.scores import scores_from_samples
 from app.tasks.task import Task
 from app.visualizations.actions import visualize_action_probs
-from app.visualizations.gradients import visualize_gradients, visualize_gradients_compose_only, visualize_gradients_exclude_representation
+from app.visualizations.gradients import visualize_gradients
 from app.visualizations.trees import visualize_tree
 import hydra
 import logging
@@ -183,7 +183,7 @@ class TrainTask(Task):
             samples, scores, time_sample = self.sample()
             f1, precision, recall = scores
         self.model.train()
-        gradients_all, gradients_compose_only, gradients_exclude_rep = self.make_gradient_visualizations()
+        gradients_all = self.make_gradient_visualizations()
         if self.sampler is not None:
             sample_index = random.randint(0, len(samples) - 1)
             sample = samples[sample_index]
@@ -204,8 +204,6 @@ class TrainTask(Task):
             self.writer.add_scalar('memory/allocated_gb_val', allocated_gb, sequence_count)
             self.writer.add_scalar('memory/reserved_gb_val', reserved_gb, sequence_count)
         self.writer.add_figure('gradients/all', gradients_all, sequence_count)
-        self.writer.add_figure('gradients/compose_only', gradients_compose_only, sequence_count)
-        self.writer.add_figure('gradients/exclude_representation', gradients_exclude_rep, sequence_count)
         self.writer.add_scalar('time/evaluate_s', time_evaluate, sequence_count)
         self.writer.add_scalar('time/val_s', time_val, sequence_count)
         self.writer.add_scalar('time/actions_per_s_val', actions_per_second, sequence_count)
@@ -283,9 +281,7 @@ class TrainTask(Task):
         self.model.zero_grad()
         loss.backward()
         gradients_all = visualize_gradients(self.model.named_parameters())
-        gradients_compose_only = visualize_gradients_compose_only(self.model.named_parameters())
-        gradients_exclude_rep = visualize_gradients_exclude_representation(self.model.named_parameters())
-        return gradients_all, gradients_compose_only, gradients_exclude_rep
+        return gradients_all
 
     def make_tree_visualizations(self, sample):
         groundtruth = visualize_tree(sample.gold.actions, sample.gold.tokens)
