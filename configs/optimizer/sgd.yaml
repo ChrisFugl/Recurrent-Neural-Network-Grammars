@@ -3,5 +3,5 @@ optimizer:
   learning_rate: 0.1
   momentum: 0.0
   dampening: 0.0
-  weight_decay: 1e-6
+  weight_decay: 0.0
   nesterov: false

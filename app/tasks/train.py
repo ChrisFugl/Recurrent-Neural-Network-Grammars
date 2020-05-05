@@ -6,6 +6,7 @@ from app.visualizations.gradients import visualize_gradients
 from app.visualizations.trees import visualize_tree
 import hydra
 import logging
+from math import exp
 import numpy as np
 from operator import itemgetter
 import os
@@ -184,6 +185,7 @@ class TrainTask(Task):
             f1, precision, recall = scores
         self.model.train()
         gradients_all = self.make_gradient_visualizations()
+        self.model.eval()
         if self.sampler is not None:
             sample_index = random.randint(0, len(samples) - 1)
             sample = samples[sample_index]
@@ -226,6 +228,7 @@ class TrainTask(Task):
             score = loss_val
             is_new_best_score = best_score is None or score < best_score
         self.evaluator.evaluation_finished()
+        self.model.train()
         # save model with best performing score
         if is_new_best_score:
             if best_score is not None:
@@ -290,11 +293,11 @@ class TrainTask(Task):
         return groundtruth, predicted
 
     def make_action_visualizations(self, sample):
-        gold_probs = [prob.cpu().item() for prob in sample.gold.log_probs.exp()]
+        gold_probs = [exp(prob) for prob in sample.gold.log_probs]
         groundtruth = visualize_action_probs(sample.gold.actions, gold_probs)
         # assumes that only a single tree is predicted
         prediction = sample.predictions[0]
-        pred_probs = [prob.cpu().item() for prob in prediction.log_probs.exp()]
+        pred_probs = [exp(prob) for prob in prediction.log_probs]
         predicted = visualize_action_probs(prediction.actions, pred_probs)
         return groundtruth, predicted
 

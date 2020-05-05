@@ -87,7 +87,8 @@ class DiscriminativeParallelRNNG(ParallelRNNG):
         if self.training:
             unknown_prob_mask = torch.rand(state.singletons.shape, device=self.device) < self.unk_token_prob
             unknown_mask = state.singletons & unknown_prob_mask
-            tokens = state.token_index
+            tokens = state.empty_like(state.token_index)
+            tokens.copy_(state.token_index)
             tokens[unknown_mask] = state.unk_token_index[unknown_mask]
         else:
             tokens = state.unk_token_index

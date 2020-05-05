@@ -140,14 +140,15 @@ class Sampler:
         :param actions: tensor, S x B
         :type actions: torch.Tensor
         :type lengths: torch.Tensor
-        :rtype: list of torch.Tensor, list of float
+        :rtype: list of list of float, list of float
         """
         max_length, batch_size = actions.shape
         indices = actions.unsqueeze(dim=2)
-        selected_log_probs = torch.gather(batch_log_probs, 2, indices).view(max_length, batch_size)
+        selected_log_probs = torch.gather(batch_log_probs, 2, indices).view(max_length, batch_size).cpu()
         selected_log_probs = [selected_log_probs[:length, i] for i, length in enumerate(lengths)]
+        selected_log_probs_list = [[lp.item() for lp in log_probs] for log_probs in selected_log_probs]
         log_likelihoods = [self.log_likelihood(log_probs) for log_probs in selected_log_probs]
-        return selected_log_probs, log_likelihoods
+        return selected_log_probs_list, log_likelihoods
 
     def log_likelihood(self, log_probs):
         return log_probs.sum().cpu().item()
