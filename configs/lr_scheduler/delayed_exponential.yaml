@@ -1,0 +1,4 @@
+lr_scheduler:
+  type: delayed_exponential
+  decay: 0.85
+  delay: 15
