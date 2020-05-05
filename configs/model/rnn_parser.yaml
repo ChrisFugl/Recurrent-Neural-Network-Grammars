@@ -1,0 +1,19 @@
+model:
+  type: rnn_parser
+  embedding:
+    max_norm: null
+    norm_type: 2.0
+    scale_grad_by_freq: false
+    sparse: false
+  rnn:
+    type: lstm
+    hidden_size: 256
+    num_layers: 3
+    bias: true
+    dropout: null
+    bidirectional: false
+    weight_drop: null
+  size:
+    rnn: 256
+  action_emb_drop: null
+  token_emb_drop: null

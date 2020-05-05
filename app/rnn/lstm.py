@@ -22,6 +22,7 @@ class LSTM(RNN):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.bidirectional = bidirectional
+        self.num_directions = 2 if bidirectional else 1
         self.dropout = dropout
         self.weight_drop = weight_drop
         self.use_weight_drop = weight_drop is not None
@@ -50,8 +51,7 @@ class LSTM(RNN):
         :type batch_size: int
         :rtype: torch.Tensor, torch.Tensor
         """
-        num_directions = 2 if self.bidirectional else 1
-        shape = (self.num_layers * num_directions, batch_size, self.hidden_size)
+        shape = (self.num_layers * self.num_directions, batch_size, self.hidden_size)
         cell = torch.zeros(shape, device=self.device, requires_grad=True)
         hidden = torch.zeros(shape, device=self.device, requires_grad=True)
         return cell, hidden
@@ -59,6 +59,28 @@ class LSTM(RNN):
     def reset(self):
         if self.use_weight_drop:
             self.lstm.reset()
+
+    def get_output_size(self):
+        """
+        :rtype: int
+        """
+        return self.hidden_size * self.num_directions
+
+    def state2output(self, state):
+        """
+        :type state: torch.Tensor, torch.Tensor
+        :rtype: torch.Tensor
+        """
+        hidden, _ = state # (num_layers * num_directions, batch, hidden_size)
+        batch_size = hidden.size(1)
+        hidden = hidden.view(self.num_layers, self.num_directions, batch_size, self.hidden_size)
+        if self.bidirectional:
+            forward = hidden[-1, 0]
+            backward = hidden[-1, 1]
+            output = torch.stack((forward, backward), dim=0)
+        else:
+            output = hidden[-1]
+        return output
 
     def __str__(self):
         if self.use_weight_drop:

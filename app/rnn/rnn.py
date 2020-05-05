@@ -24,3 +24,15 @@ class RNN(nn.Module):
         Resets internal state.
         """
         raise NotImplementedError('must be implemented by subclass')
+
+    def get_output_size(self):
+        """
+        :rtype: int
+        """
+        raise NotImplementedError('must be implemented by subclass')
+
+    def state2output(self, state):
+        """
+        :rtype: torch.Tensor
+        """
+        raise NotImplementedError('must be implemented by subclass')
