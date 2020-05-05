@@ -29,7 +29,7 @@ class GenerativeRNNG(RNNG):
                 buffer_state = self.token_buffer.push(buffer_state)
             if self.uses_stack:
                 token_index = outputs.token_counter
-                token_tensor = tokens_tensor[token_index].unsqueeze(dim=0)
+                token_tensor = unknownified_tokens_tensor[token_index].unsqueeze(dim=0)
                 token_embedding = self.token_embedding(token_tensor)
                 stack_top = self.stack.push(token_embedding, data=action, top=stack_top)
         if log_probs is None:

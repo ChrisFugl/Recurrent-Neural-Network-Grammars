@@ -41,7 +41,7 @@ class GenerativeParallelRNNG(ParallelRNNG):
         :type state: app.models.parallel_rnng.state.State
         :rtype: torch.Tensor, torch.Tensor
         """
-        return self.token_embedding(state.token_index)
+        return self.token_embedding(state.unk_token_index)
 
     def update_token_buffer(self, batch_size, token_action_indices, word_embeddings):
         """
