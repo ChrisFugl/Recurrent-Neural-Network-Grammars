@@ -4,7 +4,7 @@ from torch import nn
 
 class StackLSTM(nn.Module):
 
-    def __init__(self, device, input_size, hidden_size, num_layers, bias, dropout, weight_drop):
+    def __init__(self, device, input_size, hidden_size, num_layers, bias, dropout, weight_drop, layer_norm):
         """
         :type device: torch.device
         :type input_size: int
@@ -13,6 +13,7 @@ class StackLSTM(nn.Module):
         :type bias: bool
         :type dropout: float
         :type weight_drop: float
+        :type layer_norm: bool
         """
         super().__init__()
         self.device = device
@@ -21,7 +22,8 @@ class StackLSTM(nn.Module):
         self.num_layers = num_layers
         self.dropout = dropout
         self.weight_drop = weight_drop
-        self.lstm = MultiLayerLSTMCell(input_size, hidden_size, num_layers, bias, dropout, weight_drop)
+        self.layer_norm = layer_norm
+        self.lstm = MultiLayerLSTMCell(input_size, hidden_size, num_layers, bias, dropout, weight_drop, layer_norm)
 
     def contents(self):
         """
@@ -84,7 +86,7 @@ class StackLSTM(nn.Module):
         self.lstm.reset()
 
     def __str__(self):
-        base_args = f'input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers}'
+        base_args = f'input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers}, layer_norm={self.layer_norm}'
         if self.weight_drop is not None:
             return f'StackLSTM({base_args}, weight_drop={self.weight_drop})'
         elif self.dropout is not None:

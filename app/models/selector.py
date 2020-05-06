@@ -52,21 +52,21 @@ def get_model(device, generative, action_converter, token_converter, tag_convert
             from app.models.parallel_rnng.history_lstm import HistoryLSTM
             from app.models.parallel_rnng.stack_lstm import StackLSTM
             rnn_args = [config.rnn.hidden_size, config.rnn.num_layers, config.rnn.bias, config.rnn.dropout]
-            action_history = HistoryLSTM(device, config.size.action, *rnn_args, config.rnn.weight_drop)
-            stack = StackLSTM(device, config.size.rnn, *rnn_args, config.rnn.weight_drop)
+            action_history = HistoryLSTM(device, get_rnn(device, config.size.action, config.rnn))
+            stack = StackLSTM(device, config.size.rnn, *rnn_args, config.rnn.weight_drop, config.rnn.type == 'layer_norm_lstm')
             structures = [action_history, None, stack]
             base_args = (device, embeddings, structures, converters, representation, composer, sizes, config.sample_stack_size)
             if generative:
                 from app.models.parallel_rnng.generative import GenerativeParallelRNNG
                 from app.models.parallel_rnng.output_buffer_lstm import OutputBufferLSTM
-                token_buffer = OutputBufferLSTM(device, config.size.rnn, *rnn_args, config.rnn.weight_drop)
+                token_buffer = OutputBufferLSTM(device, get_rnn(device, config.size.rnn, config.rnn))
                 structures[1] = token_buffer
                 model = GenerativeParallelRNNG(*base_args)
             else:
                 from app.models.parallel_rnng.discriminative import DiscriminativeParallelRNNG
                 from app.models.parallel_rnng.input_buffer_lstm import InputBufferLSTM
                 pos_embedding = get_embedding(tag_converter.count(), config.size.pos, config.pos_emb_drop, config.embedding)
-                token_buffer = InputBufferLSTM(device, config.size.rnn, *rnn_args, config.rnn.weight_drop)
+                token_buffer = InputBufferLSTM(device, get_rnn(device, config.size.rnn, config.rnn))
                 structures[1] = token_buffer
                 model = DiscriminativeParallelRNNG(*base_args, config.size.pos, pos_embedding, config.unk_token_prob, pretrained)
     elif config.type == 'rnn_lm':

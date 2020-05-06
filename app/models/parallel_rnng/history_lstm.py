@@ -1,4 +1,3 @@
-from app.dropout.weight_drop import WeightDrop
 from app.utils import batched_index_select
 import torch
 from torch import nn
@@ -11,30 +10,14 @@ class HistoryLSTM(nn.Module):
     pushed beyond their respective lengths.
     """
 
-    def __init__(self, device, input_size, hidden_size, num_layers, bias, dropout, weight_drop):
+    def __init__(self, device, rnn):
         """
         :type device: torch.device
-        :type input_size: int
-        :type hidden_size: int
-        :type num_layers: int
-        :type bias: bool
-        :type dropout: float
-        :type weight_drop: float
+        :type rnn: app.rnn.rnn.RNN
         """
         super().__init__()
         self.device = device
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.dropout = dropout
-        self.weight_drop = weight_drop
-        self.use_weight_drop = weight_drop is not None
-        if self.use_weight_drop:
-            weights = [f'weight_hh_l{i}' for i in range(self.num_layers)]
-            self.lstm = nn.LSTM(input_size, hidden_size, num_layers, bias=bias)
-            self.lstm = WeightDrop(self.lstm, weights, weight_drop)
-        else:
-            self.lstm = nn.LSTM(input_size, hidden_size, num_layers, bias=bias, dropout=dropout)
+        self.rnn = rnn
 
     def contents(self):
         """
@@ -57,15 +40,13 @@ class HistoryLSTM(nn.Module):
         :type inputs: torch.Tensor
         """
         if inputs is None:
-            state_shape = (self.num_layers, batch_size, self.hidden_size)
-            cell = torch.zeros(state_shape, device=self.device, requires_grad=True)
-            hidden = torch.zeros(state_shape, device=self.device, requires_grad=True)
-            self.state = hidden, cell
+            self.state = self.rnn.initial_state(batch_size)
             self.history = []
             self.lengths = torch.zeros((batch_size,), device=self.device, dtype=torch.long)
             self.prefilled = False
         else:
-            self.history, _ = self.lstm(inputs)
+            initial_state = self.rnn.initial_state(batch_size)
+            self.history, _ = self.rnn(inputs, initial_state)
             # assumes that start embedding is implicitly given through inputs
             self.lengths = torch.ones((batch_size,), device=self.device, dtype=torch.long)
             self.prefilled = True
@@ -77,7 +58,7 @@ class HistoryLSTM(nn.Module):
         """
         self.lengths = self.lengths + op
         if not self.prefilled:
-            output, next_state = self.lstm(input, self.state)
+            output, next_state = self.rnn(input, self.state)
             self.state = next_state
             self.history.append(output)
 
@@ -95,30 +76,7 @@ class HistoryLSTM(nn.Module):
             return torch.stack(top, dim=1)
 
     def __str__(self):
-        base_args = f'input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers}'
-        if self.use_weight_drop:
-            return f'HistoryLSTM({base_args}, weight_drop={self.weight_drop})'
-        elif self.dropout is not None:
-            return f'HistoryLSTM({base_args}, dropout={self.dropout})'
-        else:
-            return f'HistoryLSTM({base_args})'
+        return f'HistoryLSTM(rnn={self.rnn})'
 
     def reset(self):
-        if self.use_weight_drop:
-            self.lstm.reset()
-
-class HistoryState:
-
-    def __init__(self, batch_size, previous, length, output, hidden_states):
-        """
-        :type batch_size: int
-        :type previous: app.models.parallel_rnng.history_lstm.HistoryState
-        :type length: int
-        :type output: torch.Tensor
-        :type hidden_states: (torch.Tensor, torch.Tensor)
-        """
-        self.batch_size = batch_size
-        self.previous = previous
-        self.length = length
-        self.output = output
-        self.hidden_states = hidden_states
+        self.rnn.reset()

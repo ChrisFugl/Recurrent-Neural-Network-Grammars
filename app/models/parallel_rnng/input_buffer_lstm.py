@@ -20,7 +20,9 @@ class InputBufferLSTM(BufferLSTM):
         :type inputs: torch.Tensor
         :type lengths: torch.Tensor
         """
-        buffer, _ = self.lstm(inputs)
+        batch_size = lengths.size(0)
+        initial_state = self.rnn.initial_state(batch_size)
+        buffer, _ = self.rnn(inputs, initial_state)
         self.buffer = buffer
         self.lengths = lengths
 
@@ -37,10 +39,4 @@ class InputBufferLSTM(BufferLSTM):
         return batched_index_select(self.buffer, self.lengths - 1)
 
     def __str__(self):
-        base_args = f'input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers}'
-        if self.use_weight_drop:
-            return f'InputBufferLSTM({base_args}, weight_drop={self.weight_drop})'
-        elif self.dropout is not None:
-            return f'InputBufferLSTM({base_args}, dropout={self.dropout})'
-        else:
-            return f'InputBufferLSTM({base_args})'
+        return f'InputBufferLSTM(rnn={self.rnn})'
