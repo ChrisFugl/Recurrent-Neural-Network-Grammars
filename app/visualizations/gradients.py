@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 import numpy as np
 
 def visualize_gradients(named_parameters):
@@ -20,23 +19,20 @@ def gradient_flow(named_parameters, parameter_condition):
 
     Usage: Plug this function in Trainer class after loss.backwards() as
     "plot_grad_flow(self.model.named_parameters())" to visualize the gradient flow'''
-    ave_grads = []
-    max_grads= []
+    plt.style.use('seaborn-whitegrid')
+    grad_norms = []
     layers = []
     fig = plt.figure(figsize=(9, 6))
     for n, p in named_parameters:
         if parameter_condition(n, p):
             layers.append(n)
-            ave_grads.append(p.grad.abs().mean())
-            max_grads.append(p.grad.abs().max())
-    plt.bar(np.arange(len(max_grads)), max_grads, alpha=0.5, lw=1, color='c')
-    plt.bar(np.arange(len(max_grads)), ave_grads, alpha=0.5, lw=1, color='b')
-    plt.xticks(range(0,len(ave_grads), 1), layers, rotation='vertical')
-    plt.xlim(left=-0.5, right=len(ave_grads) - 0.5)
+            grad_norms.append(p.grad.norm())
+    plt.bar(np.arange(len(grad_norms)), grad_norms, alpha=0.5, lw=1)
+    plt.xticks(range(0,len(grad_norms), 1), layers, rotation='vertical')
+    plt.xlim(left=-0.5, right=len(grad_norms) - 0.5)
     plt.ticklabel_format(axis='y', style='sci', scilimits=(0, 0))
-    plt.ylabel('gradients')
+    plt.ylabel('Gradients (euclidean norm)')
     plt.grid(True)
-    plt.legend([Line2D([0], [0], color='c', lw=4), Line2D([0], [0], color='b', lw=4)], ['max-gradient', 'mean-gradient'])
     plt.tight_layout()
     return fig
 
