@@ -61,7 +61,7 @@ class RNNG(AbstractRNNG):
         Compute log likelihood of each sentence/tree in a batch.
 
         :type batch: app.data.batch.Batch
-        :rtype: torch.Tensor
+        :rtype: torch.Tensor, dict
         """
         self.reset()
         history = (batch.actions.tensor, batch.actions.lengths)
@@ -99,7 +99,7 @@ class RNNG(AbstractRNNG):
         else:
             log_probs_list = [self.tree_log_probs(*args) for args in jobs_args]
         log_probs = torch.stack(log_probs_list, dim=1)
-        return log_probs
+        return log_probs, {}
 
     def tree_log_probs(self,
         action_state, buffer_state,
@@ -130,7 +130,7 @@ class RNNG(AbstractRNNG):
         output_log_probs = torch.zeros((actions_max_length, self.action_count), dtype=torch.float, device=self.device)
         for sequence_index in range(actions_length):
             action = actions[sequence_index]
-            representation = self.get_representation(action_state, stack_top, buffer_state)
+            representation, _ = self.get_representation(action_state, stack_top, buffer_state)
             logits = self.representation2logits(representation)
             log_probs = self.logits2log_prob(logits)
             action_args_log_probs = ActionLogProbs(representation, log_probs, self.index2action)
@@ -239,7 +239,7 @@ class RNNG(AbstractRNNG):
         batch_log_probs.fill_(INVALID_ACTION_LOG_PROB)
         batch_valid_actions = self.valid_actions(states)
         for i, (state, valid_actions) in enumerate(zip(states, batch_valid_actions)):
-            representation = self.get_representation(state.action_state, state.stack_top, state.buffer_state)
+            representation, _ = self.get_representation(state.action_state, state.stack_top, state.buffer_state)
             valid_indices, action2index = self.get_valid_indices(valid_actions)
             # base log probabilities
             logits = self.representation2logits(representation)

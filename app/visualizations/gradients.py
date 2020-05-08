@@ -1,3 +1,4 @@
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -34,6 +35,7 @@ def gradient_flow(named_parameters, parameter_condition):
     plt.ylabel('Gradients (euclidean norm)')
     plt.grid(True)
     plt.tight_layout()
+    mpl.rcParams.update(mpl.rcParamsDefault)
     return fig
 
 def default_parameter_condition(name, parameter):

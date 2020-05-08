@@ -27,13 +27,13 @@ class StackOnlyRepresentation(Representation):
         :type stack_lengths: torch.Tensor
         :type token_buffer: torch.Tensor
         :type token_buffer_lengths: torch.Tensor
-        :rtype: torch.Tensor
+        :rtype: torch.Tensor, dict
         """
         output = stack
         output = self.dropout(output)
         output = self.feedforward(output)
         output = self.activation(output)
-        return output
+        return output, {}
 
     def top_only(self):
         """

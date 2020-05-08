@@ -13,7 +13,7 @@ class Representation(nn.Module):
         :type stack_lengths: torch.Tensor
         :type token_buffer: torch.Tensor
         :type token_buffer_lengths: torch.Tensor
-        :rtype: torch.Tensor
+        :rtype: torch.Tensor, dict
         """
         raise NotImplementedError('must be implemented by subclass')
 

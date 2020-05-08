@@ -2,6 +2,12 @@ from app.constants import ACTION_REDUCE_TYPE
 from app.scores import scores_from_samples
 from app.tasks.task import Task
 from app.visualizations.actions import visualize_action_probs
+from app.visualizations.attention import (
+    visualize_buffer_attention,
+    visualize_history_attention,
+    visualize_rnn_parser_attention,
+    visualize_stack_attention
+)
 from app.visualizations.gradients import visualize_gradients
 from app.visualizations.trees import visualize_tree
 import hydra
@@ -14,6 +20,8 @@ import random
 import time
 import torch
 from torch.utils.tensorboard import SummaryWriter
+
+MAX_ATTENTION_TOKEN_LENGTH = 13
 
 class TrainTask(Task):
 
@@ -149,7 +157,7 @@ class TrainTask(Task):
     def train_batch(self, batch):
         self.start_measure_memory()
         time_batch_start = time.time()
-        batch_log_probs = self.model.batch_log_likelihood(batch)
+        batch_log_probs, _ = self.model.batch_log_likelihood(batch)
         time_batch_stop = time.time()
         loss = self.loss(batch_log_probs, batch.actions.tensor, batch.actions.lengths)
         time_optimize_start = time.time()
@@ -178,19 +186,21 @@ class TrainTask(Task):
         time_evaluate_start = time.time()
         self.model.eval()
         loss_train = self.evaluate_train_loss()
-        loss_val, total_actions, total_tokens, total_sentences, time_val = self.evaluate_val_loss()
+        loss_val, total_actions, total_tokens, total_sentences, time_val, attention_batch, attention_info = self.evaluate_val_loss()
         loss_diff = loss_val - loss_train
+        if attention_batch is not None:
+            self.make_attention_visualizations(attention_batch, attention_info, sequence_count)
         if self.sampler is not None:
             samples, scores, time_sample = self.sample()
             f1, precision, recall = scores
         self.model.train()
-        gradients_all = self.make_gradient_visualizations()
+        self.make_gradient_visualizations(sequence_count)
         self.model.eval()
         if self.sampler is not None:
             sample_index = random.randint(0, len(samples) - 1)
             sample = samples[sample_index]
-            groundtruth_tree, predicted_tree = self.make_tree_visualizations(sample)
-            groundtruth_probs, predicted_probs = self.make_action_visualizations(sample)
+            self.make_tree_visualizations(sample, sequence_count)
+            self.make_action_visualizations(sample, sequence_count)
         time_evaluate_stop = time.time()
         time_evaluate = time_evaluate_stop - time_evaluate_start
         actions_per_second = total_actions / time_val
@@ -205,17 +215,12 @@ class TrainTask(Task):
             allocated_gb, reserved_gb = memory
             self.writer.add_scalar('memory/allocated_gb_val', allocated_gb, sequence_count)
             self.writer.add_scalar('memory/reserved_gb_val', reserved_gb, sequence_count)
-        self.writer.add_figure('gradients/all', gradients_all, sequence_count)
         self.writer.add_scalar('time/evaluate_s', time_evaluate, sequence_count)
         self.writer.add_scalar('time/val_s', time_val, sequence_count)
         self.writer.add_scalar('time/actions_per_s_val', actions_per_second, sequence_count)
         self.writer.add_scalar('time/tokens_per_s_val', tokens_per_second, sequence_count)
         self.writer.add_scalar('time/sentences_per_s_val', sentences_per_second, sequence_count)
         if self.sampler is not None:
-            self.writer.add_figure('tree/groundtruth', groundtruth_tree, sequence_count)
-            self.writer.add_figure('tree/predicted', predicted_tree, sequence_count)
-            self.writer.add_figure('actions/groundtruth', groundtruth_probs, sequence_count)
-            self.writer.add_figure('actions/predicted', predicted_probs, sequence_count)
             self.writer.add_scalar('time/sample_s', time_sample, sequence_count)
             self.writer.add_scalar('evaluation/f1', f1, sequence_count)
             self.writer.add_scalar('evaluation/precision', precision, sequence_count)
@@ -247,7 +252,7 @@ class TrainTask(Task):
         sentences = 0
         losses = []
         for batch in self.iterator_train:
-            log_probs = self.model.batch_log_likelihood(batch)
+            log_probs, _ = self.model.batch_log_likelihood(batch)
             loss = self.loss(log_probs, batch.actions.tensor, batch.actions.lengths)
             loss_scalar = loss.cpu().item()
             losses.append(loss_scalar)
@@ -264,9 +269,12 @@ class TrainTask(Task):
         total_actions = 0
         total_tokens = 0
         total_sentences = self.iterator_val.size()
+        attention_batches = []
         for batch in self.iterator_val:
             time_start = time.time()
-            log_probs = self.model.batch_log_likelihood(batch)
+            log_probs, info = self.model.batch_log_likelihood(batch)
+            if batch.tokens.lengths[0] <= MAX_ATTENTION_TOKEN_LENGTH:
+                attention_batches.append((batch, info))
             time_stop = time.time()
             time_taken += time_stop - time_start
             loss = self.loss(log_probs, batch.actions.tensor, batch.actions.lengths)
@@ -275,31 +283,51 @@ class TrainTask(Task):
             total_actions += self.count_actions(batch)
             total_tokens += self.count_tokens(batch)
         loss = sum(losses) / len(losses)
-        return loss, total_actions, total_tokens, total_sentences, time_taken
+        if len(attention_batches) == 0:
+            attention_batch, attention_info = None, None
+        else:
+            attention_batch, attention_info = random.choice(attention_batches)
+        return loss, total_actions, total_tokens, total_sentences, time_taken, attention_batch, attention_info
 
     @torch.enable_grad()
-    def make_gradient_visualizations(self):
-        log_probs = self.model.batch_log_likelihood(self.gradient_batch)
+    def make_gradient_visualizations(self, sequence_count):
+        log_probs, _ = self.model.batch_log_likelihood(self.gradient_batch)
         loss = self.loss(log_probs, self.gradient_batch.actions.tensor, self.gradient_batch.actions.lengths)
         self.model.zero_grad()
         loss.backward()
         gradients_all = visualize_gradients(self.model.named_parameters())
-        return gradients_all
+        self.writer.add_figure('gradients/all', gradients_all, sequence_count)
 
-    def make_tree_visualizations(self, sample):
+    def make_tree_visualizations(self, sample, sequence_count):
         groundtruth = visualize_tree(sample.gold.actions, sample.gold.tokens)
         # assumes that only a single tree is predicted
         predicted = visualize_tree(sample.predictions[0].actions, sample.gold.tokens)
-        return groundtruth, predicted
+        self.writer.add_figure('tree/groundtruth', groundtruth, sequence_count)
+        self.writer.add_figure('tree/predicted', predicted, sequence_count)
 
-    def make_action_visualizations(self, sample):
+    def make_action_visualizations(self, sample, sequence_count):
         gold_probs = [exp(prob) for prob in sample.gold.log_probs]
         groundtruth = visualize_action_probs(sample.gold.actions, gold_probs)
         # assumes that only a single tree is predicted
         prediction = sample.predictions[0]
         pred_probs = [exp(prob) for prob in prediction.log_probs]
         predicted = visualize_action_probs(prediction.actions, pred_probs)
-        return groundtruth, predicted
+        self.writer.add_figure('actions/groundtruth', groundtruth, sequence_count)
+        self.writer.add_figure('actions/predicted', predicted, sequence_count)
+
+    def make_attention_visualizations(self, batch, info, sequence_count):
+        if 'attention' in info:
+            rnn_parser_attention = visualize_rnn_parser_attention(batch, info['attention'])
+            self.writer.add_figure('attention/rnn_parser', rnn_parser_attention, sequence_count)
+        if 'buffer' in info:
+            buffer_attention = visualize_buffer_attention(batch, info['buffer'])
+            self.writer.add_figure('attention/buffer', buffer_attention, sequence_count)
+        if 'history' in info:
+            history_attention = visualize_history_attention(batch, info['history'])
+            self.writer.add_figure('attention/history', history_attention, sequence_count)
+        if 'stack' in info:
+            stack_attention = visualize_stack_attention(batch, info['stack'])
+            self.writer.add_figure('attention/stack', stack_attention, sequence_count)
 
     @torch.no_grad()
     def sample(self):

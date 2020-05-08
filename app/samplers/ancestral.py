@@ -29,12 +29,12 @@ class AncestralSampler(Sampler):
         predictions = [[] for _ in range(batch.size)]
         for _ in range(self.samples):
             pred_batch = self.sample(batch)
-            pred_log_probs = self.model.batch_log_likelihood(pred_batch)
+            pred_log_probs, _ = self.model.batch_log_likelihood(pred_batch)
             pred_selected_log_probs, pred_log_likelihood = self.batch_log_probs(pred_log_probs, pred_batch.actions.tensor, pred_batch.actions.lengths)
             for i in range(batch.size):
                 prediction = (pred_batch.actions.actions[i], pred_selected_log_probs[i], pred_log_likelihood[i])
                 predictions[i].append(prediction)
-        gold_log_probs = self.model.batch_log_likelihood(batch)
+        gold_log_probs, _ = self.model.batch_log_likelihood(batch)
         gold_selected_log_probs, gold_log_likelihood = self.batch_log_probs(gold_log_probs, batch.actions.tensor, batch.actions.lengths)
         samples = []
         for i in range(batch.size):

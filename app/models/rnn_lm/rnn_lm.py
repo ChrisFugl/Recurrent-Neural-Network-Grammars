@@ -34,7 +34,7 @@ class RNNLM(Model):
         Compute log likelihood of each sentence/tree in a batch.
 
         :type batch: app.data.batch.Batch
-        :rtype: torch.Tensor
+        :rtype: torch.Tensor, dict
         """
         self.reset()
         start_action_embedding = self.start_action_embedding.view(1, 1, -1).expand(1, batch.size, -1)
@@ -45,7 +45,7 @@ class RNNLM(Model):
         rnn_output, _ = self.rnn(actions_embeddings, initial_rnn_state)
         logits = self.rnn2logits(rnn_output)
         log_probs = self.log_softmax(logits)
-        return log_probs
+        return log_probs, {}
 
     def initial_state(self, tokens, tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor, lengths):
         """

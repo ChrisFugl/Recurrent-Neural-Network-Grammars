@@ -131,9 +131,6 @@ class LayerNormLSTMCell(jit.ScriptModule):
 
     def set_weights(self):
         self.weight_hh = nn.functional.dropout(self.weight_hh_raw, p=self.weight_drop, training=self.training)
-        # param = weight
-        # print(self.weight_hh_raw.requires_grad, param.requires_grad)
-        # self.weight_hh = param
 
     def reset(self):
         if self.use_weight_drop:

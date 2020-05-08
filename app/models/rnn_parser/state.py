@@ -16,13 +16,12 @@ class StateFactory:
         :rtype: app.models.rnn_parser.state.State
         """
         batch_size = encoder_outputs.size(1)
-        tokens_lengths_list = [length.cpu().item() for length in tokens_lengths]
         token_counter = [0 for _ in range(batch_size)]
         last_action = [None for _ in range(batch_size)]
         open_nt_count = [0 for _ in range(batch_size)]
         parent_node = [None for _ in range(batch_size)]
         return State(
-            encoder_outputs, tokens_lengths_list, batch_size,
+            encoder_outputs, tokens_lengths, batch_size,
             previous_action, decoder_state, token_counter, last_action, open_nt_count, parent_node
         )
 
@@ -67,7 +66,7 @@ class State:
     ):
         """
         :type encoder_outputs: torch.Tensor
-        :type tokens_lengths: list of int
+        :type tokens_lengths: torch.Tensor
         :type batch_size: int
         :type previous_action: torch.Tensor
         :type token_counter: list of int

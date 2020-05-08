@@ -45,17 +45,18 @@ class AttentiveRepresentation(Representation):
         :type stack_lengths: torch.Tensor
         :type buf: torch.Tensor
         :type buf_lengths: torch.Tensor
-        :rtype: torch.Tensor
+        :rtype: torch.Tensor, dict
         """
-        his_embedding = self.embed(self.his2query, self.his2key, self.his2value, self.his2embedding, his, his_lengths)
-        stack_embedding = self.embed(self.stack2query, self.stack2key, self.stack2value, self.stack2embedding, stack, stack_lengths)
-        buf_embedding = self.embed(self.buf2query, self.buf2key, self.buf2value, self.buf2embedding, buf, buf_lengths)
+        his_embedding, his_weights = self.embed(self.his2query, self.his2key, self.his2value, self.his2embedding, his, his_lengths)
+        stack_embedding, stack_weights = self.embed(self.stack2query, self.stack2key, self.stack2value, self.stack2embedding, stack, stack_lengths)
+        buf_embedding, buf_weights = self.embed(self.buf2query, self.buf2key, self.buf2value, self.buf2embedding, buf, buf_lengths)
         embeddings = [his_embedding, stack_embedding, buf_embedding]
         # concatenate along last dimension, as inputs have shape S, B, H (sequence length, batch size, hidden size)
         output = torch.cat(embeddings, dim=2)
         output = self.embedding2representation(output)
         output = self.activation(output)
-        return output
+        info = {'history': his_weights, 'buffer': buf_weights, 'stack': stack_weights}
+        return output, info
 
     def top_only(self):
         """
@@ -94,13 +95,13 @@ class AttentiveRepresentation(Representation):
             attention_scores[i, 0, length:] = MASKED_SCORE_VALUE
         attention_scores = attention_scores.view(batch_size, max_length)
         attention_weights = self.softmax(attention_scores)
-        attention_weights = attention_weights.view(batch_size, 1, max_length)
-        value_weighted = torch.bmm(attention_weights, value) # batch_size, 1, hidden_size
+        attention_weights_unsqueezed = attention_weights.view(batch_size, 1, max_length)
+        value_weighted = torch.bmm(attention_weights_unsqueezed, value) # batch_size, 1, hidden_size
         embedding = value2embedding(value_weighted)
         embedding = embedding.transpose(0, 1) # length first
         output = self.activation(embedding)
         output = self.dropout(output)
-        return output
+        return output, attention_weights
 
     def __str__(self):
         if self.dropout_p is None:

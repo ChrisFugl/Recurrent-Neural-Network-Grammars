@@ -10,7 +10,7 @@ model:
     hidden_size: 256
     num_layers: 3
     bias: true
-    dropout: null
+    dropout: 0.25
     bidirectional: false
     weight_drop: null
   size:

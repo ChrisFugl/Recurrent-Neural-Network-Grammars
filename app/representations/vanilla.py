@@ -30,7 +30,7 @@ class VanillaRepresentation(Representation):
         :type stack_lengths: torch.Tensor
         :type token_buffer: torch.Tensor
         :type token_buffer_lengths: torch.Tensor
-        :rtype: torch.Tensor
+        :rtype: torch.Tensor, dict
         """
         history_embedding = self.dropout(action_history)
         stack_embedding = self.dropout(stack)
@@ -40,7 +40,7 @@ class VanillaRepresentation(Representation):
         affine_input = torch.cat(embeddings, dim=2)
         output = self.affine(affine_input)
         output = self.activation(output)
-        return output
+        return output, {}
 
     def top_only(self):
         """

@@ -10,7 +10,7 @@ class Model(nn.Module):
         Compute log likelihood of each sentence/tree in a batch.
 
         :type batch: app.data.batch.Batch
-        :rtype: torch.Tensor
+        :rtype: torch.Tensor, dict
         """
         raise NotImplementedError('must be implemented by subclass')
 

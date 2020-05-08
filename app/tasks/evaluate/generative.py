@@ -125,7 +125,7 @@ class GenerativeEvaluator(Evaluator):
         :type batch: app.data.batch.Batch
         :rtype: list of float
         """
-        batch_log_probs = self.model.batch_log_likelihood(batch)
+        batch_log_probs, _ = self.model.batch_log_likelihood(batch)
         indices = batch.actions.tensor.unsqueeze(dim=2)
         selected_log_probs = torch.gather(batch_log_probs, 2, indices).view(batch.max_actions_length, batch.size)
         selected_log_probs = [selected_log_probs[:length, i] for i, length in enumerate(batch.actions.lengths)]

@@ -49,7 +49,7 @@ class ParallelRNNG(AbstractRNNG):
         Compute log likelihood of each sentence/tree in a batch.
 
         :type batch: app.data.batch.Batch
-        :rtype: torch.Tensor
+        :rtype: torch.Tensor, dict
         """
         self.reset()
         states, stack_size = self.preprocess_batch(batch)
@@ -66,16 +66,26 @@ class ParallelRNNG(AbstractRNNG):
         )
         output_shape = (batch.max_actions_length, batch.size, self.action_count)
         output_log_probs = torch.zeros(output_shape, device=self.device, dtype=torch.float)
+        history_attention_weights = []
+        buffer_attention_weights = []
+        stack_attention_weights = []
         for sequence_index in range(batch.max_actions_length):
             state = states[sequence_index]
-            representation = self.get_representation()
+            representation, representation_info = self.get_representation()
+            if 'history' in representation_info:
+                history_attention_weights.append(representation_info['history'].detach().cpu())
+            if 'buffer' in representation_info:
+                buffer_attention_weights.append(representation_info['buffer'].detach().cpu())
+            if 'stack' in representation_info:
+                stack_attention_weights.append(representation_info['stack'].detach().cpu())
             output_log_probs[sequence_index] = self.get_log_probs(representation)
             self.do_actions(batch.size, state)
             if self.uses_history:
                 action_op = self.hold_op(batch.size)
                 action_op[state.non_pad_actions] = 1
                 self.action_history.hold_or_push(action_op)
-        return output_log_probs
+        info = {'history': history_attention_weights, 'buffer': buffer_attention_weights, 'stack': stack_attention_weights}
+        return output_log_probs, info
 
     def initial_state(self, tokens, tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor, lengths):
         """
@@ -138,7 +148,7 @@ class ParallelRNNG(AbstractRNNG):
         :rtype: torch.Tensor
         """
         batch_size = len(state.token_counter)
-        representation = self.get_representation()
+        representation, _ = self.get_representation()
         log_probs = self.get_log_probs(representation, invalid_mask=state.invalid_mask, posterior_scaling=posterior_scaling)
         return log_probs.view(batch_size, self.action_count)
 
