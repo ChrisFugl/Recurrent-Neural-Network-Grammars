@@ -12,12 +12,12 @@ class Encoder(nn.Module):
     def forward(self, tokens_reversed):
         """
         :type tokens_reversed: torch.Tensor
-        :rtype: torch.Tensor
+        :rtype: torch.Tensor, torch.Tensor
         """
         batch_size = tokens_reversed.size(1)
         initial_state = self.rnn.initial_state(batch_size)
-        output, _ = self.rnn(tokens_reversed, initial_state)
-        return output
+        output, encoder_state = self.rnn(tokens_reversed, initial_state)
+        return output, encoder_state
 
     def reset(self):
         self.rnn.reset()

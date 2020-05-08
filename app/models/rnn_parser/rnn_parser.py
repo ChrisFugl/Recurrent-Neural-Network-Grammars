@@ -11,14 +11,22 @@ from torch import nn
 
 class RNNParser(Model):
 
-    def __init__(self, device, encoder_rnn, decoder_rnn, action_embedding, action_embedding_size, token_embedding, action_converter):
+    def __init__(self,
+        device, encoder_rnn, decoder_rnn, action_embedding, action_embedding_size,
+        token_embedding, pos_embedding, action_converter,
+        token_embedding_size, pos_embedding_size, encoder_input_size
+    ):
         """
         :type device: torch.device
         :type encoder_rnn: app.rnn.rnn.RNN
         :type decoder_rnn: app.rnn.rnn.RNN
         :type action_embedding: app.embeddings.embedding.Embedding
         :type token_embedding: app.embeddings.embedding.Embedding
+        :type pos_embedding: app.embeddings.embedding.Embedding
         :type action_converter: app.data.converters.action.ActionConvter
+        :type token_embedding_size: int
+        :type pos_embedding_size: int
+        :type encoder_input_size: int
         """
         super().__init__()
         encoder_output_size = encoder_rnn.get_output_size()
@@ -28,6 +36,9 @@ class RNNParser(Model):
         self.action_count = self.action_converter.count()
         self.action_embedding = action_embedding
         self.token_embedding = token_embedding
+        self.pos_embedding = pos_embedding
+        self.word_embedding = nn.Linear(in_features=token_embedding_size + pos_embedding_size, out_features=encoder_input_size)
+        self.activation = nn.ReLU()
         self.encoder = Encoder(encoder_rnn)
         self.decoder = Decoder(decoder_rnn, self.action_count)
         self.attention = Attention(encoder_output_size, decoder_output_size)
@@ -44,10 +55,8 @@ class RNNParser(Model):
         :rtype: torch.Tensor, dict
         """
         self.reset()
-        tokens_reversed = padded_reverse(batch.unknownified_tokens.tensor, batch.tokens.lengths)
-        token_embeddings = self.token_embedding(tokens_reversed)
-        encoder_outputs = self.encoder(token_embeddings)
-        decoder_state = self.decoder.initial_hidden_state(batch.size)
+        words_embeddings = self.get_word_embeddings(batch.unknownified_tokens.tensor, batch.tags.tensor, batch.tokens.lengths)
+        encoder_outputs, decoder_state = self.encoder(words_embeddings)
         previous_action = self.start_action_embedding.view(1, 1, -1).expand(1, batch.size, -1)
         attention_weights = []
         outputs = torch.zeros((batch.max_actions_length, batch.size, self.action_count), device=self.device, dtype=torch.float)
@@ -76,10 +85,8 @@ class RNNParser(Model):
         """
         self.reset()
         batch_size = len(tokens)
-        tokens_reversed = padded_reverse(unknownified_tokens_tensor, lengths)
-        token_embeddings = self.token_embedding(tokens_reversed)
-        encoder_outputs = self.encoder(token_embeddings)
-        decoder_state = self.decoder.initial_hidden_state(batch_size)
+        words_embeddings = self.get_word_embeddings(unknownified_tokens_tensor, tags_tensor, lengths)
+        encoder_outputs, decoder_state = self.encoder(words_embeddings)
         previous_action = self.start_action_embedding.view(1, 1, -1).expand(1, batch_size, -1)
         state = self.state_factory.initialize(encoder_outputs, previous_action, decoder_state, lengths)
         return state
@@ -170,10 +177,21 @@ class RNNParser(Model):
         else:
             return self.action_converter.action2integer(action)
 
+    def get_word_embeddings(self, tokens, tags, lengths):
+        tokens_reversed = padded_reverse(tokens, lengths)
+        tags_reversed = padded_reverse(tags, lengths)
+        tokens_embeddings = self.token_embedding(tokens_reversed)
+        tags_embeddings = self.pos_embedding(tags_reversed)
+        words_embeddings = torch.cat((tokens_embeddings, tags_embeddings), dim=2)
+        words_embeddings = self.word_embedding(words_embeddings)
+        words_embeddings = self.activation(words_embeddings)
+        return words_embeddings
+
     def __str__(self):
         return (
             'RNNParser(\n'
             + f'  action_embedding={self.action_embedding}\n'
+            + f'  pos_embedding={self.pos_embedding}\n'
             + f'  token_embedding={self.token_embedding}\n'
             + f'  encoder={self.encoder}\n'
             + f'  decoder={self.decoder}\n'

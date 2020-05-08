@@ -30,13 +30,6 @@ class Decoder(nn.Module):
         output = self.log_softmax(output)
         return output, rnn_state
 
-    def initial_hidden_state(self, batch_size):
-        """
-        :type batch_size: int
-        :rtype: torch.Tensor
-        """
-        return self.rnn.initial_state(batch_size)
-
     def state2tensor(self, state):
         """
         :rtype: torch.Tensor

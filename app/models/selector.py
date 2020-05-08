@@ -87,9 +87,15 @@ def get_model(device, generative, action_converter, token_converter, tag_convert
         decoder_rnn = get_rnn(device, decoder_input_size, config.rnn)
         action_count = action_converter.count()
         token_count = token_converter.count()
+        tag_count = tag_converter.count()
         action_embedding = get_embedding(action_count, action_embedding_size, config.action_emb_drop, config.embedding)
-        token_embedding = get_embedding(token_count, config.size.rnn, config.token_emb_drop, config.embedding)
-        model = RNNParser(device, encoder_rnn, decoder_rnn, action_embedding, config.size.rnn, token_embedding, action_converter)
+        pos_embedding = get_embedding(tag_count, config.size.pos, config.pos_emb_drop, config.embedding)
+        token_embedding = get_embedding(token_count, config.size.token, config.token_emb_drop, config.embedding)
+        model = RNNParser(
+            device, encoder_rnn, decoder_rnn, action_embedding,
+            config.size.rnn, token_embedding, pos_embedding, action_converter,
+            config.size.token, config.size.pos, config.size.rnn
+        )
     else:
         raise Exception(f'Unknown model: {config.type}')
     return model.to(device)

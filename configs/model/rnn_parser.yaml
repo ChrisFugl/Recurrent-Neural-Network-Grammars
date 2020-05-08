@@ -15,5 +15,8 @@ model:
     weight_drop: null
   size:
     rnn: 256
+    pos: 16
+    token: 128
   action_emb_drop: null
+  pos_emb_drop: null
   token_emb_drop: null

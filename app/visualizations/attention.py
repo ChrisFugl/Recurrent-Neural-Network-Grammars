@@ -11,7 +11,7 @@ def visualize_rnn_parser_attention(batch, attention_weights):
     """
     n_actions = batch.actions.lengths[0]
     n_tokens = batch.tokens.lengths[0]
-    attention_weights = [weights[0, 0, :n_tokens] for weights in attention_weights[:n_actions]]
+    attention_weights = [weights[0, :n_tokens] for weights in attention_weights[:n_actions]]
     weights = torch.stack(attention_weights, dim=0)
     weights_np = weights.detach().numpy().transpose()
     fig = plt.figure()
