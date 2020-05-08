@@ -84,7 +84,13 @@ class ParallelRNNG(AbstractRNNG):
                 action_op = self.hold_op(batch.size)
                 action_op[state.non_pad_actions] = 1
                 self.action_history.hold_or_push(action_op)
-        info = {'history': history_attention_weights, 'buffer': buffer_attention_weights, 'stack': stack_attention_weights}
+        info = {}
+        if len(history_attention_weights) != 0:
+            info['history'] = history_attention_weights
+        if len(buffer_attention_weights) != 0:
+            info['buffer'] = buffer_attention_weights
+        if len(stack_attention_weights) != 0:
+            info['stack'] = stack_attention_weights
         return output_log_probs, info
 
     def initial_state(self, tokens, tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor, lengths):

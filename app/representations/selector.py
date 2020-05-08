@@ -7,6 +7,12 @@ def get_representation(rnn_input_size, rnn_hidden_size, config):
     if config.type == 'attentive':
         from app.representations.attentive import AttentiveRepresentation
         return AttentiveRepresentation(rnn_hidden_size, rnn_input_size, config.dropout)
+    elif config.type == 'attentive_no_history':
+        from app.representations.attentive_no_history import AttentiveNoHistoryRepresentation
+        return AttentiveNoHistoryRepresentation(rnn_hidden_size, rnn_input_size, config.dropout)
+    elif config.type == 'attentive_stack_only':
+        from app.representations.attentive_stack_only import AttentiveStackOnlyRepresentation
+        return AttentiveStackOnlyRepresentation(rnn_hidden_size, rnn_input_size, config.dropout)
     elif config.type == 'buffer_only':
         from app.representations.buffer_only import BufferOnlyRepresentation
         return BufferOnlyRepresentation(rnn_hidden_size, rnn_input_size, config.dropout)

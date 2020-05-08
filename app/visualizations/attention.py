@@ -9,22 +9,22 @@ def visualize_rnn_parser_attention(batch, attention_weights):
     :type batch: app.data.batch.Batch
     :type attention_weights: list of torch.Tensor
     """
-    n_actions = batch.actions.lengths[0]
-    n_tokens = batch.tokens.lengths[0]
+    n_actions = batch.actions.lengths[0].cpu().item()
+    n_tokens = batch.tokens.lengths[0].cpu().item()
     attention_weights = [weights[0, :n_tokens] for weights in attention_weights[:n_actions]]
     weights = torch.stack(attention_weights, dim=0)
-    weights_np = weights.detach().numpy().transpose()
+    weights_np = weights.detach().cpu().numpy().transpose()
     fig = plt.figure()
     ax = plt.gca()
     ylabels = list(reversed(batch.tokens.tokens[0]))
-    yticks = np.arange(0, batch.tokens.lengths[0], 1)
-    yticks_minor = np.arange(-0.5, batch.tokens.lengths[0] + 0.5, 1)
+    yticks = np.arange(0, n_tokens, 1)
+    yticks_minor = np.arange(-0.5, n_tokens + 0.5, 1)
     ax.set_yticks(yticks)
     ax.set_yticklabels(ylabels, fontsize=8)
     plt.xticks(rotation=90)
     xlabels = list(map(str, batch.actions.actions[0]))
-    xticks = list(np.arange(0, batch.actions.lengths[0], 1))
-    xticks_minor = np.arange(-0.5, batch.actions.lengths[0] + 0.5, 1)
+    xticks = list(np.arange(0, n_actions, 1))
+    xticks_minor = np.arange(-0.5, n_actions + 0.5, 1)
     ax.set_xticks(xticks)
     ax.set_xticklabels(xlabels, fontsize=8)
     ax.set_yticks(yticks_minor, minor=True)
@@ -38,8 +38,9 @@ def visualize_buffer_attention(batch, attention_weights):
     :type batch: app.data.batch.Batch
     :type attention_weights: list of torch.Tensor
     """
-    max_length = batch.tokens.lengths[0] + 1
-    n_actions = batch.actions.lengths[0]
+    n_actions = batch.actions.lengths[0].cpu().item()
+    n_tokens = batch.tokens.lengths[0].cpu().item()
+    max_length = n_tokens + 1
     expanded = []
     for i in range(n_actions):
         weights = attention_weights[i]
@@ -48,18 +49,18 @@ def visualize_buffer_attention(batch, attention_weights):
         tensor[:weights_length] = weights[0, :weights_length]
         expanded.append(tensor)
     weights = torch.stack(expanded, dim=0).squeeze()
-    weights_np = weights.detach().numpy().transpose()
+    weights_np = weights.detach().cpu().numpy().transpose()
     fig = plt.figure()
     ax = plt.gca()
     ylabels = ['<SOS>', *(reversed(batch.tokens.tokens[0]))]
-    yticks = np.arange(0, batch.tokens.lengths[0] + 1, 1)
-    yticks_minor = np.arange(-0.5, batch.tokens.lengths[0] + 1.5, 1)
+    yticks = np.arange(0, n_tokens + 1, 1)
+    yticks_minor = np.arange(-0.5, n_tokens + 1.5, 1)
     ax.set_yticks(yticks)
     ax.set_yticklabels(ylabels, fontsize=8)
     plt.xticks(rotation=90)
     xlabels = list(map(str, batch.actions.actions[0]))
-    xticks = list(np.arange(0, batch.actions.lengths[0], 1))
-    xticks_minor = np.arange(-0.5, batch.actions.lengths[0] + 0.5, 1)
+    xticks = list(np.arange(0, n_actions, 1))
+    xticks_minor = np.arange(-0.5, n_actions + 0.5, 1)
     ax.set_xticks(xticks)
     ax.set_xticklabels(xlabels, fontsize=8)
     ax.set_yticks(yticks_minor, minor=True)
@@ -73,7 +74,8 @@ def visualize_history_attention(batch, attention_weights):
     :type batch: app.data.batch.Batch
     :type attention_weights: list of torch.Tensor
     """
-    max_length = batch.actions.lengths[0]
+    n_actions = batch.actions.lengths[0].cpu().item()
+    max_length = n_actions
     expanded = []
     for i in range(max_length):
         weights = attention_weights[i]
@@ -82,18 +84,18 @@ def visualize_history_attention(batch, attention_weights):
         tensor[:weights_length] = weights[0, :weights_length]
         expanded.append(tensor)
     weights = torch.stack(expanded, dim=0).squeeze()
-    weights_np = weights.detach().numpy().transpose()
+    weights_np = weights.detach().cpu().numpy().transpose()
     fig = plt.figure()
     ax = plt.gca()
     ylabels = ['<SOS>', *map(str, batch.actions.actions[0][:-1])]
-    yticks = np.arange(0, batch.actions.lengths[0], 1)
-    yticks_minor = np.arange(-0.5, batch.actions.lengths[0] + 1.5, 1)
+    yticks = np.arange(0, n_actions, 1)
+    yticks_minor = np.arange(-0.5, n_actions + 1.5, 1)
     ax.set_yticks(yticks)
     ax.set_yticklabels(ylabels, fontsize=8)
     plt.xticks(rotation=90)
     xlabels = list(map(str, batch.actions.actions[0]))
-    xticks = list(np.arange(0, batch.actions.lengths[0], 1))
-    xticks_minor = np.arange(-0.5, batch.actions.lengths[0] + 0.5, 1)
+    xticks = list(np.arange(0, n_actions, 1))
+    xticks_minor = np.arange(-0.5, n_actions + 0.5, 1)
     ax.set_xticks(xticks)
     ax.set_xticklabels(xlabels, fontsize=8)
     ax.set_yticks(yticks_minor, minor=True)
@@ -137,7 +139,7 @@ def visualize_stack_attention(batch, attention_weights):
             raise Exception(f'Unknown action type: {type}')
         tree.append(tree_string)
     max_length = len(tree)
-    n_actions = batch.actions.lengths[0]
+    n_actions = batch.actions.lengths[0].cpu().item()
     expanded = []
     for i in range(n_actions):
         weights = attention_weights[i]
@@ -148,7 +150,7 @@ def visualize_stack_attention(batch, attention_weights):
             tensor[start:end] = weights[0, j]
         expanded.append(tensor)
     weights = torch.stack(expanded, dim=0).squeeze()
-    weights_np = weights.detach().numpy().transpose()
+    weights_np = weights.detach().cpu().numpy().transpose()
     fig = plt.figure()
     ax = plt.gca()
     ylabels = ['<SOS>', *tree]
@@ -158,8 +160,8 @@ def visualize_stack_attention(batch, attention_weights):
     ax.set_yticklabels(ylabels, fontsize=8)
     plt.xticks(rotation=90)
     xlabels = list(map(str, batch.actions.actions[0]))
-    xticks = list(np.arange(0, batch.actions.lengths[0], 1))
-    xticks_minor = np.arange(-0.5, batch.actions.lengths[0] + 0.5, 1)
+    xticks = list(np.arange(0, n_actions, 1))
+    xticks_minor = np.arange(-0.5, n_actions + 0.5, 1)
     ax.set_xticks(xticks)
     ax.set_xticklabels(xlabels, fontsize=8)
     ax.set_yticks(yticks_minor, minor=True)
