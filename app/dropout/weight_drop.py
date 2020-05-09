@@ -37,10 +37,12 @@ class WeightDrop(nn.Module):
     def forward(self, *args):
         return self.module.forward(*args)
 
-    def reset(self):
+    def reset(self, batch_size):
         self.set_weights()
         if issubclass(type(self.module), nn.RNNBase):
             self.module.flatten_parameters()
+        if hasattr(self.module, 'reset'):
+            self.module.reset(batch_size)
 
     def __str__(self):
         return f'WeightDrop(dropout={self.dropout}, module={self.module})'

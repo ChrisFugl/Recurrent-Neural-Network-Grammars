@@ -36,7 +36,7 @@ class RNNLM(Model):
         :type batch: app.data.batch.Batch
         :rtype: torch.Tensor, dict
         """
-        self.reset()
+        self.reset(batch.size)
         start_action_embedding = self.start_action_embedding.view(1, 1, -1).expand(1, batch.size, -1)
         actions_tensor = batch.actions.tensor[:batch.max_actions_length - 1] # do not include last action
         actions_embeddings = self.action_embedding(actions_tensor)
@@ -59,8 +59,8 @@ class RNNLM(Model):
         :type lengths: torch.Tensor
         :rtype: app.models.rnn_lm.state.State
         """
-        self.reset()
         batch_size = len(tokens)
+        self.reset(batch_size)
         start_action_embedding = self.start_action_embedding.view(1, 1, -1).expand(1, batch_size, -1)
         initial_rnn_state = self.rnn.initial_state(batch_size)
         _, rnn_state = self.rnn(start_action_embedding, initial_rnn_state)
@@ -126,9 +126,9 @@ class RNNLM(Model):
         state_dict = torch.load(path, map_location=self.device)
         self.load_state_dict(state_dict)
 
-    def reset(self):
+    def reset(self, batch_size):
         self.action_embedding.reset()
-        self.rnn.reset()
+        self.rnn.reset(batch_size)
 
     def actions2tensor(self, actions):
         """

@@ -1,3 +1,4 @@
+from app.dropout.variational import variational_dropout_mask
 from app.representations.representation import Representation
 from torch import nn
 
@@ -6,18 +7,24 @@ class BufferOnlyRepresentation(Representation):
     Buffer-only representation.
     """
 
-    def __init__(self, embedding_size, representation_size, dropout):
+    def __init__(self, device, embedding_size, representation_size, dropout_type, dropout):
         """
+        :type device: torch.device
         :type embedding_size: int
         :type representation_size: int
+        :type dropout_type: str
         :type dropout: float
         """
         super().__init__()
+        self.device = device
         self.representation_size = representation_size
         self.feedforward = nn.Linear(in_features=embedding_size, out_features=representation_size, bias=True)
         self.activation = nn.ReLU()
-        self.dropout_p = dropout
         self.dropout = nn.Dropout(p=dropout)
+        self.dropout_type = dropout_type
+        self.dropout_p = dropout
+        self.use_normal_dropout = dropout is not None and dropout_type == 'normal'
+        self.use_variational_dropout = dropout is not None and dropout_type == 'variational'
 
     def forward(self, action_history, action_history_lengths, stack, stack_lengths, token_buffer, token_buffer_lengths):
         """
@@ -30,9 +37,13 @@ class BufferOnlyRepresentation(Representation):
         :rtype: torch.Tensor, dict
         """
         output = token_buffer
-        output = self.dropout(output)
+        if self.use_normal_dropout:
+            output = self.dropout(output)
         output = self.feedforward(output)
         output = self.activation(output)
+        if self.use_variational_dropout and self.training:
+            batch_size = output.size(1)
+            output = output * self.dropout_mask.expand(1, batch_size, -1)
         return output, {}
 
     def top_only(self):
@@ -59,8 +70,12 @@ class BufferOnlyRepresentation(Representation):
         """
         return True
 
+    def reset(self, batch_size):
+        if self.use_variational_dropout and self.training:
+            self.dropout_mask = variational_dropout_mask((1, 1, self.representation_size), self.dropout_p, device=self.device)
+
     def __str__(self):
         if self.dropout_p is None:
             return f'BufferOnly(size={self.representation_size})'
         else:
-            return f'BufferOnly(size={self.representation_size}, dropout={self.dropout_p})'
+            return f'BufferOnly(size={self.representation_size}, dropout={self.dropout_p}, dropout_type={self.dropout_type})'

@@ -78,5 +78,5 @@ class HistoryLSTM(nn.Module):
     def __str__(self):
         return f'HistoryLSTM(rnn={self.rnn})'
 
-    def reset(self):
-        self.rnn.reset()
+    def reset(self, batch_size):
+        self.rnn.reset(batch_size)

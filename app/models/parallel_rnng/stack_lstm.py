@@ -4,7 +4,7 @@ from torch import nn
 
 class StackLSTM(nn.Module):
 
-    def __init__(self, device, input_size, hidden_size, num_layers, bias, dropout, weight_drop, layer_norm):
+    def __init__(self, device, input_size, hidden_size, num_layers, bias, dropout, weight_drop, dropout_type, layer_norm):
         """
         :type device: torch.device
         :type input_size: int
@@ -13,6 +13,7 @@ class StackLSTM(nn.Module):
         :type bias: bool
         :type dropout: float
         :type weight_drop: float
+        :type dropout_type: str
         :type layer_norm: bool
         """
         super().__init__()
@@ -21,9 +22,10 @@ class StackLSTM(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.dropout = dropout
+        self.dropout_type = dropout_type
         self.weight_drop = weight_drop
         self.layer_norm = layer_norm
-        self.lstm = MultiLayerLSTMCell(input_size, hidden_size, num_layers, bias, dropout, weight_drop, layer_norm)
+        self.lstm = MultiLayerLSTMCell(device, input_size, hidden_size, num_layers, bias, dropout, weight_drop, dropout_type, layer_norm)
 
     def contents(self):
         """
@@ -82,14 +84,17 @@ class StackLSTM(nn.Module):
         output = output[:, :, self.num_layers - 1]
         return output
 
-    def reset(self):
-        self.lstm.reset()
+    def reset(self, batch_size):
+        self.lstm.reset(batch_size)
 
     def __str__(self):
         base_args = f'input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers}, layer_norm={self.layer_norm}'
         if self.weight_drop is not None:
-            return f'StackLSTM({base_args}, weight_drop={self.weight_drop})'
+            if self.dropout is not None and self.dropout_type == 'variational':
+                return f'StackLSTM({base_args}, weight_drop={self.weight_drop}, dropout={self.dropout}, dropout_type={self.dropout_type})'
+            else:
+                return f'StackLSTM({base_args}, weight_drop={self.weight_drop})'
         elif self.dropout is not None:
-            return f'StackLSTM({base_args}, dropout={self.dropout})'
+            return f'StackLSTM({base_args}, dropout={self.dropout}, dropout_type={self.dropout_type})'
         else:
             return f'StackLSTM({base_args})'

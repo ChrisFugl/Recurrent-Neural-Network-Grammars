@@ -11,5 +11,5 @@ class BufferLSTM(nn.Module):
         self.device = device
         self.rnn = rnn
 
-    def reset(self):
-        self.rnn.reset()
+    def reset(self, batch_size):
+        self.rnn.reset(batch_size)

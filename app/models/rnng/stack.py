@@ -58,8 +58,8 @@ class Stack(nn.Module):
         """
         return top.output
 
-    def reset(self):
-        self.rnn.reset()
+    def reset(self, batch_size):
+        self.rnn.reset(batch_size)
 
     def __str__(self):
         return f'Stack(rnn={self.rnn})'

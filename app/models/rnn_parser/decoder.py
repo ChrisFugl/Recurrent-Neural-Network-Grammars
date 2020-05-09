@@ -36,8 +36,8 @@ class Decoder(nn.Module):
         """
         return self.rnn.state2output(state)
 
-    def reset(self):
-        self.rnn.reset()
+    def reset(self, batch_size):
+        self.rnn.reset(batch_size)
 
     def __str__(self):
         return f'Decoder(rnn={self.rnn})'

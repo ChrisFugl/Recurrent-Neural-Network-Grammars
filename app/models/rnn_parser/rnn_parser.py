@@ -54,7 +54,7 @@ class RNNParser(Model):
         :type batch: app.data.batch.Batch
         :rtype: torch.Tensor, dict
         """
-        self.reset()
+        self.reset(batch.size)
         words_embeddings = self.get_word_embeddings(batch.unknownified_tokens.tensor, batch.tags.tensor, batch.tokens.lengths)
         encoder_outputs, decoder_state = self.encoder(words_embeddings)
         previous_action = self.start_action_embedding.view(1, 1, -1).expand(1, batch.size, -1)
@@ -83,8 +83,8 @@ class RNNParser(Model):
         :type lengths: torch.Tensor
         :rtype: app.models.rnn_parser.state.State
         """
-        self.reset()
         batch_size = len(tokens)
+        self.reset(batch_size)
         words_embeddings = self.get_word_embeddings(unknownified_tokens_tensor, tags_tensor, lengths)
         encoder_outputs, decoder_state = self.encoder(words_embeddings)
         previous_action = self.start_action_embedding.view(1, 1, -1).expand(1, batch_size, -1)
@@ -152,9 +152,9 @@ class RNNParser(Model):
         state_dict = torch.load(path, map_location=self.device)
         self.load_state_dict(state_dict)
 
-    def reset(self):
-        self.encoder.reset()
-        self.decoder.reset()
+    def reset(self, batch_size):
+        self.encoder.reset(batch_size)
+        self.decoder.reset(batch_size)
         self.action_embedding.reset()
         self.token_embedding.reset()
 

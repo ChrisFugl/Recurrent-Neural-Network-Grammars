@@ -19,7 +19,7 @@ class RNN(nn.Module):
         """
         raise NotImplementedError('must be implemented by subclass')
 
-    def reset(self):
+    def reset(self, batch_size):
         """
         Resets internal state.
         """

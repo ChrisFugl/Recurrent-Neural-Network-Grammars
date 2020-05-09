@@ -15,4 +15,5 @@ model:
     weight_drop: null
   size:
     rnn: 1500
+  dropout_type: normal
   action_emb_drop: null

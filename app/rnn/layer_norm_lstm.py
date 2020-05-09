@@ -1,6 +1,7 @@
 """
 Modified from https://github.com/pytorch/pytorch/blob/cbcb2b5ad767622cf5ec04263018609bde3c974a/benchmarks/fastrnns/custom_lstms.py
 """
+from app.dropout.variational import variational_dropout_mask
 from app.rnn.rnn import RNN
 import torch
 from torch import Tensor
@@ -8,11 +9,10 @@ from torch.nn import Parameter
 import torch.nn as nn
 import torch.jit as jit
 from typing import List, Tuple
-import warnings
 
 class LayerNormLSTM(RNN):
 
-    def __init__(self, device, input_size, hidden_size, num_layers, dropout, weight_drop):
+    def __init__(self, device, input_size, hidden_size, num_layers, dropout, weight_drop, dropout_type):
         """
         :type device: torch.device
         :type input_size: int
@@ -20,6 +20,7 @@ class LayerNormLSTM(RNN):
         :type num_layers: int
         :type dropout: float
         :type weight_drop: float
+        :type dropout_type: str
         """
         super().__init__()
         self.device = device
@@ -29,12 +30,13 @@ class LayerNormLSTM(RNN):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.dropout = dropout
+        self.dropout_type = dropout_type
         self.weight_drop = weight_drop
         self.use_weight_drop = weight_drop is not None
-        if self.use_weight_drop:
-            self.lstm = StackedLSTM(num_layers, None, first_layer_args=first_layer_args, other_layer_args=other_layer_args)
-        else:
-            self.lstm = StackedLSTM(num_layers, dropout, first_layer_args=first_layer_args, other_layer_args=other_layer_args)
+        self.lstm = StackedLSTM(
+            device, num_layers, dropout, dropout_type, self.use_weight_drop, hidden_size,
+            first_layer_args=first_layer_args, other_layer_args=other_layer_args
+        )
 
     def forward(self, input, hidden_state):
         """
@@ -59,8 +61,8 @@ class LayerNormLSTM(RNN):
             initial_states.append((hidden, cell))
         return initial_states
 
-    def reset(self):
-        self.lstm.reset()
+    def reset(self, batch_size):
+        self.lstm.reset(batch_size)
 
     def get_output_size(self):
         """
@@ -81,9 +83,12 @@ class LayerNormLSTM(RNN):
     def __str__(self):
         base_args = f'input_size={self.input_size}, hidden_size={self.hidden_size}, num_layers={self.num_layers}'
         if self.use_weight_drop:
-            return f'LayerNormLSTM({base_args}, weight_drop={self.weight_drop})'
+            if self.dropout is not None and self.dropout_type == 'variational':
+                return f'LayerNormLSTM({base_args}, weight_drop={self.weight_drop}, dropout={self.dropout}, dropout_type={self.dropout_type})'
+            else:
+                return f'LayerNormLSTM({base_args}, weight_drop={self.weight_drop})'
         elif self.dropout is not None:
-            return f'LayerNormLSTM({base_args}, dropout={self.dropout})'
+            return f'LayerNormLSTM({base_args}, dropout={self.dropout}, dropout_type={self.dropout_type})'
         else:
             return f'LayerNormLSTM({base_args})'
 
@@ -106,7 +111,7 @@ class LayerNormLSTMCell(jit.ScriptModule):
         self.weight_drop = weight_drop
         if self.use_weight_drop:
             self.weight_hh_raw = Parameter(weight_hh)
-            self.reset()
+            self.reset(1)
         else:
             self.weight_hh = Parameter(weight_hh)
 
@@ -132,7 +137,7 @@ class LayerNormLSTMCell(jit.ScriptModule):
     def set_weights(self):
         self.weight_hh = nn.functional.dropout(self.weight_hh_raw, p=self.weight_drop, training=self.training)
 
-    def reset(self):
+    def reset(self, batch_size):
         if self.use_weight_drop:
             self.set_weights()
 
@@ -152,8 +157,8 @@ class LSTMLayer(jit.ScriptModule):
             outputs += [out]
         return torch.stack(outputs), state
 
-    def reset(self):
-        self.cell.reset()
+    def reset(self, batch_size):
+        self.cell.reset(batch_size)
 
 def init_stacked_lstm(num_layers, first_layer_args, other_layer_args):
     layers = [LSTMLayer(*first_layer_args)] + [LSTMLayer(*other_layer_args) for _ in range(num_layers - 1)]
@@ -163,19 +168,23 @@ class StackedLSTM(jit.ScriptModule):
     # Necessary for dropout support
     __constants__ = ['num_layers']
 
-    def __init__(self, num_layers, dropout, first_layer_args, other_layer_args):
+    def __init__(self, device, num_layers, dropout, dropout_type, use_weight_drop, hidden_size, first_layer_args, other_layer_args):
         super(StackedLSTM, self).__init__()
+        self.device = device
         self.layers = init_stacked_lstm(num_layers, first_layer_args, other_layer_args)
         self.num_layers = num_layers
-
-        if (num_layers == 1 and dropout is not None and dropout > 0):
-            warnings.warn('dropout lstm adds dropout layers after all but last '
-                          'recurrent layer, it expects num_layers greater than '
-                          '1, but got num_layers = 1')
-
         self.use_dropout = dropout is not None
         dropout_p = 0.0 if dropout is None else dropout
         self.dropout_layer = nn.Dropout(dropout_p)
+        self.dropout = dropout
+        self.use_weight_drop = use_weight_drop
+        self.use_variational = self.use_dropout and dropout_type == 'variational'
+        self.use_normal = self.use_dropout and not use_weight_drop and dropout_type == 'normal'
+        self.hidden_size = hidden_size
+        # must declare masks to avoid compile error
+        self.output_masks = [torch.empty((1))]
+        self.hidden_masks = [torch.empty((1))]
+        self.cell_masks = [torch.empty((1))]
 
     @jit.script_method
     def forward(self, input, states):
@@ -187,12 +196,35 @@ class StackedLSTM(jit.ScriptModule):
         for rnn_layer in self.layers:
             state = states[i]
             output, out_state = rnn_layer(output, state)
-            if self.use_dropout and i < self.num_layers - 1:
+            if self.use_normal and i < self.num_layers - 1:
                 output = self.dropout_layer(output)
+            elif self.use_variational and self.training:
+                batch_size = output.size(1)
+                output = output * self.output_masks[i].expand(batch_size, -1)
+                if not self.use_weight_drop:
+                    hidden = out_state[0] * self.hidden_masks[i].expand(batch_size, -1)
+                    cell = out_state[1] * self.cell_masks[i].expand(batch_size, -1)
+                    out_state = hidden, cell
             output_states += [out_state]
             i += 1
         return output, output_states
 
-    def reset(self):
+    def reset(self, batch_size):
         for i in range(self.num_layers):
-            self.layers[i].reset()
+            self.layers[i].reset(batch_size)
+        if self.use_variational and self.training:
+            output_masks = []
+            for _ in range(self.num_layers + 1):
+                output_mask = variational_dropout_mask((1, self.hidden_size), self.dropout, device=self.device)
+                output_masks.append(output_mask)
+            self.output_masks = output_masks
+            if not self.use_weight_drop:
+                hidden_masks = []
+                cell_masks = []
+                for _ in range(self.num_layers + 1):
+                    hidden_mask = variational_dropout_mask((1, self.hidden_size), self.dropout, device=self.device)
+                    cell_mask = variational_dropout_mask((1, self.hidden_size), self.dropout, device=self.device)
+                    hidden_masks.append(hidden_mask)
+                    cell_masks.append(cell_mask)
+                self.hidden_masks = hidden_masks
+                self.cell_masks = cell_masks

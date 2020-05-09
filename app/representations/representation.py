@@ -40,3 +40,9 @@ class Representation(nn.Module):
         :rtype: bool
         """
         raise NotImplementedError('must be implemented by subclass')
+
+    def reset(self, batch_size):
+        """
+        Resets internal state.
+        """
+        raise NotImplementedError('must be implemented by subclass')

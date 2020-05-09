@@ -63,7 +63,7 @@ class RNNG(AbstractRNNG):
         :type batch: app.data.batch.Batch
         :rtype: torch.Tensor, dict
         """
-        self.reset()
+        self.reset(batch.size)
         history = (batch.actions.tensor, batch.actions.lengths)
         action_states, buffer_states = self.initialize_batch_structures(
             batch.tokens.tokens,
@@ -85,8 +85,8 @@ class RNNG(AbstractRNNG):
             actions_tensor = element.actions.tensor[:element.actions.length]
             actions = element.actions.actions
             actions_max_length = element.actions.max_length
-            action_state = action_states[batch_index]
-            buffer_state = buffer_states[batch_index]
+            action_state = None if action_states is None else action_states[batch_index]
+            buffer_state = None if buffer_states is None else buffer_states[batch_index]
             job_args = (
                 action_state, buffer_state,
                 tokens_tensor, tokens, unknownified_tokens_tensor, singletons_tensor, tags_tensor,
@@ -161,7 +161,8 @@ class RNNG(AbstractRNNG):
         :returns: initial state
         :rtype: list of app.models.rnng.state.RNNGState
         """
-        self.reset()
+        batch_size = len(tokens)
+        self.reset(batch_size)
         action_states, buffer_states = self.initialize_batch_structures(
             tokens,
             tokens_tensor,
@@ -179,8 +180,8 @@ class RNNG(AbstractRNNG):
             singletons_tensor_i = singletons_tensor[:length, i].unsqueeze(dim=1)
             tags_tensor_i = tags_tensor[:length, i].unsqueeze(dim=1)
             stack_top = self.initialize_stack()
-            action_state = action_states[i]
-            buffer_state = buffer_states[i]
+            action_state = None if action_states is None else action_states[i]
+            buffer_state = None if buffer_states is None else buffer_states[i]
             state = RNNGState(
                 stack_top, action_state, buffer_state,
                 tokens_tensor_i, tokens[i], unknownified_tokens_tensor_i, singletons_tensor_i, tags_tensor_i, length,
@@ -431,7 +432,7 @@ class RNNG(AbstractRNNG):
                 counter += 1
         return valid_indices, action2index
 
-    def reset(self):
+    def reset(self, batch_size):
         self.action_embedding.reset()
         self.nt_embedding.reset()
         self.nt_compose_embedding.reset()
@@ -441,9 +442,10 @@ class RNNG(AbstractRNNG):
             if self.pretrained is not None:
                 self.pretrained.reset()
         if self.uses_stack:
-            self.stack.reset()
+            self.stack.reset(batch_size)
         if self.uses_buffer:
-            self.token_buffer.reset()
+            self.token_buffer.reset(batch_size)
         if self.uses_history:
-            self.action_history.reset()
-        self.composer.reset()
+            self.action_history.reset(batch_size)
+        self.composer.reset(batch_size)
+        self.representation.reset(batch_size)

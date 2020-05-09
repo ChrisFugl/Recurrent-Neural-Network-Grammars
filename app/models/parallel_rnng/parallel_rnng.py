@@ -51,7 +51,7 @@ class ParallelRNNG(AbstractRNNG):
         :type batch: app.data.batch.Batch
         :rtype: torch.Tensor, dict
         """
-        self.reset()
+        self.reset(batch.size)
         states, stack_size = self.preprocess_batch(batch)
         self.initialize_structures(
             batch.tokens.tokens,
@@ -105,8 +105,8 @@ class ParallelRNNG(AbstractRNNG):
         :type lengths: torch.Tensor
         :rtype: app.models.parallel_rnng.state.State
         """
-        self.reset()
         batch_size = lengths.size(0)
+        self.reset(batch_size)
         # plus one to account for start embeddings
         self.initialize_structures(
             tokens, tokens_tensor, unknownified_tokens_tensor,
@@ -346,7 +346,7 @@ class ParallelRNNG(AbstractRNNG):
             stack_op[non_pad_indices] = 1
             self.stack.hold_or_push(stack_input, stack_op)
 
-    def reset(self):
+    def reset(self, batch_size):
         self.action_embedding.reset()
         self.nt_embedding.reset()
         self.nt_compose_embedding.reset()
@@ -356,9 +356,10 @@ class ParallelRNNG(AbstractRNNG):
             if self.pretrained is not None:
                 self.pretrained.reset()
         if self.uses_buffer:
-            self.token_buffer.reset()
+            self.token_buffer.reset(batch_size)
         if self.uses_history:
-            self.action_history.reset()
+            self.action_history.reset(batch_size)
         if self.uses_stack:
-            self.stack.reset()
-        self.composer.reset()
+            self.stack.reset(batch_size)
+        self.composer.reset(batch_size)
+        self.representation.reset(batch_size)

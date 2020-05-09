@@ -19,8 +19,8 @@ class Encoder(nn.Module):
         output, encoder_state = self.rnn(tokens_reversed, initial_state)
         return output, encoder_state
 
-    def reset(self):
-        self.rnn.reset()
+    def reset(self, batch_size):
+        self.rnn.reset(batch_size)
 
     def __str__(self):
         return f'Encoder(rnn={self.rnn})'

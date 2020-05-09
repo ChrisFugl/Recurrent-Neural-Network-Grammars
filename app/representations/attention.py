@@ -1,3 +1,4 @@
+from app.dropout.variational import variational_dropout_mask
 from app.utils import batched_index_select
 from math import sqrt
 import torch
@@ -7,17 +8,26 @@ MASKED_SCORE_VALUE = - 1e10
 
 class Attention(nn.Module):
 
-    def __init__(self, embedding_size):
+    def __init__(self, device, embedding_size, dropout, dropout_type):
         """
+        :type device: torch.device
         :type embedding_size: int
         """
         super().__init__()
+        self.device = device
         self.normalizer = sqrt(embedding_size)
         self.query = nn.Linear(in_features=embedding_size, out_features=embedding_size, bias=True)
         self.key = nn.Linear(in_features=embedding_size, out_features=embedding_size, bias=True)
         self.value = nn.Linear(in_features=embedding_size, out_features=embedding_size, bias=True)
         self.embedding = nn.Linear(in_features=embedding_size, out_features=embedding_size, bias=True)
         self.softmax = nn.Softmax(dim=1)
+        self.activation = nn.ReLU()
+        self.dropout = dropout
+        dropout_p = 0.0 if dropout is None else dropout
+        self.dropout_layer = nn.Dropout(p=dropout_p)
+        self.use_normal_dropout = dropout is not None and dropout_type == 'normal'
+        self.use_variational_dropout = dropout is not None and dropout_type == 'variational'
+        self.embedding_size = embedding_size
 
     def forward(self, inputs, lengths):
         """
@@ -41,4 +51,13 @@ class Attention(nn.Module):
         value_weighted = torch.bmm(attention_weights_unsqueezed, value) # batch_size, 1, hidden_size
         embedding = self.embedding(value_weighted)
         output = embedding.transpose(0, 1) # length first
+        output = self.activation(output)
+        if self.use_normal_dropout:
+            output = self.dropout_layer(output)
+        elif self.use_variational_dropout and self.training:
+            output = output * self.dropout_mask.expand(1, batch_size, -1)
         return output, attention_weights
+
+    def reset(self):
+        if self.use_variational_dropout and self.training:
+            self.dropout_mask = variational_dropout_mask((1, 1, self.embedding_size), self.dropout, device=self.device)

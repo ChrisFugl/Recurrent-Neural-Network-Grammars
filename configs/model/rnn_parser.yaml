@@ -17,6 +17,7 @@ model:
     rnn: 256
     pos: 16
     token: 128
+  dropout_type: normal
   action_emb_drop: null
   pos_emb_drop: null
   token_emb_drop: null
