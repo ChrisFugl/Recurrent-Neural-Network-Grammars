@@ -1,4 +1,4 @@
-from app.constants import ACTION_SHIFT_TYPE, ACTION_REDUCE_TYPE, ACTION_NON_TERMINAL_TYPE
+from app.constants import ACTION_SHIFT_TYPE, ACTION_REDUCE_TYPE, ACTION_NON_TERMINAL_TYPE, ACTION_GENERATE_TYPE
 from app.data.actions.non_terminal import NonTerminalAction
 import matplotlib.pyplot as plt
 import numpy as np
@@ -125,6 +125,9 @@ def visualize_stack_attention(batch, attention_weights):
         elif type == ACTION_SHIFT_TYPE:
             tree_string = batch.tokens.tokens[0][shift_index]
             shift_index += 1
+            stack.append((action, (i, i + 1)))
+        elif type == ACTION_GENERATE_TYPE:
+            tree_string = action.argument
             stack.append((action, (i, i + 1)))
         elif type == ACTION_REDUCE_TYPE:
             tree_string = ')'
