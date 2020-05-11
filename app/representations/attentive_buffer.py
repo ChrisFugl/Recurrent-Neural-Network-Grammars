@@ -41,9 +41,9 @@ class AttentiveBufferRepresentation(Representation):
         :type buf_lengths: torch.Tensor
         :rtype: torch.Tensor, dict
         """
-        buf_embedding, buf_weights = self.buffer(buf, buf_lengths)
-        his_embedding = batched_index_select(his, his_lengths - 1)
         stack_embedding = batched_index_select(stack, stack_lengths - 1)
+        buf_embedding, buf_weights = self.buffer(buf, buf_lengths, query=stack_embedding)
+        his_embedding = batched_index_select(his, his_lengths - 1)
         if self.use_normal_dropout:
             his_embedding = self.dropout(his_embedding)
             stack_embedding = self.dropout(stack_embedding)

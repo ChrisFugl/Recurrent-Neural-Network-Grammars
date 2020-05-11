@@ -29,14 +29,18 @@ class Attention(nn.Module):
         self.use_variational_dropout = dropout is not None and dropout_type == 'variational'
         self.embedding_size = embedding_size
 
-    def forward(self, inputs, lengths):
+    def forward(self, inputs, lengths, query=None):
         """
         :type inputs: torch.Tensor
         :type lengths: torch.Tensor
+        :type query: torch.Tensor
         :rtype: torch.Tensor, torch.Tensor
         """
         max_length, batch_size, hidden_size = inputs.shape
-        query_inputs = batched_index_select(inputs, lengths - 1) # 1, batch_size, hidden_size
+        if query is None:
+            query_inputs = batched_index_select(inputs, lengths - 1) # 1, batch_size, hidden_size
+        else:
+            query_inputs = query
         query = self.query(query_inputs).transpose(0, 1) # batch first
         key = self.key(inputs).transpose(0, 1) # batch first
         value = self.value(inputs).transpose(0, 1) # batch first
