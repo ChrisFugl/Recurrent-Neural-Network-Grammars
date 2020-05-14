@@ -69,6 +69,7 @@ class ParallelRNNG(AbstractRNNG):
         history_attention_weights = []
         buffer_attention_weights = []
         stack_attention_weights = []
+        weighted_attention_weights = []
         for sequence_index in range(batch.max_actions_length):
             state = states[sequence_index]
             representation, representation_info = self.get_representation()
@@ -78,6 +79,8 @@ class ParallelRNNG(AbstractRNNG):
                 buffer_attention_weights.append(representation_info['buffer'].detach().cpu())
             if 'stack' in representation_info:
                 stack_attention_weights.append(representation_info['stack'].detach().cpu())
+            if 'weighted' in representation_info:
+                weighted_attention_weights.append(representation_info['weighted'].detach().cpu())
             output_log_probs[sequence_index] = self.get_log_probs(representation)
             self.do_actions(batch.size, state)
             if self.uses_history:
@@ -91,6 +94,8 @@ class ParallelRNNG(AbstractRNNG):
             info['buffer'] = buffer_attention_weights
         if len(stack_attention_weights) != 0:
             info['stack'] = stack_attention_weights
+        if len(weighted_attention_weights) != 0:
+            info['weighted'] = weighted_attention_weights
         return output_log_probs, info
 
     def initial_state(self, tokens, tokens_tensor, unknownified_tokens_tensor, singletons_tensor, tags_tensor, lengths):

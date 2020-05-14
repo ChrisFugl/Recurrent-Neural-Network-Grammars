@@ -30,5 +30,8 @@ def get_representation(device, rnn_input_size, rnn_hidden_size, dropout_type, co
     elif config.type == 'vanilla':
         from app.representations.vanilla import VanillaRepresentation
         return VanillaRepresentation(device, rnn_hidden_size, rnn_input_size, dropout_type, config.dropout)
+    elif config.type == 'weighted':
+        from app.representations.weighted import WeightedRepresentation
+        return WeightedRepresentation(device, rnn_hidden_size, rnn_input_size, dropout_type, config.dropout)
     else:
         raise Exception(f'Unknown representation: {config.type}')

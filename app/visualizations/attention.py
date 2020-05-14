@@ -104,6 +104,35 @@ def visualize_history_attention(batch, attention_weights):
     plt.imshow(weights_np, cmap='Greys', aspect='equal', vmin=0, vmax=1)
     return fig
 
+def visualize_stack_buffer_attention(batch, attention_weights):
+    """
+    :type batch: app.data.batch.Batch
+    :type attention_weights: list of torch.Tensor
+    """
+    n_actions = batch.actions.lengths[0].cpu().item()
+    attention_weights = [weights[0] for weights in attention_weights[:n_actions]]
+    weights = torch.stack(attention_weights, dim=0)
+    weights_np = weights.detach().cpu().numpy().transpose()
+    fig = plt.figure()
+    ax = plt.gca()
+    ylabels = ['S', 'B']
+    n_structures = len(ylabels)
+    yticks = np.arange(0, n_structures, 1)
+    yticks_minor = np.arange(-0.5, n_structures + 1.5, 1)
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(ylabels, fontsize=8)
+    plt.xticks(rotation=90)
+    xlabels = list(map(str, batch.actions.actions[0]))
+    xticks = list(np.arange(0, n_actions, 1))
+    xticks_minor = np.arange(-0.5, n_actions + 0.5, 1)
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xlabels, fontsize=8)
+    ax.set_yticks(yticks_minor, minor=True)
+    ax.set_xticks(xticks_minor, minor=True)
+    ax.grid(which='minor', color='#dadada', linestyle='-', linewidth=1)
+    plt.imshow(weights_np, cmap='Greys', aspect='equal', vmin=0, vmax=1)
+    return fig
+
 def visualize_stack_attention(batch, attention_weights):
     """
     :type batch: app.data.batch.Batch

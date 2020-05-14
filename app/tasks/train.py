@@ -6,7 +6,8 @@ from app.visualizations.attention import (
     visualize_buffer_attention,
     visualize_history_attention,
     visualize_rnn_parser_attention,
-    visualize_stack_attention
+    visualize_stack_attention,
+    visualize_stack_buffer_attention,
 )
 from app.visualizations.gradients import visualize_gradients
 from app.visualizations.trees import visualize_tree
@@ -328,6 +329,9 @@ class TrainTask(Task):
         if 'stack' in info:
             stack_attention = visualize_stack_attention(batch, info['stack'])
             self.writer.add_figure('attention/stack', stack_attention, sequence_count)
+        if 'weighted' in info:
+            stack_buffer_attention = visualize_stack_buffer_attention(batch, info['weighted'])
+            self.writer.add_figure('attention/stack_buffer', stack_buffer_attention, sequence_count)
 
     @torch.no_grad()
     def sample(self):
