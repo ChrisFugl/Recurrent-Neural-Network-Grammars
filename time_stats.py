@@ -13,7 +13,6 @@ import hydra
 def main(config):
     loader = get_loader(config.loader)
     _, actions_train, tokens_train, unknownified_tokens_train, tags_train = loader.load_train()
-    _, actions_val, tokens_val, unknownified_tokens_val, tags_val = loader.load_val()
     generative = is_generative(config.type)
     device = get_device(config.gpu)
     token_converter = TokenConverter(tokens_train, unknownified_tokens_train)
@@ -22,7 +21,7 @@ def main(config):
     non_terminal_converter = NonTerminalConverter(actions_train)
     iterator_converters = (action_converter, token_converter, tag_converter)
     model_converters = (action_converter, token_converter, tag_converter, non_terminal_converter)
-    iterator = get_iterator(device, *iterator_converters, unknownified_tokens_val, unknownified_tokens_val, actions_val, tags_val, config.iterator)
+    iterator = get_iterator(device, *iterator_converters, unknownified_tokens_train, unknownified_tokens_train, actions_train, tags_train, config.iterator)
     model = get_model(device, generative, *model_converters, config.model)
     task = TimeStatsTask(device, model, iterator)
     task.run()
