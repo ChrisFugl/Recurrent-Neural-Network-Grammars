@@ -55,15 +55,22 @@ class GenerativeEvaluator(Evaluator):
         likelihoods = []
         perplexities = []
         for _, tokens_likelihood, tokens_length in evaluations:
-            tokens_log_likelihood = log(tokens_likelihood)
-            perplexity = exp(- tokens_log_likelihood / tokens_length)
-            likelihoods.append(tokens_likelihood)
-            perplexities.append(perplexity)
-        likelihood = sum(likelihoods) / len(likelihoods)
-        perplexity = sum(perplexities) / len(perplexities)
+            try:
+                tokens_log_likelihood = log(tokens_likelihood)
+                perplexity = exp(- tokens_log_likelihood / tokens_length)
+                likelihoods.append(tokens_likelihood)
+                perplexities.append(perplexity)
+            except ValueError:
+                pass
+        if len(likelihoods) == 0 or len(perplexities) == 0:
+            likelihood = 'NaN'
+            perplexity = 'NaN'
+        else:
+            likelihood = f'{sum(likelihoods) / len(likelihoods):0.8f}'
+            perplexity = f'{sum(perplexities) / len(perplexities):0.8f}'
         return [
-            ('Sentence mean likelihood', f'{likelihood:0.8f}'),
-            ('Sentence mean perplexity', f'{perplexity:0.8f}'),
+            ('Sentence mean likelihood', likelihood),
+            ('Sentence mean perplexity', perplexity),
         ]
 
     def predictions2actions(self, tokens, predictions):

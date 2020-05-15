@@ -5,11 +5,14 @@ from app.tasks.task import Task
 from app.data.converters.utils import action_string_dis2gen
 import logging
 from math import exp
+import numpy as np
 import os
+import pandas as pd
 import time
 import torch
 
 EVALB_FILENAME = 'evalb.txt'
+LENGTH_FILENAME = 'scores_by_length.csv'
 
 class EvaluateTask(Task):
 
@@ -50,6 +53,7 @@ class EvaluateTask(Task):
 
     def evaluate(self):
         tokens, tags, gold_actions, gold_log_likelihoods, predicted_actions, evaluations = self.load_samples()
+        self.evaluate_by_sentence_length(tokens, tags, gold_actions, predicted_actions)
         predicted_log_likelihoods = self.evaluator.get_predicted_log_likelihoods(evaluations)
         scores, evalb_output, gold_path, predicted_path = scores_from_samples(tokens, tags, gold_actions, predicted_actions)
         self.logger.info(f'Saved gold trees at {gold_path}')
@@ -67,6 +71,37 @@ class EvaluateTask(Task):
         with open(path, 'w') as file:
             file.write(evalb_output)
         self.logger.info(f'Saved evalb output to {path}')
+
+    def evaluate_by_sentence_length(self, tokens, tags, gold_actions, predicted_actions):
+        lengths = list(set(map(len, tokens)))
+        lengths.sort()
+        n_features = 4
+        data = np.ndarray((len(lengths), n_features))
+        for i, length in enumerate(lengths):
+            group = self.group_by_length(tokens, tags, gold_actions, predicted_actions, length)
+            tokens_group, tags_group, gold_actions_group, predicted_actions_group = group
+            scores, _, _, _ = scores_from_samples(tokens_group, tags_group, gold_actions_group, predicted_actions_group)
+            data[i] = (length, *scores)
+        columns = ['length', 'f1', 'precision', 'recall']
+        dtype = {'length': int, 'f1': float, 'precision': float, 'recall': float}
+        dataframe = pd.DataFrame(data, columns=columns)
+        dataframe = dataframe.astype(dtype)
+        path = self.get_path(LENGTH_FILENAME)
+        dataframe.to_csv(path, index=False)
+        self.logger.info(f'Saved evaluation scores by sentence length at {path}')
+
+    def group_by_length(self, tokens, tags, gold_actions, predicted_actions, length):
+        tokens_group = []
+        tags_group = []
+        gold_actions_group = []
+        predicted_actions_group = []
+        for i in range(len(tokens)):
+            if len(tokens[i]) == length:
+                tokens_group.append(tokens[i])
+                tags_group.append(tags[i])
+                gold_actions_group.append(gold_actions[i])
+                predicted_actions_group.append(predicted_actions[i])
+        return tokens_group, tags_group, gold_actions_group, predicted_actions_group
 
     def get_path(self, filename):
         working_dir = os.getcwd()
