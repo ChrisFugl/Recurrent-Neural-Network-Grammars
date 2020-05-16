@@ -52,24 +52,17 @@ class GenerativeEvaluator(Evaluator):
         """
         :rtype: list of (str, str)
         """
-        likelihoods = []
-        perplexities = []
+        log_likelihood = 0
+        n_tokens = 0
         for _, tokens_likelihood, tokens_length in evaluations:
             try:
                 tokens_log_likelihood = log(tokens_likelihood)
-                perplexity = exp(- tokens_log_likelihood / tokens_length)
-                likelihoods.append(tokens_likelihood)
-                perplexities.append(perplexity)
+                log_likelihood += tokens_log_likelihood
+                n_tokens += tokens_length
             except ValueError:
                 pass
-        if len(likelihoods) == 0 or len(perplexities) == 0:
-            likelihood = 'NaN'
-            perplexity = 'NaN'
-        else:
-            likelihood = f'{sum(likelihoods) / len(likelihoods):0.8f}'
-            perplexity = f'{sum(perplexities) / len(perplexities):0.8f}'
+        perplexity = f'{exp(- log_likelihood / n_tokens):0.8f}'
         return [
-            ('Sentence mean likelihood', likelihood),
             ('Sentence mean perplexity', perplexity),
         ]
 

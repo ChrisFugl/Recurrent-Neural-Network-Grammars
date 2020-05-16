@@ -138,20 +138,19 @@ class EvaluateTask(Task):
         :type log_likelihoods: list of float
         """
         likelihoods = []
-        perplexities = []
+        n_actions = 0
         for i, log_likelihood in enumerate(log_likelihoods):
             try:
-                perplexity = exp(- log_likelihood / len(actions[i]))
+                n_actions += len(actions[i])
                 likelihoods.append(exp(log_likelihood))
-                perplexities.append(perplexity)
             except Exception:
-                self.logger.warning(f'Failed to compute likelihood/perplexity of "{name}" tree at index {i}')
+                self.logger.warning(f'Failed to compute likelihood of "{name}" tree at index {i}')
         log_likelihood = sum(log_likelihoods) / len(log_likelihoods)
         likelihood = sum(likelihoods) / len(likelihoods)
-        perplexity = sum(perplexities) / len(perplexities)
+        perplexity = exp(- sum(log_likelihoods) / n_actions)
         self.logger.info(f'{name} mean log likelihood = {log_likelihood:0.8f}')
         self.logger.info(f'{name} mean likelihood     = {likelihood:0.8f}')
-        self.logger.info(f'{name} mean perplexity     = {perplexity:0.8f}')
+        self.logger.info(f'{name} perplexity     = {perplexity:0.8f}')
 
     def string2action(self, tokens, actions):
         if self.generative:

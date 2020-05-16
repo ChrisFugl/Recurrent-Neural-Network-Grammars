@@ -237,8 +237,7 @@ class TrainTask(Task):
         self.model.train()
         # save model with best performing score
         if is_new_best_score:
-            if best_score is not None:
-                self.save()
+            self.save()
             return score
         else:
             return best_score
