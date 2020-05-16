@@ -2,7 +2,7 @@ from app.data.batch import Batch
 from app.data.batch_utils import sequences2tensor, sequences2lengths
 from app.data.converters.utils import action_string_dis2gen
 from app.tasks.evaluate.evaluator import Evaluator
-from math import exp, log
+from math import ceil, exp, log
 from operator import itemgetter
 import torch
 
@@ -11,7 +11,7 @@ class GenerativeEvaluator(Evaluator):
     Importance sampling.
     """
 
-    def __init__(self, device, model, action_converter, token_converter, tag_converter, non_terminal_converter):
+    def __init__(self, device, model, action_converter, token_converter, tag_converter, non_terminal_converter, max_batch_size=None):
         """
         :type device: torch.device
         :type model: app.models.model.Model
@@ -19,10 +19,13 @@ class GenerativeEvaluator(Evaluator):
         :type token_converter: app.data.converters.token.TokenConverter
         :type tag_converter: app.data.converters.tag.TagConverter
         :type non_terminal_converter: app.data.converters.non_terminal.NonTerminalConverter
+        :type max_batch_size: int
         """
         super().__init__(model, action_converter, token_converter, tag_converter, non_terminal_converter)
         self.device = device
+        self.max_batch_size = max_batch_size
 
+    @torch.no_grad()
     def evaluate_predictions(self, tokens, unknownified_tokens, tags, predictions):
         """
         :type tokens: list of str
@@ -33,8 +36,8 @@ class GenerativeEvaluator(Evaluator):
         """
         self.model.eval()
         actions = self.predictions2actions(unknownified_tokens, predictions)
-        batch = self.create_batch(tokens, unknownified_tokens, tags, actions)
-        generative_log_likelihoods = self.evaluate_batch(batch)
+        batches = self.create_batches(tokens, unknownified_tokens, tags, actions)
+        generative_log_likelihoods = self.evaluate_batches(batches)
         discriminative_log_likelihoods = self.predictions2log_likelihoods(predictions)
         best_prediction, best_log_likelihood = self.get_best_prediction(unknownified_tokens, predictions, generative_log_likelihoods)
         weights = [exp(g_log_lik - d_log_lik) for g_log_lik, d_log_lik in zip(generative_log_likelihoods, discriminative_log_likelihoods)]
@@ -79,12 +82,34 @@ class GenerativeEvaluator(Evaluator):
             batch_actions.append(actions)
         return batch_actions
 
+    def create_batches(self, tokens, unknownified_tokens, tags, actions):
+        """
+        :type tokens: list of str
+        :type unknownified_tokens: list of str
+        :type tags: list of tags
+        :type actions: list of list of app.data.actions.action.Action
+        :rtype: list of app.data.batch.batch
+        """
+        if self.max_batch_size is None:
+            batch = self.create_batch(tokens, unknownified_tokens, tags, actions)
+            return [batch]
+        batches = []
+        n_elements = len(actions)
+        n_batches = ceil(n_elements / self.max_batch_size)
+        for i in range(n_batches):
+            start = self.max_batch_size * i
+            end = min(n_elements, self.max_batch_size * (i + 1))
+            batch = self.create_batch(tokens, unknownified_tokens, tags, actions[start:end])
+            batches.append(batch)
+        return batches
+
     def create_batch(self, tokens, unknownified_tokens, tags, actions):
         """
         :type tokens: list of str
         :type unknownified_tokens: list of str
         :type tags: list of tags
         :type actions: list of list of app.data.actions.action.Action
+        :rtype: app.data.batch.batch
         """
         batch_size = len(actions)
         actions_tensor = sequences2tensor(self.device, self.action_converter.action2integer, actions)
@@ -120,16 +145,20 @@ class GenerativeEvaluator(Evaluator):
         tensor = torch.tensor(integers, device=self.device, dtype=torch.long)
         return tensor
 
-    def evaluate_batch(self, batch):
+    def evaluate_batches(self, batches):
         """
-        :type batch: app.data.batch.Batch
+        :type batch: list of app.data.batch.Batch
         :rtype: list of float
         """
-        batch_log_probs, _ = self.model.batch_log_likelihood(batch)
-        indices = batch.actions.tensor.unsqueeze(dim=2)
-        selected_log_probs = torch.gather(batch_log_probs, 2, indices).view(batch.max_actions_length, batch.size)
-        selected_log_probs = [selected_log_probs[:length, i] for i, length in enumerate(batch.actions.lengths)]
-        log_likelihoods = [self.log_likelihood(log_probs) for log_probs in selected_log_probs]
+        log_likelihoods = []
+        for batch in batches:
+            batch_log_probs, _ = self.model.batch_log_likelihood(batch)
+            indices = batch.actions.tensor.unsqueeze(dim=2)
+            selected_log_probs = torch.gather(batch_log_probs, 2, indices).view(batch.max_actions_length, batch.size)
+            selected_log_probs = [selected_log_probs[:length, i] for i, length in enumerate(batch.actions.lengths)]
+            for log_probs in selected_log_probs:
+                log_likelihood = self.log_likelihood(log_probs)
+                log_likelihoods.append(log_likelihood)
         return log_likelihoods
 
     def log_likelihood(self, log_probs):

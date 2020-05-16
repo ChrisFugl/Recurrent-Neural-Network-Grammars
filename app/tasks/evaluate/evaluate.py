@@ -16,7 +16,7 @@ LENGTH_FILENAME = 'scores_by_length.csv'
 
 class EvaluateTask(Task):
 
-    def __init__(self, device, model, generative, action_converter, token_converter, tag_converter, non_terminal_converter, samples):
+    def __init__(self, device, model, generative, action_converter, token_converter, tag_converter, non_terminal_converter, samples, max_batch_size):
         """
         :type device: torch.device
         :type model: app.models.model.Model
@@ -26,6 +26,7 @@ class EvaluateTask(Task):
         :type tag_converter: app.data.converters.tag.TagConverter
         :type non_terminal_converter: app.data.converters.non_terminal.NonTerminalConverter
         :type samples: object
+        :type max_batch_size: int
         """
         super().__init__()
         self.logger = logging.getLogger('evaluate')
@@ -34,8 +35,9 @@ class EvaluateTask(Task):
         self.samples = samples
         self.action_converter = action_converter
         self.model = model
+        self.max_batch_size = max_batch_size
         if generative:
-            self.evaluator = GenerativeEvaluator(device, model, action_converter, token_converter, tag_converter, non_terminal_converter)
+            self.evaluator = GenerativeEvaluator(device, model, action_converter, token_converter, tag_converter, non_terminal_converter, max_batch_size)
         else:
             self.evaluator = DiscriminativeEvaluator(model, action_converter, token_converter, tag_converter, non_terminal_converter)
 
@@ -45,6 +47,8 @@ class EvaluateTask(Task):
         self.logger.info('Starting evaluation')
         self.logger.info(f'Saving output to {os.getcwd()}')
         self.logger.info(f'Using device: {self.device}')
+        if self.max_batch_size is not None:
+            self.logger.info(f'Max. batch size: {self.max_batch_size}')
         self.logger.info(f'Model:\n{self.model}')
         self.evaluate()
         time_stop = time.time()

@@ -14,7 +14,7 @@ def _main(config):
     samples_path = hydra.utils.to_absolute_path(config.samples)
     with open(samples_path, 'r') as file:
         samples = json.load(file)
-    task = EvaluateTask(device, model, generative, action_converter, token_converter, tag_converter, non_terminal_converter, samples)
+    task = EvaluateTask(device, model, generative, action_converter, token_converter, tag_converter, non_terminal_converter, samples, config.max_batch_size)
     task.run()
 
 if __name__ == '__main__':

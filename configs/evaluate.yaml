@@ -1,5 +1,6 @@
 gpu: null
 seed: null
+max_batch_size: null
 model_dir: null
 samples: null
 name: tmp
