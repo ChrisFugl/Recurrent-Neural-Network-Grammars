@@ -1,9 +1,8 @@
+from app.utils import batched_index_select
 from app.representations.attention import Attention
 from app.representations.representation import Representation
 import torch
 from torch import nn
-
-MASKED_SCORE_VALUE = - 1e10
 
 class AttentiveRepresentation(Representation):
 
@@ -37,9 +36,10 @@ class AttentiveRepresentation(Representation):
         :type buf_lengths: torch.Tensor
         :rtype: torch.Tensor, dict
         """
+        stack_query = batched_index_select(stack, stack_lengths - 1)
         his_embedding, his_weights = self.history(his, his_lengths)
         stack_embedding, stack_weights = self.stack(stack, stack_lengths)
-        buf_embedding, buf_weights = self.buffer(buf, buf_lengths)
+        buf_embedding, buf_weights = self.buffer(buf, buf_lengths, query=stack_query)
         embeddings = [his_embedding, stack_embedding, buf_embedding]
         # concatenate along last dimension, as inputs have shape S, B, H (sequence length, batch size, hidden size)
         output = torch.cat(embeddings, dim=2)

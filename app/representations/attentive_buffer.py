@@ -5,8 +5,6 @@ from app.utils import batched_index_select
 import torch
 from torch import nn
 
-MASKED_SCORE_VALUE = - 1e10
-
 class AttentiveBufferRepresentation(Representation):
 
     def __init__(self, device, embedding_size, representation_size, dropout_type, dropout):
