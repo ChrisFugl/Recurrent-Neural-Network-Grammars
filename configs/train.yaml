@@ -12,6 +12,7 @@ defaults:
 name: tmp
 log_train_every: 1
 load_checkpoint: null
+max_grad_norm: null
 gpu: null
 seed: null
 hydra:

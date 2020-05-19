@@ -65,6 +65,7 @@ def _main(config):
         tag_converter.count() - TAG_EMBEDDING_OFFSET,
         non_terminal_converter.count() - NON_TERMINAL_EMBEDDING_OFFSET,
         action_converter.count() - ACTION_EMBEDDING_OFFSET,
+        config.max_grad_norm
     )
     task.run()
 

@@ -31,7 +31,8 @@ class TrainTask(Task):
         iterator_train, iterator_val,
         model, loss, optimizer, learning_rate_scheduler,
         stopping_criterion, checkpoint, evaluator, sampler,
-        log_train_every, load_checkpoint, token_count, tag_count, non_terminal_count, action_count
+        log_train_every, load_checkpoint, token_count, tag_count, non_terminal_count, action_count,
+        max_grad_norm,
     ):
         """
         :type device: torch.device
@@ -51,6 +52,7 @@ class TrainTask(Task):
         :type tag_count: int
         :type non_terminal_count: int
         :type action_count: int
+        :type max_grad_norm: int
         """
         super().__init__()
         self.device = device
@@ -69,6 +71,7 @@ class TrainTask(Task):
         self.tag_count = tag_count
         self.non_terminal_count = non_terminal_count
         self.action_count = action_count
+        self.max_grad_norm = max_grad_norm
         working_directory = os.getcwd()
         tensorboard_directory = os.path.join(working_directory, 'tb')
         self.writer = SummaryWriter(log_dir=tensorboard_directory)
@@ -92,6 +95,8 @@ class TrainTask(Task):
         self.logger.info(f'Non-terminals: {self.non_terminal_count:,}')
         self.logger.info(f'Actions: {self.action_count:,}')
         self.logger.info(f'Parameters: {self.count_parameters():,}')
+        if self.max_grad_norm is not None:
+            self.logger.info(f'Max. gradient norm: {self.max_grad_norm}')
         self.logger.info(f'Model:\n{self.model}')
         batch_count = self.start_batch_count
         sequence_count = self.start_sequence_count
@@ -180,6 +185,8 @@ class TrainTask(Task):
     def optimize(self, loss):
         self.optimizer.zero_grad()
         loss.backward()
+        if self.max_grad_norm is not None:
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
         self.optimizer.step()
 
     def evaluate(self, epoch, batch_count, sequence_count, best_score):
