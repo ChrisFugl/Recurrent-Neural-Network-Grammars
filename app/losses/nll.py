@@ -1,8 +1,7 @@
 from app.losses.loss import Loss
 import torch
-from torch import nn
 
-class NegativeLogLikelihoodLoss(Loss):
+class NLLLoss(Loss):
 
     def __init__(self, device):
         """
@@ -10,7 +9,6 @@ class NegativeLogLikelihoodLoss(Loss):
         """
         super().__init__()
         self.device = device
-        self.loss = nn.NLLLoss()
 
     def forward(self, predictions, groundtruths, lengths):
         """
@@ -21,15 +19,15 @@ class NegativeLogLikelihoodLoss(Loss):
         :type lengths: torch.Tensor
         :rtype: torch.Tensor
         """
-        _, _, action_count = predictions.shape
+        max_length, batch_size, action_count = predictions.shape
         mask = torch.zeros(groundtruths.shape, device=self.device, dtype=torch.bool)
         for index, length in enumerate(lengths):
             mask[:length, index] = 1
-        mask_flattened = mask.view(-1)
-        mask_expanded = mask_flattened.unsqueeze(dim=1)
-        mask_expanded = mask_expanded.expand(len(mask_flattened), action_count)
-        groundtruths_flattened = groundtruths.view(-1)
-        groundtruths_masked = groundtruths_flattened.masked_select(mask_flattened)
-        predictions_flattened = predictions.view(-1, action_count)
-        predictions_masked = predictions_flattened.masked_select(mask_expanded).view(-1, action_count)
-        return self.loss(predictions_masked, groundtruths_masked)
+
+        indices = groundtruths.unsqueeze(dim=2)
+        log_probs = torch.gather(predictions, 2, indices).view(max_length, batch_size)
+        masked_log_probs = log_probs * mask
+
+        log_likelihoods = masked_log_probs.sum(dim=0)
+        loss = - log_likelihoods.mean()
+        return loss

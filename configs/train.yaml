@@ -3,7 +3,7 @@ defaults:
   - model: ${defaults.0.type}.parallel_rnng
   - iterator: ordered
   - loader: wsj.${defaults.0.type}.oracle
-  - loss: negative_log_likelihood
+  - loss: nll
   - optimizer: adam
   - lr_scheduler: constant
   - stopping_criterion: manual
@@ -12,7 +12,7 @@ defaults:
 name: tmp
 log_train_every: 1
 load_checkpoint: null
-max_grad_norm: null
+max_grad_norm: 5.0
 gpu: null
 seed: null
 hydra:
