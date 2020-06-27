@@ -1,7 +1,5 @@
-# Parallel Recurrent Neural Network Grammars
-This repository contains the code associated with the paper: Parallel Recurrent Neural Network Grammars. This includes a PyTorch implementation of Recurrent Neural Network Grammars.
-
-[TOC]
+# Recurrent Neural Network Grammars
+This repository contains the code associated with the master's thesis: Efficient and Interpretable Recurrent Neural Network Grammars. This includes a PyTorch implementation of Recurrent Neural Network Grammars.
 
 ## Requirements
 This work has only been tested on the following dependencies:
@@ -11,7 +9,7 @@ This work has only been tested on the following dependencies:
 * [Graphviz](http://graphviz.org/) v2.44.0 (for visualising trees)
 
 ## Installation
-The project can be installed by running the following script from the root of the project. This assumes that you use a UNIX-based system and have already installed the requirements. 
+The project can be installed by running the following script from the root of the project. This assumes that you use a UNIX-based system and have already installed the requirements.
 
 ``` sh
 sh install.sh
@@ -45,7 +43,7 @@ Note that you will have to call `create_oracle.py` and `clustering.py` on the ou
 
 ### Training
 
-Models can be trained using `train.py`. The following command can be used to train a Discriminative Parallel RNNG on the Wall Street Journal (WSJ) sections of the Penn English Treebank (PET), assuming that the data is located in `data/pet/wsj/discriminative/train.oracle`, and the word vectors are located in `data/pet/wsj/sskip.100.vectors`. 
+Models can be trained using `train.py`. The following command can be used to train a Discriminative Parallel RNNG on the Wall Street Journal (WSJ) sections of the Penn English Treebank (PET), assuming that the data is located in `data/pet/wsj/discriminative/train.oracle`, and the word vectors are located in `data/pet/wsj/sskip.100.vectors`.
 
 ``` sh
 python train.py type=dis loader=wsj.dis.oracle model=dis.parallel_rnng name=wsj/dis/parallel_rnng
@@ -81,7 +79,7 @@ The samples will be saved to `outputs/sample/<experiment name>/samples.json`. Re
 
 ### Evaluation
 
-Evaluation is measured in F1 score for discriminative models, and also in word-level perplexity for generative models. The evaluation script automatically detects whether the model is discriminative or generative. 
+Evaluation is measured in F1 score for discriminative models, and also in word-level perplexity for generative models. The evaluation script automatically detects whether the model is discriminative or generative.
 
 ``` sh
 python evaluate.py samples=<path to samples.json> model_dir=outputs/train/wsj/dis/parallel_rnng gpu=0 name=<experiment name>
